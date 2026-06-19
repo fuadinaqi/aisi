@@ -13,6 +13,7 @@ import { ListGroup } from '@/components/layout/AppUI';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 
 type PembinaOption = { id: string; name: string; email: string };
@@ -230,9 +231,8 @@ export default function NewSchoolGroupPage() {
                     {useDirectPassword && (
                       <div className="space-y-2">
                         <Label htmlFor="pembinaPassword">Password pembina</Label>
-                        <Input
+                        <PasswordInput
                           id="pembinaPassword"
-                          type="password"
                           className="rounded-xl"
                           {...register('pembinaPassword', { required: useDirectPassword })}
                         />

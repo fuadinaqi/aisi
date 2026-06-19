@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { setPasswordSchema, type SetPasswordInput } from '@dakwah/shared';
 import { api, type ApiResponse } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RoleBadge } from '@/components/shared/Badges';
@@ -64,12 +64,12 @@ function SetPasswordForm() {
             <input type="hidden" {...register('token')} />
             <div>
               <Label htmlFor="password">Password Baru</Label>
-              <Input id="password" type="password" {...register('password')} />
+              <PasswordInput id="password" {...register('password')} />
               {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>}
             </div>
             <div>
               <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
-              <Input id="confirmPassword" type="password" {...register('confirmPassword')} />
+              <PasswordInput id="confirmPassword" {...register('confirmPassword')} />
               {errors.confirmPassword && <p className="mt-1 text-sm text-red-500">{errors.confirmPassword.message}</p>}
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}

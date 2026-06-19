@@ -23,6 +23,7 @@ import { cn, getPrimaryRole, getRoleLabel } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { AppLogo } from '@/components/layout/AppLogo';
 
 type NavItem = {
   href: string;
@@ -124,11 +125,8 @@ export function Sidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border/60 bg-card md:flex">
-      <div className="flex h-16 items-center px-5">
-        <div>
-          <p className="text-base font-bold tracking-tight text-primary">AISI</p>
-          <p className="text-[11px] text-muted-foreground">Pembinaan Dakwah Depok</p>
-        </div>
+      <div className="flex h-16 items-center px-4">
+        <AppLogo href="/dashboard" priority />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">

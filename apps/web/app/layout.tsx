@@ -6,7 +6,7 @@ import { Providers } from '@/components/Providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AISI',
+  title: 'Bina AISI',
   description: 'Aplikasi pendataan dan monitoring pembinaan dakwah Kota Depok',
 };
 

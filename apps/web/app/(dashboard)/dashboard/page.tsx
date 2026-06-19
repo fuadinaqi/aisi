@@ -16,6 +16,7 @@ import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { getPrimaryRole, getRoleLabel, isPointEligibleRole } from '@/lib/utils';
 import { PointBadge, RoleBadge, LoadingSkeleton } from '@/components/shared/Badges';
+import { AppLogo } from '@/components/layout/AppLogo';
 import { PageContainer } from '@/components/layout/PageShell';
 import {
   AppSectionHeader,
@@ -103,6 +104,9 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <PageContainer tight>
+        <div className="mb-4 flex justify-center md:hidden">
+          <AppLogo href="/dashboard" priority />
+        </div>
         <LoadingSkeleton className="h-32 rounded-2xl" />
         <LoadingSkeleton className="h-24 rounded-2xl" />
         <LoadingSkeleton className="h-48 rounded-2xl" />
@@ -112,6 +116,9 @@ export default function DashboardPage() {
 
   return (
     <PageContainer tight>
+      <div className="mb-4 flex justify-center md:hidden">
+        <AppLogo href="/dashboard" priority />
+      </div>
       <HeroGreeting
         name={user?.name?.split(' ')[0] || 'Pengguna'}
         subtitle={getRoleLabel(role)}

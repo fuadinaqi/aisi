@@ -12,6 +12,7 @@ import { ListGroup } from '@/components/layout/AppUI';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 
 type FormData = {
@@ -174,9 +175,8 @@ export default function NewSchoolPage() {
                 {useDirectPassword && (
                   <div className="space-y-2">
                     <Label htmlFor="pjPassword">Password PJ</Label>
-                    <Input
+                    <PasswordInput
                       id="pjPassword"
-                      type="password"
                       placeholder="Min. 8 karakter, huruf besar & angka"
                       className="rounded-xl"
                       {...register('pjPassword', { required: useDirectPassword })}

@@ -28,10 +28,10 @@ class ResendEmailProvider implements EmailProvider {
       body: JSON.stringify({
         from: env.EMAIL_FROM,
         to,
-        subject: 'Undangan Bergabung - AISI',
+        subject: 'Undangan Bergabung - Bina AISI',
         html: `
           <h2>Assalamu'alaikum ${name},</h2>
-          <p>Anda diundang untuk bergabung ke Aplikasi AISI.</p>
+          <p>Anda diundang untuk bergabung ke Bina AISI.</p>
           <p><a href="${inviteLink}">Klik di sini untuk membuat password</a></p>
           <p>Link berlaku 7 hari.</p>
         `,

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 
 type InviteFormData = {
@@ -116,8 +117,7 @@ export function InviteForm({
           {useDirectPassword && (
             <div className="space-y-2">
               <Label>Password</Label>
-              <Input
-                type="password"
+              <PasswordInput
                 className="rounded-xl"
                 {...register('password', { required: useDirectPassword })}
                 placeholder="Min. 8 karakter, huruf besar & angka"
