@@ -1,17 +1,88 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Users, School, ClipboardList, Star } from 'lucide-react';
+import {
+  Calendar,
+  ClipboardList,
+  School,
+  Users,
+  BookOpen,
+  Bell,
+  BarChart3,
+  Settings,
+  Star,
+} from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
-import { StatCard, LoadingSkeleton } from '@/components/shared/Badges';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getPrimaryRole, getRoleLabel, isPointEligibleRole } from '@/lib/utils';
+import { PointBadge, RoleBadge, LoadingSkeleton } from '@/components/shared/Badges';
+import { PageContainer } from '@/components/layout/PageShell';
+import {
+  AppSectionHeader,
+  HeroGreeting,
+  ListDivider,
+  ListGroup,
+  ListRow,
+  MetricStrip,
+  QuickActionGrid,
+} from '@/components/layout/AppUI';
 import type { GroupItem, OverviewData } from '@/lib/types';
+
+function getQuickActions(role: string) {
+  const actions: { href: string; label: string; icon: typeof Calendar }[] = [];
+
+  if (role === 'ANGGOTA') {
+    return [
+      { href: '/events', label: 'Agenda', icon: Calendar },
+      { href: '/notifications', label: 'Notifikasi', icon: Bell },
+      { href: '/profile', label: 'Profil', icon: Users },
+    ];
+  }
+
+  if (role === 'PEMBINA') {
+    return [
+      { href: '/evaluasi', label: 'Evaluasi', icon: ClipboardList },
+      { href: '/events', label: 'Agenda', icon: Calendar },
+      { href: '/materi', label: 'Materi', icon: BookOpen },
+      { href: '/notifications', label: 'Notifikasi', icon: Bell },
+    ];
+  }
+
+  if (role === 'PJ_SEKOLAH') {
+    return [
+      { href: '/schools', label: 'Sekolah', icon: School },
+      { href: '/pembina', label: 'Pembina', icon: Users },
+      { href: '/events', label: 'Agenda', icon: Calendar },
+      { href: '/notifications', label: 'Notifikasi', icon: Bell },
+    ];
+  }
+
+  if (role === 'ADMIN') {
+    return [
+      { href: '/schools', label: 'Sekolah', icon: School },
+      { href: '/events', label: 'Agenda', icon: Calendar },
+      { href: '/analytics', label: 'Analitik', icon: BarChart3 },
+      { href: '/materi', label: 'Materi', icon: BookOpen },
+    ];
+  }
+
+  if (role === 'SUPERADMIN') {
+    return [
+      { href: '/schools', label: 'Sekolah', icon: School },
+      { href: '/users', label: 'Pengguna', icon: Users },
+      { href: '/events', label: 'Agenda', icon: Calendar },
+      { href: '/config', label: 'Pengaturan', icon: Settings },
+    ];
+  }
+
+  return actions;
+}
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const role = user ? getPrimaryRole(user.roles) : 'ANGGOTA';
+  const showPoints = user ? isPointEligibleRole(user.roles) : false;
+  const quickActions = getQuickActions(role);
 
   const { data: overview, isLoading } = useQuery<OverviewData | null>({
     queryKey: ['analytics', role],
@@ -31,57 +102,101 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <LoadingSkeleton className="h-8 w-48" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => <LoadingSkeleton key={i} className="h-24" />)}
-        </div>
-      </div>
+      <PageContainer tight>
+        <LoadingSkeleton className="h-32 rounded-2xl" />
+        <LoadingSkeleton className="h-24 rounded-2xl" />
+        <LoadingSkeleton className="h-48 rounded-2xl" />
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold md:text-2xl">Assalamu&apos;alaikum, {user?.name}</h1>
-        <p className="text-sm text-muted-foreground">Dashboard {role.replace('_', ' ')}</p>
-      </div>
+    <PageContainer tight>
+      <HeroGreeting
+        name={user?.name?.split(' ')[0] || 'Pengguna'}
+        subtitle={getRoleLabel(role)}
+        badge={<RoleBadge role={role} className="bg-white/15 text-white ring-white/20" />}
+        trailing={
+          showPoints && user ? (
+            <div className="rounded-2xl bg-white/15 px-3 py-2 text-center backdrop-blur-sm">
+              <p className="text-lg font-bold">{user.totalPoints.toLocaleString('id-ID')}</p>
+              <p className="text-[10px] text-primary-foreground/75">Poin</p>
+            </div>
+          ) : undefined
+        }
+      />
+
+      {quickActions.length > 0 && (
+        <section className="space-y-3">
+          <AppSectionHeader title="Akses cepat" />
+          <QuickActionGrid actions={quickActions} />
+        </section>
+      )}
 
       {(role === 'SUPERADMIN' || role === 'ADMIN') && overview && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={Users} label="Total Pembina" value={overview.totalPembina} />
-          <StatCard icon={School} label="Total Kelompok" value={overview.totalGroups} />
-          <StatCard icon={Users} label="Total Anggota" value={overview.totalAnggota} />
-          <StatCard icon={ClipboardList} label="Evaluasi Pekan Ini" value={`${overview.submissionRate}%`} sub={`${overview.evaluationsThisWeek} terisi`} />
-        </div>
+        <section className="space-y-3">
+          <AppSectionHeader title="Ringkasan" />
+          <MetricStrip
+            items={[
+              { label: 'Sekolah', value: overview.totalSchools ?? 0 },
+              { label: 'Pembina', value: overview.totalPembina ?? 0 },
+              { label: 'Kelompok', value: overview.totalGroups ?? 0 },
+              { label: 'Anggota', value: overview.totalAnggota ?? 0 },
+              {
+                label: 'Evaluasi',
+                value: `${overview.submissionRate ?? 0}%`,
+                sub: `${overview.evaluationsThisWeek ?? 0} pekan ini`,
+              },
+            ]}
+          />
+        </section>
       )}
 
-      {role === 'PEMBINA' && overview?.groups && (
-        <Card>
-          <CardHeader><CardTitle>Kelompok Saya</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {overview.groups.map((g) => (
-              <div key={g.id} className="flex justify-between rounded-lg border p-3">
-                <span className="font-medium">{g.name}</span>
-                <span className="text-sm text-muted-foreground">{g._count.members} anggota</span>
+      {role === 'PEMBINA' && overview?.groups && overview.groups.length > 0 && (
+        <section className="space-y-3">
+          <AppSectionHeader title="Kelompok saya" />
+          <ListGroup>
+            {overview.groups.map((g, i) => (
+              <div key={g.id}>
+                {i > 0 && <ListDivider />}
+                <ListRow
+                  href={`/kelompok/${g.id}`}
+                  icon={Users}
+                  title={g.name}
+                  subtitle={`${g._count.members} anggota · ${g.school.name}`}
+                />
               </div>
             ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {role === 'ANGGOTA' && user && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <StatCard icon={Star} label="Point Saya" value={user.totalPoints} />
-        </div>
+          </ListGroup>
+        </section>
       )}
 
       {role === 'PJ_SEKOLAH' && (
-        <Card>
-          <CardHeader><CardTitle>Overview Sekolah</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Lihat detail di menu Kelompok dan Pembina</p></CardContent>
-        </Card>
+        <section className="space-y-3">
+          <AppSectionHeader title="Kelola sekolah" />
+          <ListGroup>
+            <ListRow href="/schools" icon={School} title="Sekolah saya" subtitle="Lihat pembina & kelompok" />
+            <ListDivider />
+            <ListRow href="/pembina" icon={Users} title="Daftar pembina" subtitle="Pembina di sekolah Anda" />
+          </ListGroup>
+        </section>
       )}
-    </div>
+
+      {role === 'ANGGOTA' && showPoints && user && (
+        <section className="space-y-3">
+          <AppSectionHeader title="Poin saya" />
+          <ListGroup>
+            <ListRow
+              href="/profile"
+              icon={Star}
+              title="Total poin"
+              subtitle="Lihat riwayat di profil"
+              trailing={<PointBadge points={user.totalPoints} />}
+              showChevron
+            />
+          </ListGroup>
+        </section>
+      )}
+    </PageContainer>
   );
 }

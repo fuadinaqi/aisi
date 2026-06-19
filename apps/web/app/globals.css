@@ -5,23 +5,24 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 222 47% 11%;
+    --surface: 210 20% 96%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 160 84% 39%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 199 89% 48%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 43 96% 56%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 160 84% 39%;
-    --radius: 0.5rem;
+    --card-foreground: 222 47% 11%;
+    --primary: 158 64% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 18% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 18% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 158 64% 32%;
+    --radius: 0.875rem;
   }
 }
 
@@ -29,7 +30,40 @@
   * {
     @apply border-border;
   }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-[hsl(var(--surface))] text-foreground;
+  }
+}
+
+@layer components {
+  .materi-content h2 {
+    @apply mb-2 mt-4 text-lg font-semibold first:mt-0;
+  }
+
+  .materi-content p {
+    @apply mb-3 last:mb-0;
+  }
+
+  .materi-content ul {
+    @apply mb-3 list-disc space-y-1 pl-5;
+  }
+
+  .materi-content ol {
+    @apply mb-3 list-decimal space-y-1 pl-5;
+  }
+
+  .materi-content a {
+    @apply text-primary underline;
+  }
+
+  .materi-content strong {
+    @apply font-semibold;
   }
 }

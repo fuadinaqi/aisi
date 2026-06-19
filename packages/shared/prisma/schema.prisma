@@ -35,6 +35,18 @@ enum NotifType {
   GENERAL
 }
 
+enum EventCheckInStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MateriContentType {
+  FILE
+  LINK
+  RICH_TEXT
+}
+
 enum InvitationStatus {
   PENDING
   USED
@@ -51,6 +63,7 @@ model School {
 
   users  UserSchool[]
   groups Group[]
+  events Event[]
 }
 
 model User {
@@ -76,6 +89,7 @@ model User {
   notifications      Notification[]
   refreshTokens      RefreshToken[]
   eventAttendances   EventAttendance[]
+  eventApprovals     EventAttendance[]      @relation("EventApprover")
   invitationsSent    UserInvitation[]       @relation("InvitationCreator")
 }
 
@@ -119,8 +133,9 @@ model Group {
 
   school      School             @relation(fields: [schoolId], references: [id])
   pembina     User               @relation("PembinaGroups", fields: [pembinaId], references: [id])
-  members     GroupMember[]
-  evaluations WeeklyEvaluation[]
+  members         GroupMember[]
+  evaluations     WeeklyEvaluation[]
+  eventAttendances EventAttendance[]
 
   @@index([schoolId])
   @@index([pembinaId])
@@ -188,44 +203,61 @@ model PointLog {
 }
 
 model Event {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
   description String?
   location    String?
   startAt     DateTime
-  endAt       DateTime?
-  pointValue  Int       @default(0)
+  endAt       DateTime
+  pointValue  Int      @default(0)
   imageUrl    String?
-  isPublished Boolean   @default(false)
+  schoolId    String?
+  isPublished Boolean  @default(true)
   createdById String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
+  school      School?           @relation(fields: [schoolId], references: [id])
   attendances EventAttendance[]
+
+  @@index([schoolId])
+  @@index([endAt])
 }
 
 model EventAttendance {
-  id        String   @id @default(cuid())
-  eventId   String
-  userId    String
-  checkedAt DateTime @default(now())
+  id            String             @id @default(cuid())
+  eventId       String
+  userId        String
+  groupId       String
+  photoUrl      String
+  status        EventCheckInStatus @default(PENDING)
+  checkedAt     DateTime           @default(now())
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectionNote String?
 
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id])
+  event      Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user       User  @relation(fields: [userId], references: [id])
+  group      Group @relation(fields: [groupId], references: [id])
+  approvedBy User? @relation("EventApprover", fields: [approvedById], references: [id])
 
   @@unique([eventId, userId])
+  @@index([groupId, status])
 }
 
 model WeeklyMateri {
-  id          String   @id @default(cuid())
+  id          String            @id @default(cuid())
   title       String
   description String?
   weekDate    DateTime
+  contentType MateriContentType @default(RICH_TEXT)
+  linkUrl     String?
+  contentHtml String?           @db.Text
   fileUrls    String[]
   createdById String
-  isPublished Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isPublished Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@index([weekDate])
 }

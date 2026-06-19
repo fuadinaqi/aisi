@@ -28,10 +28,10 @@ class ResendEmailProvider implements EmailProvider {
       body: JSON.stringify({
         from: env.EMAIL_FROM,
         to,
-        subject: 'Undangan Bergabung - Pembinaan Dakwah Depok',
+        subject: 'Undangan Bergabung - AISI',
         html: `
           <h2>Assalamu'alaikum ${name},</h2>
-          <p>Anda diundang untuk bergabung ke Aplikasi Pembinaan Dakwah Depok.</p>
+          <p>Anda diundang untuk bergabung ke Aplikasi AISI.</p>
           <p><a href="${inviteLink}">Klik di sini untuk membuat password</a></p>
           <p>Link berlaku 7 hari.</p>
         `,
@@ -40,5 +40,6 @@ class ResendEmailProvider implements EmailProvider {
   }
 }
 
-export const emailProvider: EmailProvider =
-  process.env.RESEND_API_KEY ? new ResendEmailProvider() : new ConsoleEmailProvider();
+export const emailProvider: EmailProvider = process.env.RESEND_API_KEY
+  ? new ResendEmailProvider()
+  : new ConsoleEmailProvider();

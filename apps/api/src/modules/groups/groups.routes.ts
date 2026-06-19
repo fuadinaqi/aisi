@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { param } from '../../utils/param.js';
-import { groupSchema, paginationSchema } from '@dakwah/shared';
+import { groupSchema, paginationSchema, updateGroupSchema, updateGroupMemberSchema } from '@dakwah/shared';
 import { prisma } from '../../lib/prisma.js';
 import { checkAuth, checkRole, validate, getUserSchoolIds, isPembinaOfGroup, canAccessSchool } from '../../middleware/auth.js';
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
 import { Role } from '@prisma/client';
+import { computeMemberAttendance, computeGroupAttendance } from '../../utils/attendance.js';
 
 const router = Router();
 
@@ -67,7 +68,10 @@ router.get('/:id', async (req, res, next) => {
       include: {
         school: true,
         pembina: { select: { id: true, name: true, email: true } },
-        members: { where: { isActive: true }, include: { user: { select: { id: true, name: true, email: true, totalPoints: true } } } },
+        members: {
+          where: { isActive: true },
+          include: { user: { select: { id: true, name: true, email: true, totalPoints: true } } },
+        },
       },
     });
     if (!group) throw new AppError(404, 'Kelompok tidak ditemukan');
@@ -79,13 +83,36 @@ router.get('/:id', async (req, res, next) => {
       if (!isOwner && !canSchool) throw new AppError(403, 'Akses ditolak');
     }
 
-    sendSuccess(res, group);
+    const submittedEvaluations = await prisma.weeklyEvaluation.findMany({
+      where: { groupId: group.id, isSubmitted: true },
+      select: {
+        weekDate: true,
+        attendances: { select: { userId: true, status: true } },
+      },
+      orderBy: { weekDate: 'asc' },
+    });
+
+    const membersWithStats = group.members.map((member) => {
+      const stats = computeMemberAttendance(
+        { userId: member.userId, joinedAt: member.joinedAt },
+        submittedEvaluations,
+      );
+      return { ...member, ...stats };
+    });
+
+    const groupStats = computeGroupAttendance(
+      group.createdAt,
+      group.members.map((m) => ({ userId: m.userId, joinedAt: m.joinedAt })),
+      submittedEvaluations,
+    );
+
+    sendSuccess(res, { ...group, ...groupStats, members: membersWithStats });
   } catch (err) {
     next(err);
   }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', validate(updateGroupSchema), async (req, res, next) => {
   try {
     const group = await prisma.group.findUnique({ where: { id: param(req.params.id) } });
     if (!group) throw new AppError(404, 'Kelompok tidak ditemukan');
@@ -97,10 +124,46 @@ router.put('/:id', async (req, res, next) => {
       throw new AppError(403, 'Akses ditolak');
     }
 
-    const { name, level, isActive } = req.body;
+    const { name, level, pembinaId, isActive } = req.body as {
+      name?: string;
+      level?: 'LEVEL_1' | 'LEVEL_2';
+      pembinaId?: string;
+      isActive?: boolean;
+    };
+
+    const data: Record<string, unknown> = {};
+    if (name !== undefined) data.name = name;
+    if (level !== undefined) data.level = level;
+    if (isActive !== undefined) data.isActive = isActive;
+
+    if (pembinaId !== undefined && pembinaId !== group.pembinaId) {
+      if (!roles.includes('PJ_SEKOLAH') && !roles.includes('ADMIN') && !roles.includes('SUPERADMIN')) {
+        throw new AppError(403, 'Hanya PJ Sekolah atau Admin yang dapat mengganti pembina');
+      }
+
+      const pembina = await prisma.user.findFirst({
+        where: {
+          id: pembinaId,
+          isActive: true,
+          roles: { some: { role: Role.PEMBINA } },
+          OR: [
+            { schools: { some: { schoolId: group.schoolId } } },
+            { groupsAsPembina: { some: { schoolId: group.schoolId, isActive: true } } },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!pembina) throw new AppError(400, 'Pembina tidak valid untuk sekolah ini');
+      data.pembinaId = pembinaId;
+    }
+
     const updated = await prisma.group.update({
       where: { id: param(req.params.id) },
-      data: { ...(name && { name }), ...(level && { level }), ...(isActive !== undefined && { isActive }) },
+      data,
+      include: {
+        school: { select: { id: true, name: true } },
+        pembina: { select: { id: true, name: true, email: true } },
+      },
     });
     sendSuccess(res, updated, 'Kelompok berhasil diperbarui');
   } catch (err) {
@@ -145,6 +208,161 @@ router.post('/:id/members', async (req, res, next) => {
       include: { user: { select: { id: true, name: true, email: true } } },
     });
     sendSuccess(res, member, 'Anggota berhasil ditambahkan', 201);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id/members/:userId', async (req, res, next) => {
+  try {
+    const groupId = param(req.params.id);
+    const memberUserId = param(req.params.userId);
+
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      include: {
+        school: { select: { id: true, name: true } },
+      },
+    });
+    if (!group || !group.isActive) throw new AppError(404, 'Kelompok tidak ditemukan');
+
+    const roles = req.user!.roles;
+    if (!roles.includes('SUPERADMIN') && !roles.includes('ADMIN')) {
+      const isOwner = group.pembinaId === req.user!.userId;
+      const canSchool = await canAccessSchool(req.user!.userId, roles, group.schoolId);
+      if (!isOwner && !canSchool) throw new AppError(403, 'Akses ditolak');
+    }
+
+    const member = await prisma.groupMember.findFirst({
+      where: { groupId, userId: memberUserId, isActive: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            totalPoints: true,
+            lastLoginAt: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    if (!member) throw new AppError(404, 'Anggota tidak ditemukan di kelompok ini');
+
+    const submittedEvaluations = await prisma.weeklyEvaluation.findMany({
+      where: { groupId, isSubmitted: true },
+      select: {
+        weekDate: true,
+        attendances: { select: { userId: true, status: true } },
+      },
+      orderBy: { weekDate: 'asc' },
+    });
+
+    const stats = computeMemberAttendance(
+      { userId: member.userId, joinedAt: member.joinedAt },
+      submittedEvaluations,
+    );
+
+    sendSuccess(res, {
+      joinedAt: member.joinedAt,
+      ...stats,
+      user: member.user,
+      group: { id: group.id, name: group.name, level: group.level },
+      school: group.school,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/:id/members/:userId', validate(updateGroupMemberSchema), async (req, res, next) => {
+  try {
+    const groupId = param(req.params.id);
+    const memberUserId = param(req.params.userId);
+    const isOwner = await isPembinaOfGroup(req.user!.userId, groupId);
+    const roles = req.user!.roles;
+    if (!isOwner && !roles.includes('PJ_SEKOLAH') && !roles.includes('ADMIN') && !roles.includes('SUPERADMIN')) {
+      throw new AppError(403, 'Akses ditolak');
+    }
+
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      include: { school: { select: { id: true, name: true } } },
+    });
+    if (!group || !group.isActive) throw new AppError(404, 'Kelompok tidak ditemukan');
+
+    const member = await prisma.groupMember.findFirst({
+      where: { groupId, userId: memberUserId, isActive: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            roles: { select: { role: true } },
+          },
+        },
+      },
+    });
+    if (!member) throw new AppError(404, 'Anggota tidak ditemukan di kelompok ini');
+    if (!member.user.roles.some((r) => r.role === Role.ANGGOTA)) {
+      throw new AppError(400, 'User bukan anggota');
+    }
+
+    const { name, email, phone } = req.body as {
+      name?: string;
+      email?: string;
+      phone?: string | null;
+    };
+
+    if (email && email !== member.user.email) {
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser && existingUser.id !== memberUserId) {
+        throw new AppError(400, 'Email sudah digunakan');
+      }
+    }
+
+    const userData: Record<string, unknown> = {};
+    if (name !== undefined) userData.name = name;
+    if (email !== undefined) userData.email = email;
+    if (phone !== undefined) userData.phone = phone || null;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: memberUserId },
+      data: userData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        totalPoints: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
+
+    const submittedEvaluations = await prisma.weeklyEvaluation.findMany({
+      where: { groupId, isSubmitted: true },
+      select: {
+        weekDate: true,
+        attendances: { select: { userId: true, status: true } },
+      },
+      orderBy: { weekDate: 'asc' },
+    });
+
+    const stats = computeMemberAttendance(
+      { userId: member.userId, joinedAt: member.joinedAt },
+      submittedEvaluations,
+    );
+
+    sendSuccess(res, {
+      joinedAt: member.joinedAt,
+      ...stats,
+      user: updatedUser,
+      group: { id: group.id, name: group.name, level: group.level },
+      school: group.school,
+    }, 'Data anggota berhasil diperbarui');
   } catch (err) {
     next(err);
   }

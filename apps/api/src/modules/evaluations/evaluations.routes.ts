@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { param } from '../../utils/param.js';
-import { evaluationSchema, paginationSchema, POINT_RULES } from '@dakwah/shared';
+import { evaluationSchema, paginationSchema, POINT_RULES, isPointEligible } from '@dakwah/shared';
 import { prisma } from '../../lib/prisma.js';
 import { checkAuth, validate, isPembinaOfGroup } from '../../middleware/auth.js';
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
-import { getMonday, isSubmitOnTime } from '../../utils/weekDate.js';
+import { getMonday, isSubmitOnTime, assertWeekDateNotFuture } from '../../utils/weekDate.js';
 import { upload, getPublicUrl } from '../../lib/storage.js';
 import { AttendanceStatus } from '@prisma/client';
 
@@ -48,6 +48,12 @@ router.post('/', validate(evaluationSchema), async (req, res, next) => {
     const { groupId, weekDate, notes, attendances } = req.body;
     const isOwner = await isPembinaOfGroup(req.user!.userId, groupId);
     if (!isOwner) throw new AppError(403, 'Hanya pembina kelompok yang bisa membuat evaluasi');
+
+    try {
+      assertWeekDateNotFuture(weekDate);
+    } catch {
+      throw new AppError(400, 'Tanggal evaluasi tidak boleh setelah hari ini');
+    }
 
     const normalizedWeek = getMonday(new Date(weekDate));
 
@@ -153,28 +159,43 @@ router.post('/:id/submit', async (req, res, next) => {
       ? POINT_RULES.PEMBINA_SUBMIT_EVALUATION
       : POINT_RULES.PEMBINA_SUBMIT_EVALUATION_LATE;
 
+    const hadirUserIds = evaluation.attendances
+      .filter((a) => a.status === AttendanceStatus.HADIR)
+      .map((a) => a.userId);
+    const pointUsers = await prisma.user.findMany({
+      where: { id: { in: [evaluation.createdById, ...hadirUserIds] } },
+      select: { id: true, roles: { select: { role: true } } },
+    });
+    const eligibleIds = new Set(
+      pointUsers
+        .filter((u) => isPointEligible(u.roles.map((r) => r.role)))
+        .map((u) => u.id),
+    );
+
     await prisma.$transaction(async (tx) => {
       await tx.weeklyEvaluation.update({
         where: { id: evaluation.id },
         data: { isSubmitted: true, submittedAt },
       });
 
-      await tx.pointLog.create({
-        data: {
-          userId: evaluation.createdById,
-          points: pembinaPoints,
-          description: onTime ? 'Submit evaluasi tepat waktu' : 'Submit evaluasi terlambat',
-          refType: 'EVALUATION',
-          refId: evaluation.id,
-        },
-      });
-      await tx.user.update({
-        where: { id: evaluation.createdById },
-        data: { totalPoints: { increment: pembinaPoints } },
-      });
+      if (eligibleIds.has(evaluation.createdById)) {
+        await tx.pointLog.create({
+          data: {
+            userId: evaluation.createdById,
+            points: pembinaPoints,
+            description: onTime ? 'Submit evaluasi tepat waktu' : 'Submit evaluasi terlambat',
+            refType: 'EVALUATION',
+            refId: evaluation.id,
+          },
+        });
+        await tx.user.update({
+          where: { id: evaluation.createdById },
+          data: { totalPoints: { increment: pembinaPoints } },
+        });
+      }
 
       for (const att of evaluation.attendances) {
-        if (att.status === AttendanceStatus.HADIR) {
+        if (att.status === AttendanceStatus.HADIR && eligibleIds.has(att.userId)) {
           await tx.pointLog.create({
             data: {
               userId: att.userId,

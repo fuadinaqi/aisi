@@ -1,9 +1,32 @@
+export const POINT_ELIGIBLE_ROLES = ['PEMBINA', 'ANGGOTA'] as const;
+
+export function isPointEligible(roles: string[]): boolean {
+  return roles.some((r) => (POINT_ELIGIBLE_ROLES as readonly string[]).includes(r));
+}
+
+/** Role yang boleh menambah poin manual ke target role */
+export const MANUAL_POINT_GRANTORS: Record<'PEMBINA' | 'ANGGOTA', readonly string[]> = {
+  PEMBINA: ['PJ_SEKOLAH', 'ADMIN', 'SUPERADMIN'],
+  ANGGOTA: ['PEMBINA', 'PJ_SEKOLAH', 'ADMIN', 'SUPERADMIN'],
+};
+
+export function getPointEligibleTargetRole(roles: string[]): 'PEMBINA' | 'ANGGOTA' | null {
+  if (roles.includes('PEMBINA')) return 'PEMBINA';
+  if (roles.includes('ANGGOTA')) return 'ANGGOTA';
+  return null;
+}
+
+export function canGrantManualPoints(grantorRoles: string[], targetRoles: string[]): boolean {
+  const targetRole = getPointEligibleTargetRole(targetRoles);
+  if (!targetRole) return false;
+  const allowed = MANUAL_POINT_GRANTORS[targetRole];
+  return grantorRoles.some((r) => allowed.includes(r));
+}
+
 export const POINT_RULES = {
   PEMBINA_SUBMIT_EVALUATION: 10,
   PEMBINA_SUBMIT_EVALUATION_LATE: 5,
-  PEMBINA_ATTEND_EVENT: 15,
   ANGGOTA_HADIR_PEMBINAAN: 5,
-  ANGGOTA_ATTEND_EVENT: 10,
 } as const;
 
 export const ROLES = [

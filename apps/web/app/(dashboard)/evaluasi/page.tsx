@@ -2,48 +2,67 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils';
+import type { EvaluationItem } from '@/lib/types';
 
 export default function EvaluasiPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<EvaluationItem[]>({
     queryKey: ['evaluations'],
-    queryFn: async () => {
-      const res = await api.get<ApiResponse>('/evaluations');
-      return res.data.data;
-    },
+    queryFn: async () => (await api.get<ApiResponse<EvaluationItem[]>>('/evaluations')).data.data,
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold md:text-2xl">Evaluasi Mingguan</h1>
-        <Link href="/evaluasi/isi"><Button>Isi Evaluasi</Button></Link>
-      </div>
-      {isLoading ? <LoadingSkeleton className="h-64" /> : !data?.length ? (
-        <EmptyState title="Belum ada evaluasi" description="Mulai isi evaluasi mingguan" />
-      ) : (
-        <div className="space-y-2">
-          {data.map((e: { id: string; weekDate: string; isSubmitted: boolean; group: { name: string } }) => (
-            <Link key={e.id} href={`/evaluasi/${e.id}`}>
-              <Card className="hover:shadow-md">
-                <CardContent className="flex justify-between p-4">
-                  <div>
-                    <p className="font-medium">{e.group.name}</p>
-                    <p className="text-sm text-muted-foreground">Pekan {formatDate(e.weekDate)}</p>
-                  </div>
-                  <span className={`text-xs font-medium ${e.isSubmitted ? 'text-green-600' : 'text-yellow-600'}`}>
-                    {e.isSubmitted ? 'Submitted' : 'Draft'}
-                  </span>
-                </CardContent>
-              </Card>
+    <PageContainer>
+      <PageHeader
+        title="Evaluasi mingguan"
+        description="Riwayat form evaluasi kelompok"
+        action={
+          <Button asChild size="sm">
+            <Link href="/evaluasi/isi">
+              <Plus className="mr-2 h-4 w-4" />
+              Isi evaluasi
             </Link>
-          ))}
-        </div>
+          </Button>
+        }
+      />
+
+      {isLoading ? (
+        <LoadingSkeleton className="h-64" />
+      ) : !data?.length ? (
+        <EmptyState title="Belum ada evaluasi" description="Mulai isi evaluasi mingguan kelompok Anda." />
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="divide-y">
+            {data.map((e) => (
+              <Link
+                key={e.id}
+                href={`/evaluasi/${e.id}`}
+                className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-muted/30"
+              >
+                <div>
+                  <p className="font-medium">{e.group.name}</p>
+                  <p className="text-sm text-muted-foreground">Pekan {formatDate(e.weekDate)}</p>
+                </div>
+                <span
+                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                    e.isSubmitted
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-amber-50 text-amber-800'
+                  }`}
+                >
+                  {e.isSubmitted ? 'Terkirim' : 'Draft'}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }

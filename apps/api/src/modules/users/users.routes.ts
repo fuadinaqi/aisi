@@ -30,13 +30,21 @@ router.get('/leaderboard', checkAuth, validate(paginationSchema, 'query'), async
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          roles: { some: { role: { in: [Role.PEMBINA, Role.ANGGOTA] } } },
+        },
         select: { id: true, name: true, totalPoints: true, roles: { select: { role: true } } },
         orderBy: { totalPoints: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.user.count({ where: { isActive: true } }),
+      prisma.user.count({
+        where: {
+          isActive: true,
+          roles: { some: { role: { in: [Role.PEMBINA, Role.ANGGOTA] } } },
+        },
+      }),
     ]);
 
     sendSuccess(res, users, undefined, 200, { page, limit, total, totalPages: Math.ceil(total / limit) });

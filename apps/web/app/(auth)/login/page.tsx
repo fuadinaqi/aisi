@@ -10,21 +10,27 @@ import { useAuthStore, type AuthUser } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [error, setError] = useState('');
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginInput>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
 
   const onSubmit = async (data: LoginInput) => {
     try {
       setError('');
-      const res = await api.post<ApiResponse<{ user: AuthUser; accessToken: string }>>('/auth/login', data);
+      const res = await api.post<ApiResponse<{ user: AuthUser; accessToken: string }>>(
+        '/auth/login',
+        data,
+      );
       setAuth(res.data.data.user, res.data.data.accessToken);
       router.push('/dashboard');
     } catch (err: unknown) {
@@ -34,31 +40,59 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-sky-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle>🕌 Pembinaan Dakwah Depok</CardTitle>
-          <p className="text-sm text-muted-foreground">Silakan login untuk melanjutkan</p>
-        </CardHeader>
-        <CardContent>
+    <div className="flex min-h-screen">
+      <div className="hidden w-1/2 flex-col justify-between bg-primary p-10 text-primary-foreground lg:flex">
+        <div>
+          <p className="text-lg font-semibold tracking-tight">AISI</p>
+          <p className="mt-1 text-sm text-primary-foreground/80">Pembinaan Dakwah Depok</p>
+        </div>
+        <div className="space-y-3">
+          <h2 className="text-3xl font-semibold leading-tight tracking-tight">
+            Pendataan & monitoring pembinaan, lebih terstruktur.
+          </h2>
+          <p className="max-w-md text-sm text-primary-foreground/80">
+            Kelola evaluasi mingguan, kehadiran anggota, dan perkembangan pembinaan dalam satu
+            platform.
+          </p>
+        </div>
+        <p className="text-xs text-primary-foreground/60">Kota Depok</p>
+      </div>
+
+      <div className="flex flex-1 items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="space-y-2 lg:hidden">
+            <p className="text-lg font-semibold">AISI</p>
+            <p className="text-sm text-muted-foreground">Masuk ke akun Anda</p>
+          </div>
+          <div className="hidden space-y-2 lg:block">
+            <h1 className="text-2xl font-semibold tracking-tight">Masuk</h1>
+            <p className="text-sm text-muted-foreground">Gunakan email dan password yang terdaftar</p>
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="email@dakwah.id" {...register('email')} />
-              {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>}
+              <Input id="email" type="email" placeholder="nama@email.com" {...register('email')} />
+              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" {...register('password')} />
-              {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>}
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password.message}</p>
+              )}
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && (
+              <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Memproses...' : 'Login'}
+              {isSubmitting ? 'Memproses...' : 'Masuk'}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

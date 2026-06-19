@@ -1,4 +1,4 @@
-# 🕌 PROJECT PLAN — Aplikasi Pembinaan Dakwah Depok
+# PROJECT PLAN — Aplikasi AISI
 
 > Dokumen perencanaan kerja (engineering plan) untuk membangun aplikasi web full-stack
 > pendataan & monitoring pembinaan dakwah di sekolah-sekolah Kota Depok.
@@ -7,15 +7,15 @@
 
 ## 0. Keputusan Teknis (Sudah Dikonfirmasi)
 
-| Aspek | Keputusan | Catatan |
-|---|---|---|
-| Output tahap ini | **Dokumen plan saja** | Implementasi menyusul setelah plan disetujui |
-| Monorepo tooling | **pnpm + Turborepo** | Workspace: `apps/*`, `packages/*` |
-| Email (dev) | **Mock / console log** | Link undangan di-print ke terminal; abstraksi `EmailProvider` agar mudah ganti ke Resend di production |
-| Backend | **Express.js** | Pola Controller → Service → Repository |
-| Frontend | **Next.js 14 (App Router)** | Tailwind + shadcn/ui, mobile-first |
-| Database | **PostgreSQL 16 + Prisma** | Lewat Docker Compose untuk dev |
-| Validasi | **Zod** | Schema di-share via `packages/shared` |
+| Aspek            | Keputusan                   | Catatan                                                                                                |
+| ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Output tahap ini | **Dokumen plan saja**       | Implementasi menyusul setelah plan disetujui                                                           |
+| Monorepo tooling | **pnpm + Turborepo**        | Workspace: `apps/*`, `packages/*`                                                                      |
+| Email (dev)      | **Mock / console log**      | Link undangan di-print ke terminal; abstraksi `EmailProvider` agar mudah ganti ke Resend di production |
+| Backend          | **Express.js**              | Pola Controller → Service → Repository                                                                 |
+| Frontend         | **Next.js 14 (App Router)** | Tailwind + shadcn/ui, mobile-first                                                                     |
+| Database         | **PostgreSQL 16 + Prisma**  | Lewat Docker Compose untuk dev                                                                         |
+| Validasi         | **Zod**                     | Schema di-share via `packages/shared`                                                                  |
 
 ---
 
@@ -49,6 +49,7 @@ packages/shared → Zod schemas, TypeScript types, constants, Prisma schema
 ```
 
 **Prinsip kunci:**
+
 - **Single source of truth** untuk tipe & validasi: `packages/shared` (dipakai FE & BE).
 - **Separation of concern** di backend: Controller (HTTP) → Service (logika bisnis) → Repository (akses Prisma).
 - **Authorization berlapis**: middleware role-check + resource-ownership check.
@@ -99,6 +100,7 @@ aisi/                                # project root
 ```
 
 **Konvensi modul backend (per domain):**
+
 ```
 modules/groups/
 ├── groups.routes.ts        # definisi route + middleware
@@ -113,13 +115,15 @@ modules/groups/
 ## 3. Urutan Pengerjaan (Roadmap Bertahap)
 
 Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
-*Definition of Done (DoD)* sendiri. Urutan dirancang agar dependensi terpenuhi
+_Definition of Done (DoD)_ sendiri. Urutan dirancang agar dependensi terpenuhi
 (fondasi dulu, baru fitur).
 
 ### 🟦 PHASE 1 — CORE
 
 #### Sprint 0 — Fondasi Proyek (1–2 hari)
+
 **Tujuan:** monorepo jalan, DB hidup, lint/format/CI dasar siap.
+
 - [ ] Init `pnpm` workspace + `turbo.json` + `pnpm-workspace.yaml`.
 - [ ] Setup `packages/shared` (tsconfig base, build via `tsup`/`tsc`).
 - [ ] Setup `apps/api` (Express + TypeScript + ts-node-dev) skeleton `GET /health`.
@@ -130,7 +134,9 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 - **DoD:** `pnpm dev` menjalankan web + api; `GET /health` 200; Postgres terkoneksi.
 
 #### Sprint 1 — Database & Schema (1–2 hari)
+
 **Tujuan:** skema Prisma final + migrasi + seed dasar.
+
 - [ ] Tulis `schema.prisma` lengkap (semua model & enum dari spesifikasi).
 - [ ] Tambahkan index sesuai kebutuhan query (weekDate, userId, groupId, schoolId).
 - [ ] `prisma migrate dev` → migrasi awal.
@@ -139,7 +145,9 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 - **DoD:** migrasi sukses; `prisma studio` menampilkan data seed; superadmin bisa di-query.
 
 #### Sprint 2 — Auth System (2–3 hari)
+
 **Tujuan:** login/logout/refresh + middleware otorisasi.
+
 - [ ] `POST /auth/login` (bcrypt verify, terbitkan access+refresh token).
 - [ ] Refresh token disimpan di tabel `RefreshToken` + HttpOnly cookie.
 - [ ] `POST /auth/refresh` dengan **rotation** (invalidate token lama).
@@ -151,7 +159,9 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 - **DoD:** login mengembalikan token; endpoint terproteksi menolak tanpa/invalid token; refresh rotation bekerja.
 
 #### Sprint 3 — Invitation & Set-Password (2–3 hari)
+
 **Tujuan:** seluruh flow undangan berjenjang berfungsi (tanpa registrasi publik).
+
 - [ ] `EmailProvider` abstraksi + implementasi `ConsoleEmailProvider` (print link).
 - [ ] Template HTML email undangan (string template / `react-email` opsional).
 - [ ] `POST /invitations` — buat undangan (validasi hierarki role pengundang).
@@ -165,7 +175,9 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 - **DoD:** alur lengkap dari kirim undangan → buka link console → set password → login berhasil; aturan keamanan token terpenuhi.
 
 #### Sprint 4 — Users, Schools, Groups, Members (2–3 hari)
+
 **Tujuan:** CRUD entitas inti + role/ownership enforcement.
+
 - [ ] Users: `GET/POST /users`, `GET/PUT /users/me`, `GET/PUT/DELETE /users/:id`.
 - [ ] UserRole & UserSchool assignment.
 - [ ] Schools: `GET/POST/PUT/DELETE /schools`, `GET /schools/:id/stats`.
@@ -175,7 +187,9 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 - **DoD:** CRUD lengkap dengan otorisasi per role; pagination & filter berjalan.
 
 #### Sprint 5 — Form Evaluasi & Point System (3–4 hari)
+
 **Tujuan:** fitur inti aplikasi — evaluasi mingguan + distribusi point otomatis.
+
 - [ ] Util normalisasi `weekDate` (Senin minggu ybs) + week-picker helper.
 - [ ] `GET /evaluations` (filter groupId, weekDate), `POST /evaluations` (draft).
 - [ ] `GET /evaluations/:id`, `PUT /evaluations/:id` (sebelum submit).
@@ -188,7 +202,9 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 - **DoD:** submit evaluasi mendistribusikan point secara atomik & idempoten (tidak dobel saat re-submit).
 
 #### Sprint 6 — Dashboard Inti (2–3 hari)
+
 **Tujuan:** UI dashboard per role + integrasi FE↔BE end-to-end.
+
 - [ ] Frontend auth flow: login page, token mgmt (`store/authStore`), axios interceptor + refresh.
 - [ ] Layout dashboard (Sidebar desktop + bottom-nav mobile + RoleGuard).
 - [ ] `/set-password` page (validasi token → form → redirect login).
@@ -204,6 +220,7 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 ### 🟨 PHASE 2 — FEATURES
 
 #### Sprint 7 — Events, Materi, Notifikasi, Leaderboard (3–4 hari)
+
 - [ ] Events: CRUD + `POST /events/:id/attend` (self check-in, beri point).
 - [ ] Materi: CRUD per `weekDate` + publish flag.
 - [ ] Notifikasi in-app: `GET /notifications`, mark read / read-all + NotifBell.
@@ -212,6 +229,7 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 - **DoD:** keempat fitur jalan FE↔BE dengan otorisasi benar.
 
 #### Sprint 8 — File Upload & Analytics (3–4 hari)
+
 - [ ] Object storage (Cloudflare R2 / MinIO) + Multer + validasi MIME & ukuran (≤5MB).
 - [ ] Upload foto evaluasi nyata (`photoUrls`) + Next `<Image>`.
 - [ ] Analytics agregat di level DB:
@@ -224,6 +242,7 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 ### 🟩 PHASE 3 — POLISH & DEPLOY
 
 #### Sprint 9 — Hardening & Deployment (3–5 hari)
+
 - [ ] Config label level kelompok (`GET/PUT /config/group-levels`).
 - [ ] Rate limiting (`/auth/login` 5/menit; API umum 100/menit), Helmet, CORS ketat.
 - [ ] Sanitasi input & audit error handling (tidak bocorkan raw DB error).
@@ -236,12 +255,12 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 
 ## 4. Estimasi Waktu
 
-| Fase | Sprint | Estimasi |
-|---|---|---|
-| Phase 1 | Sprint 0–6 | ~13–20 hari kerja |
-| Phase 2 | Sprint 7–8 | ~6–8 hari kerja |
-| Phase 3 | Sprint 9 | ~3–5 hari kerja |
-| **Total** | | **~22–33 hari kerja** (1 developer) |
+| Fase      | Sprint     | Estimasi                            |
+| --------- | ---------- | ----------------------------------- |
+| Phase 1   | Sprint 0–6 | ~13–20 hari kerja                   |
+| Phase 2   | Sprint 7–8 | ~6–8 hari kerja                     |
+| Phase 3   | Sprint 9   | ~3–5 hari kerja                     |
+| **Total** |            | **~22–33 hari kerja** (1 developer) |
 
 > Estimasi untuk 1 developer full-time. Bisa diparalelkan (FE/BE terpisah) untuk mempercepat.
 
@@ -250,8 +269,14 @@ Pengerjaan dibagi menjadi **3 fase** & **9 sprint logis**. Setiap sprint punya
 ## 5. Detail Kontrak API (Ringkas)
 
 Format response konsisten:
+
 ```json
-{ "success": true, "data": {}, "message": "", "pagination": { "page": 1, "limit": 20, "total": 0, "totalPages": 0 } }
+{
+  "success": true,
+  "data": {},
+  "message": "",
+  "pagination": { "page": 1, "limit": 20, "total": 0, "totalPages": 0 }
+}
 ```
 
 Endpoint penuh mengikuti spesifikasi (`/api/v1`): AUTH, INVITATIONS, USERS, SCHOOLS,
@@ -275,6 +300,7 @@ export const POINT_RULES = {
   ANGGOTA_ATTEND_EVENT: 10,
 } as const;
 ```
+
 - Distribusi point dijalankan dalam **transaksi Prisma** saat submit evaluasi.
 - **Idempotensi**: cek `isSubmitted` agar tidak ada double-award.
 - "Tepat waktu" = submit ≤ hari Minggu minggu ybs; lewat itu = LATE.
@@ -308,13 +334,13 @@ export const POINT_RULES = {
 
 ## 9. Strategi Testing
 
-| Layer | Pendekatan |
-|---|---|
-| Shared schemas | Unit test Zod (valid/invalid cases) |
-| Backend service | Unit test logika point & otorisasi (Vitest) |
-| Backend API | Integration test endpoint kunci (supertest + test DB) |
-| Frontend | Component test komponen kritis + e2e happy-path (Playwright) opsional |
-| Smoke | Seed → login → isi evaluasi → cek point |
+| Layer           | Pendekatan                                                            |
+| --------------- | --------------------------------------------------------------------- |
+| Shared schemas  | Unit test Zod (valid/invalid cases)                                   |
+| Backend service | Unit test logika point & otorisasi (Vitest)                           |
+| Backend API     | Integration test endpoint kunci (supertest + test DB)                 |
+| Frontend        | Component test komponen kritis + e2e happy-path (Playwright) opsional |
+| Smoke           | Seed → login → isi evaluasi → cek point                               |
 
 Prioritas test: **auth, invitation, distribusi point** (logika paling berisiko).
 
@@ -334,14 +360,14 @@ Prioritas test: **auth, invitation, distribusi point** (logika paling berisiko).
 
 ## 11. Risiko & Catatan Terbuka
 
-| Risiko / Pertanyaan | Dampak | Rencana Mitigasi / Perlu Keputusan |
-|---|---|---|
-| Daftar 30+ sekolah Depok belum disediakan | Seed tidak lengkap | **Perlu data dari Anda**; sementara pakai placeholder |
-| Multi-role per user (tabel UserRole) vs role tunggal | Kompleksitas otorisasi | Default: dukung multi-role, tapi UI fokus 1 role aktif |
-| Definisi "tepat waktu" submit evaluasi | Salah hitung point | Default: deadline Minggu 23:59 WIB — konfirmasi bila beda |
-| Email production (Resend domain & API key) | Undangan tak terkirim di prod | Disiapkan abstraksi; isi kredensial saat deploy |
-| Zona waktu (WIB) untuk weekDate | Salah pengelompokan minggu | Normalisasi server ke Asia/Jakarta |
-| Storage foto (R2 vs MinIO) | Biaya/operasional | Default R2 (free tier); MinIO bila ingin self-host |
+| Risiko / Pertanyaan                                  | Dampak                        | Rencana Mitigasi / Perlu Keputusan                        |
+| ---------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| Daftar 30+ sekolah Depok belum disediakan            | Seed tidak lengkap            | **Perlu data dari Anda**; sementara pakai placeholder     |
+| Multi-role per user (tabel UserRole) vs role tunggal | Kompleksitas otorisasi        | Default: dukung multi-role, tapi UI fokus 1 role aktif    |
+| Definisi "tepat waktu" submit evaluasi               | Salah hitung point            | Default: deadline Minggu 23:59 WIB — konfirmasi bila beda |
+| Email production (Resend domain & API key)           | Undangan tak terkirim di prod | Disiapkan abstraksi; isi kredensial saat deploy           |
+| Zona waktu (WIB) untuk weekDate                      | Salah pengelompokan minggu    | Normalisasi server ke Asia/Jakarta                        |
+| Storage foto (R2 vs MinIO)                           | Biaya/operasional             | Default R2 (free tier); MinIO bila ingin self-host        |
 
 ---
 
@@ -357,4 +383,4 @@ Prioritas test: **auth, invitation, distribusi point** (logika paling berisiko).
 
 ---
 
-*Plan ini siap dieksekusi. Langkah berikutnya yang disarankan: mulai Sprint 0 (scaffold monorepo).*
+_Plan ini siap dieksekusi. Langkah berikutnya yang disarankan: mulai Sprint 0 (scaffold monorepo)._

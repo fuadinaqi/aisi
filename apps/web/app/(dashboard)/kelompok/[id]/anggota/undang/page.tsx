@@ -1,46 +1,47 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { api, type ApiResponse } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft } from 'lucide-react';
+import { api } from '@/lib/api';
+import { PageContainer, PageHeader } from '@/components/layout/PageShell';
+import { ListGroup } from '@/components/layout/AppUI';
+import { InviteForm } from '@/components/shared/InviteForm';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function UndangAnggotaPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm<{ name: string; email: string }>();
-
-  const onSubmit = async (data: { name: string; email: string }) => {
-    try {
-      setError('');
-      await api.post('/invitations', { ...data, role: 'ANGGOTA', groupId: id });
-      setSuccess('Undangan berhasil dikirim! Cek console API untuk link.');
-    } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Gagal');
-    }
-  };
+  const queryClient = useQueryClient();
 
   return (
-    <Card className="max-w-md">
-      <CardHeader><CardTitle>Undang Anggota Baru</CardTitle></CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div><Label>Nama</Label><Input {...register('name', { required: true })} /></div>
-          <div><Label>Email</Label><Input type="email" {...register('email', { required: true })} /></div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          {success && <p className="text-sm text-green-600">{success}</p>}
-          <div className="flex gap-2">
-            <Button type="submit" disabled={isSubmitting}>Kirim Undangan</Button>
-            <Button type="button" variant="outline" onClick={() => router.back()}>Batal</Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+    <PageContainer tight className="max-w-lg">
+      <PageHeader
+        title="Undang anggota"
+        compact
+        action={
+          <Button asChild variant="ghost" size="sm" className="rounded-xl">
+            <Link href={`/kelompok/${id}`}>
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Kembali
+            </Link>
+          </Button>
+        }
+      />
+
+      <ListGroup className="p-5">
+        <InviteForm
+          description="Anggota akan menerima undangan email dan otomatis masuk ke kelompok ini setelah aktivasi."
+          submitLabel="Kirim undangan anggota"
+          onCancel={() => router.back()}
+          onSubmit={async (data) => {
+            await api.post('/invitations', { ...data, role: 'ANGGOTA', groupId: id });
+            await queryClient.invalidateQueries({ queryKey: ['group', id] });
+            router.push(`/kelompok/${id}`);
+          }}
+        />
+      </ListGroup>
+    </PageContainer>
   );
 }

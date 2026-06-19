@@ -1,4 +1,4 @@
-# Aplikasi Pembinaan Dakwah Depok
+# Aplikasi AISI
 
 Monorepo full-stack untuk pendataan dan monitoring pembinaan dakwah di sekolah-sekolah Kota Depok.
 
@@ -47,16 +47,17 @@ pnpm dev
 
 ### Default Accounts (seed)
 
-| Role | Email | Password |
-|------|-------|----------|
+| Role       | Email                | Password       |
+| ---------- | -------------------- | -------------- |
 | Superadmin | superadmin@dakwah.id | SuperAdmin123! |
-| Admin | admin@dakwah.id | Admin123! |
-| Pembina | pembina1@dakwah.id | Pembina123! |
-| Anggota | anggota1@dakwah.id | Anggota123! |
+| Admin      | admin@dakwah.id      | Admin123!      |
+| Pembina    | pembina1@dakwah.id   | Pembina123!    |
+| Anggota    | anggota1@dakwah.id   | Anggota123!    |
 
 ### Test Invitations
 
 Seed includes 3 pending invitations. Use these tokens at `/set-password?token=...`:
+
 - `00000000-0000-4000-8000-000000000001`
 - `00000000-0000-4000-8000-000000000002`
 - `00000000-0000-4000-8000-000000000003`
@@ -71,13 +72,13 @@ packages/shared/   Zod schemas, constants, Prisma schema
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start all apps in dev mode |
-| `pnpm build` | Build all apps |
-| `pnpm db:migrate` | Run Prisma migrations |
-| `pnpm db:seed` | Seed database |
-| `pnpm db:studio` | Open Prisma Studio |
+| Command           | Description                |
+| ----------------- | -------------------------- |
+| `pnpm dev`        | Start all apps in dev mode |
+| `pnpm build`      | Build all apps             |
+| `pnpm db:migrate` | Run Prisma migrations      |
+| `pnpm db:seed`    | Seed database              |
+| `pnpm db:studio`  | Open Prisma Studio         |
 
 ## Deployment
 

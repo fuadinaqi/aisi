@@ -17,13 +17,15 @@ router.get('/overview', checkRole(Role.SUPERADMIN, Role.ADMIN), async (_req, res
     const eightWeeksAgo = new Date(thisMonday);
     eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
 
-    const [totalGroups, totalPembina, totalAnggota, evaluationsThisWeek, totalGroupsActive] = await Promise.all([
-      prisma.group.count({ where: { isActive: true } }),
-      prisma.userRole.count({ where: { role: Role.PEMBINA } }),
-      prisma.userRole.count({ where: { role: Role.ANGGOTA } }),
-      prisma.weeklyEvaluation.count({ where: { weekDate: thisMonday, isSubmitted: true } }),
-      prisma.group.count({ where: { isActive: true } }),
-    ]);
+    const [totalSchools, totalGroups, totalPembina, totalAnggota, evaluationsThisWeek, totalGroupsActive] =
+      await Promise.all([
+        prisma.school.count({ where: { isActive: true } }),
+        prisma.group.count({ where: { isActive: true } }),
+        prisma.userRole.count({ where: { role: Role.PEMBINA } }),
+        prisma.userRole.count({ where: { role: Role.ANGGOTA } }),
+        prisma.weeklyEvaluation.count({ where: { weekDate: thisMonday, isSubmitted: true } }),
+        prisma.group.count({ where: { isActive: true } }),
+      ]);
 
     const attendanceTrend = await prisma.$queryRaw<{ week: Date; rate: number }[]>`
       SELECT we."weekDate" as week,
@@ -56,6 +58,7 @@ router.get('/overview', checkRole(Role.SUPERADMIN, Role.ADMIN), async (_req, res
     });
 
     sendSuccess(res, {
+      totalSchools,
       totalGroups,
       totalPembina,
       totalAnggota,

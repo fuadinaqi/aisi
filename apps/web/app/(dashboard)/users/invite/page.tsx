@@ -3,50 +3,70 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { api } from '@/lib/api';
+import { PageContainer, PageHeader } from '@/components/layout/PageShell';
+import { ListGroup } from '@/components/layout/AppUI';
+import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RoleGuard } from '@/components/layout/RoleGuard';
 
-export default function InviteUserPage() {
+export default function InviteAdminPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm<{ name: string; email: string; role: string; schoolId?: string }>();
+  const { register, handleSubmit, formState: { isSubmitting } } = useForm<{
+    name: string;
+    email: string;
+  }>();
 
-  const onSubmit = async (data: { name: string; email: string; role: string }) => {
+  const onSubmit = async (data: { name: string; email: string }) => {
     try {
       setError('');
-      await api.post('/invitations', data);
-      setSuccess('Undangan berhasil dikirim! Cek console API untuk link.');
+      setSuccess('');
+      await api.post('/invitations', { ...data, role: 'ADMIN' });
+      setSuccess('Undangan admin berhasil dikirim. Cek log API untuk link aktivasi.');
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Gagal');
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Gagal mengirim undangan',
+      );
     }
   };
 
   return (
-    <RoleGuard allowedRoles={['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA']}>
-      <Card className="max-w-md">
-        <CardHeader><CardTitle>Undang User Baru</CardTitle></CardHeader>
-        <CardContent>
+    <RoleGuard allowedRoles={['SUPERADMIN']}>
+      <PageContainer tight className="max-w-lg">
+        <PageHeader
+          title="Undang Admin"
+          description="Hanya Superadmin yang dapat menambah admin baru ke sistem"
+        />
+
+        <ListGroup className="p-5">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div><Label>Nama</Label><Input {...register('name', { required: true })} /></div>
-            <div><Label>Email</Label><Input type="email" {...register('email', { required: true })} /></div>
-            <div>
-              <Label>Role</Label>
-              <select className="flex h-10 w-full rounded-md border px-3" {...register('role')}>
-                <option value="ADMIN">Admin</option>
-                <option value="PJ_SEKOLAH">PJ Sekolah</option>
-                <option value="PEMBINA">Pembina</option>
-                <option value="ANGGOTA">Anggota</option>
-              </select>
+            <div className="space-y-2">
+              <Label>Nama lengkap</Label>
+              <Input className="rounded-xl" {...register('name', { required: true })} placeholder="Nama admin" />
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            {success && <p className="text-sm text-green-600">{success}</p>}
-            <Button type="submit" disabled={isSubmitting}>Kirim Undangan</Button>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                className="rounded-xl"
+                {...register('email', { required: true })}
+                placeholder="admin@email.com"
+              />
+            </div>
+            {error && (
+              <div className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
+            )}
+            {success && (
+              <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</div>
+            )}
+            <Button type="submit" disabled={isSubmitting} className="rounded-xl">
+              {isSubmitting ? 'Mengirim...' : 'Kirim undangan admin'}
+            </Button>
           </form>
-        </CardContent>
-      </Card>
+        </ListGroup>
+      </PageContainer>
     </RoleGuard>
   );
 }

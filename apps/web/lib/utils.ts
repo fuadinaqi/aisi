@@ -13,6 +13,30 @@ export function formatDate(date: string | Date) {
   });
 }
 
+/** Format tanggal lokal untuk input type="date" (YYYY-MM-DD) */
+export function toDateInputValue(date: Date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function toDateTimeLocalValue(date: Date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${d}T${h}:${min}`;
+}
+
+export function getMediaUrl(url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1').replace(/\/api\/v1\/?$/, '');
+  return `${base}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
 export function getRoleLabel(role: string) {
   const labels: Record<string, string> = {
     SUPERADMIN: 'Super Admin',
@@ -30,4 +54,8 @@ export function getPrimaryRole(roles: string[]): string {
     if (roles.includes(r)) return r;
   }
   return roles[0] || 'ANGGOTA';
+}
+
+export function isPointEligibleRole(roles: string[]): boolean {
+  return roles.some((r) => r === 'PEMBINA' || r === 'ANGGOTA');
 }

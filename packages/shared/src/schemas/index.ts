@@ -52,11 +52,68 @@ export const schoolSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+export const createSchoolWithPjSchema = z.object({
+  name: z.string().min(2, 'Nama sekolah minimal 2 karakter'),
+  city: z.string().default('Depok'),
+  pj: z.object({
+    name: z.string().min(2, 'Nama PJ minimal 2 karakter'),
+    email: z.string().email('Email PJ tidak valid'),
+    phone: z.string().optional(),
+    password: passwordSchema.optional(),
+  }),
+});
+
+export const invitePjSchema = z.object({
+  name: z.string().min(2, 'Nama PJ minimal 2 karakter'),
+  email: z.string().email('Email PJ tidak valid'),
+  phone: z.string().optional(),
+  password: passwordSchema.optional(),
+  replace: z.boolean().default(false),
+  replaceUserId: z.string().optional(),
+});
+
+export const inviteAnggotaSchema = z.object({
+  name: z.string().min(2, 'Nama minimal 2 karakter'),
+  email: z.string().email('Email tidak valid'),
+});
+
+export const updateGroupMemberSchema = z.object({
+  name: z.string().min(2, 'Nama minimal 2 karakter').optional(),
+  email: z.string().email('Email tidak valid').optional(),
+  phone: z.string().optional().nullable(),
+});
+
+const pembinaInputSchema = z.object({
+  name: z.string().min(2, 'Nama pembina minimal 2 karakter'),
+  email: z.string().email('Email pembina tidak valid'),
+  phone: z.string().optional(),
+  password: passwordSchema.optional(),
+});
+
+export const createSchoolGroupSchema = z
+  .object({
+    name: z.string().min(2, 'Nama kelompok minimal 2 karakter'),
+    level: z.enum(['LEVEL_1', 'LEVEL_2']),
+    pembinaId: z.string().optional(),
+    pembina: pembinaInputSchema.optional(),
+  })
+  .refine((data) => data.pembinaId || data.pembina, {
+    message: 'Pilih pembina atau undang pembina baru',
+    path: ['pembinaId'],
+  });
+
 export const groupSchema = z.object({
   name: z.string().min(2),
   level: z.enum(['LEVEL_1', 'LEVEL_2']),
   schoolId: z.string(),
   pembinaId: z.string(),
+});
+
+export const updateGroupSchema = z.object({
+  name: z.string().min(2, 'Nama kelompok minimal 2 karakter').optional(),
+  level: z.enum(['LEVEL_1', 'LEVEL_2']).optional(),
+  pembinaId: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export const evaluationSchema = z.object({
@@ -72,24 +129,49 @@ export const evaluationSchema = z.object({
   ),
 });
 
-export const eventSchema = z.object({
-  title: z.string().min(2),
-  description: z.string().optional(),
-  location: z.string().optional(),
-  startAt: z.coerce.date(),
-  endAt: z.coerce.date().optional(),
-  pointValue: z.number().int().min(0).default(0),
-  imageUrl: z.string().optional(),
-  isPublished: z.boolean().default(false),
+export const eventSchema = z
+  .object({
+    title: z.string().min(2, 'Judul minimal 2 karakter'),
+    description: z.string().optional(),
+    location: z.string().optional(),
+    startAt: z.coerce.date(),
+    endAt: z.coerce.date(),
+    pointValue: z.number().int().min(0).default(0),
+    imageUrl: z.string().optional(),
+    schoolId: z.string().nullable().optional(),
+    isPublished: z.boolean().default(true),
+  })
+  .refine((data) => data.endAt > data.startAt, {
+    message: 'Waktu berakhir harus setelah waktu mulai',
+    path: ['endAt'],
+  });
+
+export const rejectEventCheckInSchema = z.object({
+  rejectionNote: z.string().optional(),
 });
 
-export const materiSchema = z.object({
-  title: z.string().min(2),
-  description: z.string().optional(),
-  weekDate: z.coerce.date(),
-  fileUrls: z.array(z.string()).default([]),
-  isPublished: z.boolean().default(true),
-});
+export const materiSchema = z
+  .object({
+    title: z.string().min(2, 'Judul minimal 2 karakter'),
+    description: z.string().optional(),
+    weekDate: z.coerce.date(),
+    contentType: z.enum(['FILE', 'LINK', 'RICH_TEXT']),
+    linkUrl: z.string().url('Link tidak valid').optional(),
+    contentHtml: z.string().optional(),
+    fileUrls: z.array(z.string()).default([]),
+    isPublished: z.boolean().default(true),
+  })
+  .superRefine((data, ctx) => {
+    if (data.contentType === 'LINK' && !data.linkUrl) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Link wajib diisi', path: ['linkUrl'] });
+    }
+    if (data.contentType === 'RICH_TEXT' && !data.contentHtml?.replace(/<[^>]*>/g, '').trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Konten wajib diisi', path: ['contentHtml'] });
+    }
+    if (data.contentType === 'FILE' && data.fileUrls.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'File wajib diunggah', path: ['fileUrls'] });
+    }
+  });
 
 export const groupLevelConfigSchema = z.object({
   level: z.enum(['LEVEL_1', 'LEVEL_2']),
@@ -106,3 +188,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
 export type InvitationInput = z.infer<typeof invitationSchema>;
 export type EvaluationInput = z.infer<typeof evaluationSchema>;
+export type CreateSchoolWithPjInput = z.infer<typeof createSchoolWithPjSchema>;
+export type CreateSchoolGroupInput = z.infer<typeof createSchoolGroupSchema>;
+export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
+export type UpdateGroupMemberInput = z.infer<typeof updateGroupMemberSchema>;

@@ -18,6 +18,19 @@ const storage = multer.diskStorage({
   },
 });
 
+const MATERI_MIME_TYPES = [
+  'image/',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'application/zip',
+];
+
 export const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -27,6 +40,18 @@ export const upload = multer({
     } else {
       cb(new Error('Hanya file gambar yang diizinkan'));
     }
+  },
+});
+
+export const uploadMateri = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = MATERI_MIME_TYPES.some((t) =>
+      t.endsWith('/') ? file.mimetype.startsWith(t) : file.mimetype === t,
+    );
+    if (allowed) cb(null, true);
+    else cb(new Error('Tipe file tidak didukung'));
   },
 });
 
