@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  PJ_SEKOLAH
+  PEMBINA
+  ANGGOTA
+}
+
+enum AttendanceStatus {
+  HADIR
+  TIDAK_HADIR
+  IZIN
+  SAKIT
+}
+
+enum GroupLevel {
+  LEVEL_1
+  LEVEL_2
+}
+
+enum NotifType {
+  REMINDER_FORM
+  NEW_EVENT
+  NEW_MATERI
+  POINT_EARNED
+  GENERAL
+}
+
+enum InvitationStatus {
+  PENDING
+  USED
+  EXPIRED
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  city      String   @default("Depok")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users  UserSchool[]
+  groups Group[]
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  phone       String?
+  password    String
+  avatarUrl   String?
+  totalPoints Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
+  roles              UserRole[]
+  schools            UserSchool[]
+  groupsAsPembina    Group[]                @relation("PembinaGroups")
+  groupsAsAnggota    GroupMember[]
+  evaluationsCreated WeeklyEvaluation[]     @relation("EvaluationCreator")
+  attendances        EvaluationAttendance[]
+  pointLogs          PointLog[]
+  notifications      Notification[]
+  refreshTokens      RefreshToken[]
+  eventAttendances   EventAttendance[]
+  invitationsSent    UserInvitation[]       @relation("InvitationCreator")
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  role   Role
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+model UserSchool {
+  id       String @id @default(cuid())
+  userId   String
+  schoolId String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, schoolId])
+}
+
+model GroupLevelConfig {
+  id        String     @id @default(cuid())
+  level     GroupLevel @unique
+  label     String
+  updatedAt DateTime   @updatedAt
+}
+
+model Group {
+  id        String     @id @default(cuid())
+  name      String
+  level     GroupLevel
+  schoolId  String
+  pembinaId String
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  school      School             @relation(fields: [schoolId], references: [id])
+  pembina     User               @relation("PembinaGroups", fields: [pembinaId], references: [id])
+  members     GroupMember[]
+  evaluations WeeklyEvaluation[]
+
+  @@index([schoolId])
+  @@index([pembinaId])
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  userId   String
+  joinedAt DateTime @default(now())
+  isActive Boolean  @default(true)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+model WeeklyEvaluation {
+  id          String    @id @default(cuid())
+  groupId     String
+  createdById String
+  weekDate    DateTime
+  notes       String?
+  photoUrls   String[]
+  isSubmitted Boolean   @default(false)
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  group       Group                  @relation(fields: [groupId], references: [id])
+  createdBy   User                   @relation("EvaluationCreator", fields: [createdById], references: [id])
+  attendances EvaluationAttendance[]
+
+  @@unique([groupId, weekDate])
+  @@index([groupId])
+  @@index([weekDate])
+}
+
+model EvaluationAttendance {
+  id           String           @id @default(cuid())
+  evaluationId String
+  userId       String
+  status       AttendanceStatus @default(HADIR)
+  note         String?
+
+  evaluation WeeklyEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id])
+
+  @@unique([evaluationId, userId])
+}
+
+model PointLog {
+  id          String   @id @default(cuid())
+  userId      String
+  points      Int
+  description String
+  refType     String?
+  refId       String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  location    String?
+  startAt     DateTime
+  endAt       DateTime?
+  pointValue  Int       @default(0)
+  imageUrl    String?
+  isPublished Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  attendances EventAttendance[]
+}
+
+model EventAttendance {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  checkedAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+}
+
+model WeeklyMateri {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  weekDate    DateTime
+  fileUrls    String[]
+  createdById String
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([weekDate])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      NotifType
+  title     String
+  body      String
+  refId     String?
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserInvitation {
+  id          String           @id @default(cuid())
+  email       String
+  name        String
+  role        Role
+  schoolId    String?
+  groupId     String?
+  token       String           @unique @default(uuid())
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  invitedBy User @relation("InvitationCreator", fields: [invitedById], references: [id])
+
+  @@index([token])
+  @@index([email])
+}

@@ -1,0 +1,21 @@
+{
+  "name": "dakwah-depok",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "db:generate": "pnpm --filter @dakwah/shared db:generate",
+    "db:migrate": "pnpm --filter @dakwah/shared db:migrate",
+    "db:seed": "pnpm --filter @dakwah/shared db:seed",
+    "db:studio": "pnpm --filter @dakwah/shared db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}
