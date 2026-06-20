@@ -199,7 +199,7 @@ export default function MutabaahPage() {
 
         {!items.length ? (
           <ListGroup className="p-6 text-center text-sm text-muted-foreground">
-            Belum ada master mutabaah untuk level kelompok Anda
+            Belum ada master mutabaah untuk kelompok Anda
           </ListGroup>
         ) : (
           <ListGroup className="space-y-6 p-5">

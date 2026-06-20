@@ -21,6 +21,7 @@ const checkInLabels: Record<string, string> = {
 export default function EventsPage() {
   const user = useAuthStore((s) => s.user);
   const role = user ? getPrimaryRole(user.roles) : '';
+  const isAnggota = role === 'ANGGOTA';
   const canCreate = role === 'SUPERADMIN' || role === 'ADMIN' || role === 'PJ_SEKOLAH';
   const isPembina = role === 'PEMBINA';
 
@@ -108,7 +109,7 @@ export default function EventsPage() {
                           <p className="mt-1 text-xs text-muted-foreground">Semua sekolah</p>
                         )}
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {formatEventTargetLevels(e.targetLevels, levelLabels)}
+                          {formatEventTargetLevels(e.targetLevels, levelLabels, isAnggota)}
                         </p>
                         {e.location && (
                           <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">

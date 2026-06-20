@@ -142,7 +142,7 @@ export default function EventDetailPage() {
           <p className="text-xs text-muted-foreground">Cakupan</p>
           <p className="mt-1 font-medium">{event.school?.name || 'Semua sekolah'}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {formatEventTargetLevels(event.targetLevels, levelLabels)}
+            {formatEventTargetLevels(event.targetLevels, levelLabels, isAnggota)}
           </p>
         </div>
 

@@ -119,8 +119,9 @@ export function isPointEligibleRole(roles: string[]): boolean {
 export function formatEventTargetLevels(
   targetLevels: string[] | undefined,
   labels: Record<string, string>,
+  forAnggota = false,
 ) {
-  if (!targetLevels?.length) return 'Semua level';
+  if (!targetLevels?.length) return forAnggota ? 'Semua kelompok' : 'Semua level';
   return targetLevels.map((level) => labels[level] || level).join(', ');
 }
 
