@@ -46,6 +46,12 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+export const evaluationListQuerySchema = paginationSchema.extend({
+  groupId: z.string().optional(),
+  weekDate: z.string().optional(),
+  schoolId: z.string().optional(),
+});
+
 export const schoolSchema = z.object({
   name: z.string().min(2),
   city: z.string().default('Depok'),
@@ -177,6 +183,83 @@ export const materiSchema = z
 export const groupLevelConfigSchema = z.object({
   level: z.enum(['LEVEL_1', 'LEVEL_2']),
   label: z.string().min(1),
+});
+
+const mutabaahOptionSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+});
+
+const mutabaahItemObjectSchema = z.object({
+  level: z.enum(['LEVEL_1', 'LEVEL_2']),
+  title: z.string().min(2, 'Judul minimal 2 karakter'),
+  description: z.string().optional(),
+  target: z.string().optional(),
+  fieldType: z.enum(['CHECKBOX', 'NUMBER', 'TEXT', 'SELECT']),
+  inputScope: z.enum(['WEEKLY', 'DAILY']).default('WEEKLY'),
+  options: z.array(mutabaahOptionSchema).optional(),
+  minValue: z.number().int().optional(),
+  maxValue: z.number().int().optional(),
+  sortOrder: z.number().int().min(0).default(0),
+  isRequired: z.boolean().default(true),
+  isActive: z.boolean().default(true),
+  allowOther: z.boolean().default(false),
+  otherLabel: z.string().min(1).default('Lainnya'),
+});
+
+function refineMutabaahItem(
+  data: z.infer<typeof mutabaahItemObjectSchema>,
+  ctx: z.RefinementCtx,
+) {
+  if (data.fieldType === 'SELECT' && (!data.options || data.options.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Pilihan wajib diisi untuk tipe SELECT',
+      path: ['options'],
+    });
+  }
+  if (data.minValue !== undefined && data.maxValue !== undefined && data.minValue > data.maxValue) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Nilai minimum tidak boleh lebih besar dari maksimum',
+      path: ['minValue'],
+    });
+  }
+}
+
+export const mutabaahItemSchema = mutabaahItemObjectSchema.superRefine(refineMutabaahItem);
+
+export const updateMutabaahItemSchema = mutabaahItemObjectSchema
+  .partial()
+  .superRefine((data, ctx) => {
+    if (data.fieldType === 'SELECT' && (!data.options || data.options.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Pilihan wajib diisi untuk tipe SELECT',
+        path: ['options'],
+      });
+    }
+    if (data.minValue !== undefined && data.maxValue !== undefined && data.minValue > data.maxValue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Nilai minimum tidak boleh lebih besar dari maksimum',
+        path: ['minValue'],
+      });
+    }
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'Minimal satu field harus diisi',
+  });
+
+export const mutabaahEntrySchema = z.object({
+  groupId: z.string(),
+  weekDate: z.coerce.date(),
+  answers: z.array(
+    z.object({
+      itemId: z.string(),
+      value: z.record(z.unknown()),
+    }),
+  ),
 });
 
 export const manualPointSchema = z.object({

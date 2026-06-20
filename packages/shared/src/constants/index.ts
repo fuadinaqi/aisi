@@ -27,6 +27,7 @@ export const POINT_RULES = {
   PEMBINA_SUBMIT_EVALUATION: 10,
   PEMBINA_SUBMIT_EVALUATION_LATE: 5,
   ANGGOTA_HADIR_PEMBINAAN: 5,
+  ANGGOTA_SUBMIT_MUTABAAH: 2,
 } as const;
 
 export const ROLES = [
@@ -43,6 +44,11 @@ export const PAGINATION_DEFAULT = {
   page: 1,
   limit: 20,
 } as const;
+
+/** Nilai internal opsi "Lainnya" pada mutabaah SELECT */
+export const MUTABAAH_OTHER_VALUE = '__other__';
+
+export const MUTABAAH_OTHER_DEFAULT_LABEL = 'Lainnya';
 
 export const INVITATION_RULES: Record<string, string[]> = {
   SUPERADMIN: ['ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA'],

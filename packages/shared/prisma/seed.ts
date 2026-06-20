@@ -112,6 +112,9 @@ async function clearDatabase() {
   await prisma.userInvitation.deleteMany();
   await prisma.userRole.deleteMany();
   await prisma.userSchool.deleteMany();
+  await prisma.mutabaahAnswer.deleteMany();
+  await prisma.mutabaahEntry.deleteMany();
+  await prisma.mutabaahItem.deleteMany();
   await prisma.group.deleteMany();
   await prisma.event.deleteMany();
   await prisma.weeklyMateri.deleteMany();
@@ -133,6 +136,108 @@ async function main() {
     where: { level: GroupLevel.LEVEL_2 },
     update: { label: 'Pratama' },
     create: { level: GroupLevel.LEVEL_2, label: 'Pratama' },
+  });
+
+  await prisma.mutabaahItem.createMany({
+    data: [
+      // Level Muda (LEVEL_1)
+      {
+        level: GroupLevel.LEVEL_1,
+        title: 'Sholat Wajib (berjamaah di masjid bagi laki laki)',
+        target: '35x',
+        fieldType: 'NUMBER',
+        inputScope: 'WEEKLY',
+        minValue: 0,
+        maxValue: 35,
+        isRequired: true,
+        sortOrder: 1,
+      },
+      {
+        level: GroupLevel.LEVEL_1,
+        title: "Tilawah Al Qur'an",
+        target: '14 halaman',
+        fieldType: 'NUMBER',
+        inputScope: 'WEEKLY',
+        minValue: 0,
+        maxValue: 50,
+        isRequired: false,
+        sortOrder: 2,
+      },
+      {
+        level: GroupLevel.LEVEL_1,
+        title: 'Dzikir pagi petang',
+        description: 'Total dzikir pagi petang pekan ini (angka)',
+        target: '5x seminggu',
+        fieldType: 'NUMBER',
+        inputScope: 'WEEKLY',
+        minValue: 0,
+        maxValue: 5,
+        isRequired: false,
+        sortOrder: 3,
+      },
+      // Level Pratama (LEVEL_2)
+      {
+        level: GroupLevel.LEVEL_2,
+        title: 'Sholat Wajib (berjamaah di masjid bagi laki laki)',
+        target: '35x seminggu',
+        fieldType: 'NUMBER',
+        inputScope: 'WEEKLY',
+        minValue: 0,
+        maxValue: 35,
+        isRequired: true,
+        sortOrder: 1,
+      },
+      {
+        level: GroupLevel.LEVEL_2,
+        title: "Tilawah Al Qur'an",
+        target: '70 halaman seminggu',
+        fieldType: 'NUMBER',
+        inputScope: 'WEEKLY',
+        minValue: 0,
+        maxValue: 100,
+        isRequired: false,
+        sortOrder: 2,
+      },
+      {
+        level: GroupLevel.LEVEL_2,
+        title: 'Dzikir pagi petang',
+        description: 'Total dzikir pagi petang pekan ini (angka)',
+        target: '7x seminggu',
+        fieldType: 'NUMBER',
+        inputScope: 'WEEKLY',
+        minValue: 0,
+        maxValue: 7,
+        isRequired: false,
+        sortOrder: 3,
+      },
+      {
+        level: GroupLevel.LEVEL_2,
+        title: 'Puasa Sunnah',
+        target: '1x seminggu',
+        fieldType: 'CHECKBOX',
+        inputScope: 'DAILY',
+        isRequired: false,
+        sortOrder: 4,
+      },
+      {
+        level: GroupLevel.LEVEL_2,
+        title: 'Sholat Dhuha',
+        target: '3x seminggu',
+        fieldType: 'CHECKBOX',
+        inputScope: 'DAILY',
+        isRequired: false,
+        sortOrder: 5,
+      },
+      {
+        level: GroupLevel.LEVEL_2,
+        title: 'Sholat Tahajud',
+        target: '1x seminggu',
+        fieldType: 'CHECKBOX',
+        inputScope: 'DAILY',
+        isRequired: false,
+        sortOrder: 6,
+      },
+    ],
   });
 
   const schoolRecords = [];

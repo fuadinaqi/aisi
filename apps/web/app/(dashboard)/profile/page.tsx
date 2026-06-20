@@ -1,10 +1,10 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
-import { api, type ApiResponse } from '@/lib/api';
+import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { useMyPoints } from '@/hooks/useMyPoints';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import {
   AppSectionHeader,
@@ -14,19 +14,13 @@ import {
 } from '@/components/layout/AppUI';
 import { PointBadge, RoleBadge, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { getPrimaryRole, isPointEligibleRole, formatDate } from '@/lib/utils';
+import { getPrimaryRole, formatDate } from '@/lib/utils';
 
 export default function ProfilePage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const showPoints = user ? isPointEligibleRole(user.roles) : false;
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['points-me'],
-    queryFn: async () => (await api.get<ApiResponse>('/points/me')).data.data,
-    enabled: showPoints,
-  });
+  const { totalPoints, logs, showPoints, isLoading } = useMyPoints();
 
   const handleLogout = async () => {
     try {
@@ -47,7 +41,7 @@ export default function ProfilePage() {
           name={user.name}
           email={user.email}
           badge={<RoleBadge role={getPrimaryRole(user.roles)} />}
-          points={showPoints ? <PointBadge points={user.totalPoints} /> : undefined}
+          points={showPoints ? <PointBadge points={totalPoints} /> : undefined}
         />
       )}
 
@@ -59,27 +53,25 @@ export default function ProfilePage() {
               <div className="p-5">
                 <LoadingSkeleton className="h-24 rounded-xl" />
               </div>
-            ) : !data?.logs?.length ? (
+            ) : !logs.length ? (
               <div className="px-5 py-8 text-center text-sm text-muted-foreground">
                 Belum ada riwayat poin
               </div>
             ) : (
-              data.logs.map(
-                (log: { id: string; points: number; description: string; createdAt: string }, i: number) => (
-                  <div key={log.id}>
-                    {i > 0 && <ListDivider />}
-                    <div className="flex items-center justify-between gap-4 px-4 py-4 md:px-5">
-                      <div className="min-w-0">
-                        <p className="font-medium">{log.description}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(log.createdAt)}</p>
-                      </div>
-                      <span className="shrink-0 text-sm font-semibold text-amber-600">
-                        +{log.points}
-                      </span>
+              logs.map((log, i) => (
+                <div key={log.id}>
+                  {i > 0 && <ListDivider />}
+                  <div className="flex items-center justify-between gap-4 px-4 py-4 md:px-5">
+                    <div className="min-w-0">
+                      <p className="font-medium">{log.description}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(log.createdAt)}</p>
                     </div>
+                    <span className="shrink-0 text-sm font-semibold text-amber-600">
+                      +{log.points}
+                    </span>
                   </div>
-                ),
-              )
+                </div>
+              ))
             )}
           </ListGroup>
         </section>

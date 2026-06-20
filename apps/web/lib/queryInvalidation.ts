@@ -69,6 +69,15 @@ export async function invalidateConfigQueries(queryClient: QueryClient) {
   await queryClient.invalidateQueries({ queryKey: ['group-levels'] });
 }
 
+/** Invalidate master & entri mutabaah. */
+export async function invalidateMutabaahQueries(queryClient: QueryClient) {
+  await queryClient.invalidateQueries({ queryKey: ['mutabaah-items'] });
+  await queryClient.invalidateQueries({ queryKey: ['mutabaah-my'] });
+  await queryClient.invalidateQueries({ queryKey: ['mutabaah-member'] });
+  await queryClient.invalidateQueries({ queryKey: ['mutabaah-group'] });
+  await invalidateDashboardQueries(queryClient);
+}
+
 /** Invalidate notifikasi setelah ditandai dibaca. */
 export async function invalidateNotificationQueries(queryClient: QueryClient) {
   await queryClient.invalidateQueries({ queryKey: ['notifications'] });

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn, toDateInputValue } from '@/lib/utils';
+import { cn, formatWeekRange, toDateInputValue, toWeekDateParam } from '@/lib/utils';
 import type { EvaluationItem, GroupItem } from '@/lib/types';
 
 const STATUSES = ['HADIR', 'IZIN', 'SAKIT', 'TIDAK_HADIR'] as const;
@@ -63,13 +63,14 @@ export default function IsiEvaluasiPage() {
     setEvalLoading(true);
     setError('');
     try {
-      const res = await api.get<ApiResponse<EvaluationItem[]>>(
-        `/evaluations?groupId=${gid}&weekDate=${week}`,
-      );
+      const res = await api.get<ApiResponse<EvaluationItem[]>>('/evaluations', {
+        params: { groupId: gid, weekDate: toWeekDateParam(week), limit: 1 },
+      });
       const ev = res.data.data?.[0];
       if (ev) {
         setEvalId(ev.id);
         setIsSubmitted(ev.isSubmitted);
+        setWeekDate(toWeekDateParam(ev.weekDate));
         setNotes(ev.notes || '');
         setAttendances(
           ev.attendances.map((a) => ({
@@ -176,10 +177,13 @@ export default function IsiEvaluasiPage() {
 
       {isSubmitted && (
         <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Evaluasi pekan ini sudah dikirim dan tidak bisa diubah.{' '}
+          Evaluasi pekan {formatWeekRange(weekDate)} sudah dikirim dan tidak bisa diubah.{' '}
           <Link href={`/evaluasi/${evalId}`} className="font-medium underline">
             Lihat detail
           </Link>
+          <p className="mt-2 text-emerald-900/80">
+            Untuk isi pekan berikutnya, ubah tanggal pekan di bawah (mis. pekan {formatWeekRange(todayMax)}).
+          </p>
         </div>
       )}
 
@@ -197,7 +201,7 @@ export default function IsiEvaluasiPage() {
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
                 value={groupId}
-                disabled={isSubmitted || evalLoading}
+                disabled={evalLoading}
                 onChange={(e) => handleGroupChange(e.target.value)}
               >
                 {groups?.map((g) => (
@@ -213,9 +217,10 @@ export default function IsiEvaluasiPage() {
                 type="date"
                 value={weekDate}
                 max={todayMax}
-                disabled={isSubmitted || evalLoading}
+                disabled={evalLoading}
                 onChange={(e) => handleWeekDateChange(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">Pekan {formatWeekRange(weekDate)}</p>
             </div>
           </div>
 

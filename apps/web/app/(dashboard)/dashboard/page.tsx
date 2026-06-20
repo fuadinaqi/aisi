@@ -11,10 +11,12 @@ import {
   BarChart3,
   Settings,
   Star,
+  BookHeart,
 } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole, getRoleLabel, isPointEligibleRole } from '@/lib/utils';
+import { useMyPoints } from '@/hooks/useMyPoints';
+import { getPrimaryRole, getRoleLabel } from '@/lib/utils';
 import { PointBadge, RoleBadge, LoadingSkeleton } from '@/components/shared/Badges';
 import { AppLogo } from '@/components/layout/AppLogo';
 import { PageContainer } from '@/components/layout/PageShell';
@@ -34,6 +36,7 @@ function getQuickActions(role: string) {
 
   if (role === 'ANGGOTA') {
     return [
+      { href: '/mutabaah', label: 'Mutabaah', icon: BookHeart },
       { href: '/events', label: 'Agenda', icon: Calendar },
       { href: '/notifications', label: 'Notifikasi', icon: Bell },
       { href: '/profile', label: 'Profil', icon: Users },
@@ -82,7 +85,7 @@ function getQuickActions(role: string) {
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const role = user ? getPrimaryRole(user.roles) : 'ANGGOTA';
-  const showPoints = user ? isPointEligibleRole(user.roles) : false;
+  const { totalPoints, showPoints } = useMyPoints();
   const quickActions = getQuickActions(role);
 
   const { data: overview, isLoading } = useQuery<OverviewData | null>({
@@ -126,7 +129,7 @@ export default function DashboardPage() {
         trailing={
           showPoints && user ? (
             <div className="rounded-2xl bg-white/15 px-3 py-2 text-center backdrop-blur-sm">
-              <p className="text-lg font-bold">{user.totalPoints.toLocaleString('id-ID')}</p>
+              <p className="text-lg font-bold">{totalPoints.toLocaleString('id-ID')}</p>
               <p className="text-[10px] text-primary-foreground/75">Poin</p>
             </div>
           ) : undefined
@@ -201,7 +204,7 @@ export default function DashboardPage() {
               icon={Star}
               title="Total poin"
               subtitle="Lihat riwayat di profil"
-              trailing={<PointBadge points={user.totalPoints} />}
+              trailing={<PointBadge points={totalPoints} />}
               showChevron
             />
           </ListGroup>

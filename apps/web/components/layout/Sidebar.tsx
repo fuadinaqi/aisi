@@ -16,6 +16,7 @@ import {
   User,
   BarChart3,
   LayoutGrid,
+  BookHeart,
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -74,6 +75,7 @@ const navByRole: Record<string, NavItem[]> = {
   ],
   ANGGOTA: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
+    { href: '/mutabaah', label: 'Mutabaah', icon: BookHeart },
     { href: '/events', label: 'Agenda', icon: Calendar },
     { href: '/notifications', label: 'Notifikasi', icon: Bell },
     { href: '/profile', label: 'Profil', icon: User },
@@ -86,7 +88,7 @@ const mobilePrimaryByRole: Record<string, string[]> = {
   ADMIN: ['/dashboard', '/schools', '/notifications', '/profile'],
   PJ_SEKOLAH: ['/dashboard', '/schools', '/notifications', '/profile'],
   PEMBINA: ['/dashboard', '/evaluasi', '/notifications', '/profile'],
-  ANGGOTA: ['/dashboard', '/events', '/notifications', '/profile'],
+  ANGGOTA: ['/dashboard', '/mutabaah', '/notifications', '/profile'],
 };
 
 function isNavActive(pathname: string, href: string): boolean {

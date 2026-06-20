@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { param } from '../../utils/param.js';
-import { evaluationSchema, paginationSchema, POINT_RULES, isPointEligible } from '@dakwah/shared';
+import {
+  evaluationSchema,
+  evaluationListQuerySchema,
+  POINT_RULES,
+  isPointEligible,
+} from '@dakwah/shared';
 import { prisma } from '../../lib/prisma.js';
 import { checkAuth, validate, isPembinaOfGroup, getUserSchoolIds, canAccessSchool } from '../../middleware/auth.js';
 import { sendSuccess } from '../../utils/response.js';
@@ -79,7 +84,7 @@ async function assertCanAccessEvaluation(
   }
 }
 
-router.get('/', validate(paginationSchema, 'query'), async (req, res, next) => {
+router.get('/', validate(evaluationListQuerySchema, 'query'), async (req, res, next) => {
   try {
     const { page, limit } = req.query as unknown as { page: number; limit: number };
     const { groupId, weekDate, schoolId } = req.query as {

@@ -21,6 +21,58 @@ export function toDateInputValue(date: Date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+/** Ambil komponen tanggal kalender WIB (selaras dengan API) */
+function getWibCalendarParts(input: Date | string): { year: number; month: number; day: number } {
+  let instant: number;
+  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const [y, m, d] = input.split('-').map(Number);
+    instant = Date.UTC(y, m - 1, d) - WIB_OFFSET_MS;
+  } else {
+    instant = new Date(input).getTime();
+  }
+  const wib = new Date(instant + WIB_OFFSET_MS);
+  return {
+    year: wib.getUTCFullYear(),
+    month: wib.getUTCMonth() + 1,
+    day: wib.getUTCDate(),
+  };
+}
+
+/** Normalisasi weekDate ke YYYY-MM-DD (Senin pekan, WIB) untuk query API */
+export function toWeekDateParam(date: string | Date): string {
+  const { year, month, day } = getWibCalendarParts(date);
+  const wib = new Date(Date.UTC(year, month - 1, day));
+  const dow = wib.getUTCDay();
+  const mondayDay = day - dow + (dow === 0 ? -6 : 1);
+  const monday = new Date(Date.UTC(year, month - 1, mondayDay));
+  const y = monday.getUTCFullYear();
+  const m = String(monday.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(monday.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Label rentang pekan (Sen–Min) dalam WIB */
+export function formatWeekRange(date: string | Date): string {
+  const mondayParam = toWeekDateParam(date);
+  const [y, m, d] = mondayParam.split('-').map(Number);
+  const monday = new Date(Date.UTC(y, m - 1, d) - WIB_OFFSET_MS);
+  const sunday = new Date(Date.UTC(y, m - 1, d + 6) - WIB_OFFSET_MS);
+  const startOpts: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'Asia/Jakarta',
+  };
+  const endOpts: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Asia/Jakarta',
+  };
+  return `${monday.toLocaleDateString('id-ID', startOpts)} – ${sunday.toLocaleDateString('id-ID', endOpts)}`;
+}
+
 export function toDateTimeLocalValue(date: Date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

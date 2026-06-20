@@ -53,6 +53,18 @@ enum InvitationStatus {
   EXPIRED
 }
 
+enum MutabaahFieldType {
+  CHECKBOX
+  NUMBER
+  TEXT
+  SELECT
+}
+
+enum MutabaahInputScope {
+  WEEKLY
+  DAILY
+}
+
 model School {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -91,6 +103,7 @@ model User {
   eventAttendances   EventAttendance[]
   eventApprovals     EventAttendance[]      @relation("EventApprover")
   invitationsSent    UserInvitation[]       @relation("InvitationCreator")
+  mutabaahEntries    MutabaahEntry[]
 }
 
 model UserRole {
@@ -136,6 +149,7 @@ model Group {
   members         GroupMember[]
   evaluations     WeeklyEvaluation[]
   eventAttendances EventAttendance[]
+  mutabaahEntries MutabaahEntry[]
 
   @@index([schoolId])
   @@index([pembinaId])
@@ -306,4 +320,58 @@ model UserInvitation {
 
   @@index([token])
   @@index([email])
+}
+
+model MutabaahItem {
+  id          String              @id @default(cuid())
+  level       GroupLevel
+  title       String
+  description String?
+  target      String?
+  fieldType   MutabaahFieldType
+  inputScope  MutabaahInputScope  @default(WEEKLY)
+  options     Json?
+  minValue    Int?
+  maxValue    Int?
+  sortOrder   Int                 @default(0)
+  isRequired  Boolean             @default(true)
+  isActive    Boolean             @default(true)
+  allowOther  Boolean             @default(false)
+  otherLabel  String              @default("Lainnya")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  answers MutabaahAnswer[]
+
+  @@index([level, isActive, sortOrder])
+}
+
+model MutabaahEntry {
+  id          String    @id @default(cuid())
+  userId      String
+  groupId     String
+  weekDate    DateTime
+  isSubmitted Boolean   @default(false)
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User             @relation(fields: [userId], references: [id])
+  group   Group            @relation(fields: [groupId], references: [id])
+  answers MutabaahAnswer[]
+
+  @@unique([userId, groupId, weekDate])
+  @@index([groupId, weekDate])
+}
+
+model MutabaahAnswer {
+  id      String @id @default(cuid())
+  entryId String
+  itemId  String
+  value   Json
+
+  entry MutabaahEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  item  MutabaahItem  @relation(fields: [itemId], references: [id])
+
+  @@unique([entryId, itemId])
 }

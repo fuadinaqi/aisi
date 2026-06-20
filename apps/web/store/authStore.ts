@@ -13,6 +13,7 @@ interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
   setAuth: (user: AuthUser, token: string) => void;
+  updateTotalPoints: (totalPoints: number) => void;
   logout: () => void;
   isAuthenticated: () => boolean;
 }
@@ -26,6 +27,10 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('accessToken', token);
         set({ user, accessToken: token });
       },
+      updateTotalPoints: (totalPoints) =>
+        set((state) =>
+          state.user ? { user: { ...state.user, totalPoints } } : {},
+        ),
       logout: () => {
         localStorage.removeItem('accessToken');
         set({ user: null, accessToken: null });

@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Calendar, Mail, Pencil, Phone, School, Users } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -12,7 +13,8 @@ import { ListGroup, ProfileHeader } from '@/components/layout/AppUI';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
 import { LoadingSkeleton, PointBadge, RoleBadge } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatWeekRange, toDateInputValue } from '@/lib/utils';
+import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import type { GroupMemberDetail } from '@/lib/types';
 
 const levelLabels: Record<string, string> = {
@@ -22,10 +24,14 @@ const levelLabels: Record<string, string> = {
 
 export default function AnggotaDetailPage() {
   const { id, userId } = useParams<{ id: string; userId: string }>();
+  const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const role = user ? getPrimaryRole(user.roles) : '';
   const canEdit =
     role === 'PEMBINA' || role === 'PJ_SEKOLAH' || role === 'ADMIN' || role === 'SUPERADMIN';
+  const [mutabaahWeek, setMutabaahWeek] = useState(
+    searchParams.get('weekDate') || toDateInputValue(),
+  );
 
   const { data: member, isLoading } = useQuery<GroupMemberDetail>({
     queryKey: ['group-member', id, userId],
@@ -129,6 +135,32 @@ export default function AnggotaDetailPage() {
             <p className="font-medium">{member.school.name}</p>
           </div>
         </div>
+      </ListGroup>
+
+      <ListGroup className="mt-4 p-4">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Mutabaah yaumiyah
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Laporan ibadah harian anggota per pekan · {formatWeekRange(mutabaahWeek)}
+            </p>
+          </div>
+          <input
+            type="date"
+            value={mutabaahWeek}
+            max={toDateInputValue()}
+            onChange={(e) => setMutabaahWeek(e.target.value)}
+            className="h-9 rounded-xl border border-input bg-background px-3 text-sm"
+          />
+        </div>
+        <MutabaahMemberPanel
+          userId={userId}
+          groupId={id}
+          weekDate={mutabaahWeek}
+          userName={member.user.name}
+        />
       </ListGroup>
 
       {member.user.lastLoginAt && (

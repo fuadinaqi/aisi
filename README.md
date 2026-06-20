@@ -15,18 +15,19 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 
 | Peran | Kemampuan utama |
 | ----- | --------------- |
-| **Superadmin / Admin** | Kelola sekolah, PJ Sekolah, kelompok, undangan admin, konfigurasi label level, analitik kota |
+| **Superadmin / Admin** | Kelola sekolah, PJ Sekolah, kelompok, undangan admin, konfigurasi label level & master mutabaah, analitik kota |
 | **PJ Sekolah** | Kelola kelompok & pembina di sekolahnya, lihat evaluasi sekolah, analitik sekolah, buat agenda |
-| **Pembina** | Isi evaluasi mingguan anggota, buat materi, kelola agenda & persetujuan check-in |
-| **Anggota** | Lihat agenda sesuai level kelompok, check-in event dengan foto, lihat poin & profil |
+| **Pembina** | Isi evaluasi mingguan anggota, lihat mutabaah anggota per pekan, buat materi, kelola agenda & persetujuan check-in |
+| **Anggota** | Isi mutabaah yaumiyah per pekan, lihat agenda sesuai level kelompok, check-in event dengan foto, lihat poin & profil |
 
 ### Modul
 
 - **Sekolah & Kelompok** — CRUD sekolah, PJ Sekolah (multi-PJ), kelompok dengan level (`LEVEL_1` / `LEVEL_2`), undangan pembina & anggota
-- **Evaluasi Mingguan** — Pembina mengisi kehadiran per pekan; create-only (409 jika sudah ada), edit via PUT; scope per kelompok/sekolah
+- **Evaluasi Mingguan** — Pembina mengisi kehadiran per pekan (satu evaluasi per kelompok per pekan); create-only (409 jika sudah ada), edit via PUT; tampilan mutabaah anggota per pekan evaluasi
+- **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina lihat di detail evaluasi & detail anggota
 - **Agenda & Check-in** — Event dengan target level (semua level jika kosong); anggota check-in berfoto; pembina menyetujui/menolak
 - **Materi** — Upload file, link eksternal, atau rich text
-- **Poin & Leaderboard** — Poin dari evaluasi tepat waktu dan check-in event yang disetujui
+- **Poin & Leaderboard** — Poin evaluasi tepat waktu, hadir pembinaan, kirim mutabaah (+2), dan check-in event yang disetujui
 - **Analitik** — Ringkasan kota (admin) atau per sekolah (PJ Sekolah): kelompok, pembina, anggota, tingkat submit evaluasi, tren kehadiran
 - **Notifikasi & Undangan** — Undangan email / set-password langsung; daftar undangan untuk admin
 
@@ -106,6 +107,28 @@ packages/shared/   Zod schemas, constants, Prisma schema & migrations
 See `.github/workflows/deploy.yml` for CI/CD pipeline and `deploy/nginx.conf` for Nginx config.
 
 ## Changelog
+
+### 2025-06-19 — Mutabaah yaumiyah, perbaikan evaluasi & poin
+
+#### Backend
+- **Mutabaah:** Modul `/mutabaah` — CRUD master (admin), isi/kirim entri anggota, lihat mutabaah per anggota/kelompok; field dinamis (`CHECKBOX`, `NUMBER`, `TEXT`, `SELECT`; cakupan `WEEKLY`/`DAILY`; opsi "Lainnya")
+- **Mutabaah poin:** +2 poin saat anggota kirim mutabaah (`ANGGOTA_SUBMIT_MUTABAAH`); validasi pekan sejak `joinedAt` kelompok
+- **Evaluasi:** Perbaikan filter list — `evaluationListQuerySchema` agar `groupId` & `weekDate` tidak hilang dari query (bug evaluasi pekan salah terdeteksi sudah terkirim)
+- **weekDate:** Normalisasi pekan konsisten timezone WIB (`getMonday`, `assertWeekDateNotBeforeJoin`)
+
+#### Frontend
+- **Mutabaah anggota:** Halaman `/mutabaah` — form per pekan, batas tanggal sejak bergabung kelompok, draft & kirim
+- **Mutabaah admin:** Halaman `/config/mutabaah` — kelola master per level
+- **Mutabaah pembina:** Panel di detail evaluasi & detail anggota; grid harian; empty state jika belum diisi; label rentang pekan
+- **Evaluasi:** Form isi evaluasi multi-pekan (ubah tanggal pekan meski pekan lain sudah terkirim); rentang pekan di header & form
+- **Poin:** Hook `useMyPoints` — sinkron total poin profil/dashboard dengan API (fix stale auth store)
+- **UX/Stabilitas:** Perbaikan hydration `RoleGuard`; React Query `staleTime: 0`; invalidation mutabaah & dashboard
+
+#### Database
+- Migration `20250619180000_mutabaah_yaumiyah` — `MutabaahItem`, `MutabaahEntry`, `MutabaahAnswer`
+- Migration `20250619200000_mutabaah_allow_other` — kolom `allowOther`, `otherLabel`
+- Migration `20250619210000_mutabaah_dzikir_number` / `20250619211000_mutabaah_dzikir_weekly` — penyesuaian seed dzikir
+- Seed mutabaah per level (`LEVEL_1` Muda, `LEVEL_2` Pratama)
 
 ### 2025-06-19 — Evaluasi, agenda, analitik & cache
 
