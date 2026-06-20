@@ -11,6 +11,7 @@ import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { formatDate, getMediaUrl } from '@/lib/utils';
+import { invalidateEventQueries } from '@/lib/queryInvalidation';
 
 type PendingCheckIn = {
   id: string;
@@ -31,13 +32,13 @@ export default function EventCheckInsPage() {
     queryFn: async () => (await api.get<ApiResponse<PendingCheckIn[]>>('/events/check-ins/pending')).data.data,
   });
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = async (id: string, eventId: string) => {
     try {
       setProcessingId(id);
       setError('');
       await api.post(`/events/check-ins/${id}/approve`);
       await queryClient.invalidateQueries({ queryKey: ['event-check-ins-pending'] });
-      await queryClient.invalidateQueries({ queryKey: ['events'] });
+      await invalidateEventQueries(queryClient, eventId, { includePoints: true });
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -48,12 +49,13 @@ export default function EventCheckInsPage() {
     }
   };
 
-  const handleReject = async (id: string) => {
+  const handleReject = async (id: string, eventId: string) => {
     try {
       setProcessingId(id);
       setError('');
       await api.post(`/events/check-ins/${id}/reject`, {});
       await queryClient.invalidateQueries({ queryKey: ['event-check-ins-pending'] });
+      await invalidateEventQueries(queryClient, eventId, { includePoints: true });
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -113,14 +115,14 @@ export default function EventCheckInsPage() {
                         variant="outline"
                         className="flex-1 rounded-xl"
                         disabled={processingId === item.id}
-                        onClick={() => handleReject(item.id)}
+                        onClick={() => handleReject(item.id, item.event.id)}
                       >
                         Tolak
                       </Button>
                       <Button
                         className="flex-1 rounded-xl"
                         disabled={processingId === item.id}
-                        onClick={() => handleApprove(item.id)}
+                        onClick={() => handleApprove(item.id, item.event.id)}
                       >
                         Setujui
                       </Button>

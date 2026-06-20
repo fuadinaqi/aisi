@@ -23,7 +23,11 @@ import configRoutes from './modules/config/config.routes.js';
 
 const app = express();
 
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
 app.use(compression());
 app.use(cors({ origin: env.ALLOWED_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '10mb' }));

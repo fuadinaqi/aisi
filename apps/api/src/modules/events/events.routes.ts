@@ -6,11 +6,58 @@ import { checkAuth, checkRole, validate, getUserSchoolIds, isPembinaOfGroup } fr
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
 import { upload, getPublicUrl } from '../../lib/storage.js';
-import { EventCheckInStatus, Role } from '@prisma/client';
+import { EventCheckInStatus, GroupLevel, Role } from '@prisma/client';
 
 const router = Router();
 
 router.use(checkAuth);
+
+function parseTargetLevels(value: unknown): GroupLevel[] {
+  if (value === undefined || value === null || value === '' || value === 'all') return [];
+  if (Array.isArray(value)) {
+    return value.filter((v): v is GroupLevel => v === 'LEVEL_1' || v === 'LEVEL_2');
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((v): v is GroupLevel => v === 'LEVEL_1' || v === 'LEVEL_2');
+      }
+    } catch {
+      if (value === 'LEVEL_1' || value === 'LEVEL_2') return [value];
+    }
+  }
+  return [];
+}
+
+async function getUserGroupLevels(userId: string, roles: string[]): Promise<GroupLevel[]> {
+  if (roles.includes('PJ_SEKOLAH')) {
+    const schoolIds = await getUserSchoolIds(userId);
+    const groups = await prisma.group.findMany({
+      where: { schoolId: { in: schoolIds }, isActive: true },
+      select: { level: true },
+    });
+    return [...new Set(groups.map((g) => g.level))];
+  }
+
+  if (roles.includes('PEMBINA')) {
+    const groups = await prisma.group.findMany({
+      where: { pembinaId: userId, isActive: true },
+      select: { level: true },
+    });
+    return [...new Set(groups.map((g) => g.level))];
+  }
+
+  if (roles.includes('ANGGOTA')) {
+    const memberships = await prisma.groupMember.findMany({
+      where: { userId, isActive: true },
+      include: { group: { select: { level: true } } },
+    });
+    return [...new Set(memberships.map((m) => m.group.level))];
+  }
+
+  return [];
+}
 
 async function buildEventVisibilityWhere(userId: string, roles: string[]) {
   const now = new Date();
@@ -41,13 +88,25 @@ async function buildEventVisibilityWhere(userId: string, roles: string[]) {
     schoolIds = [...new Set(memberships.map((m) => m.group.schoolId))];
   }
 
+  const userLevels = await getUserGroupLevels(userId, roles);
+  const schoolFilter = { OR: [{ schoolId: null }, { schoolId: { in: schoolIds } }] };
+  const levelFilter =
+    userLevels.length > 0
+      ? {
+          OR: [{ targetLevels: { isEmpty: true } }, { targetLevels: { hasSome: userLevels } }],
+        }
+      : { targetLevels: { isEmpty: true } };
+
   return {
-    ...base,
-    OR: [{ schoolId: null }, { schoolId: { in: schoolIds } }],
+    AND: [base, schoolFilter, levelFilter],
   };
 }
 
-async function resolveAnggotaGroup(userId: string, schoolId: string | null) {
+async function resolveAnggotaGroup(
+  userId: string,
+  schoolId: string | null,
+  targetLevels: GroupLevel[],
+) {
   const memberships = await prisma.groupMember.findMany({
     where: {
       userId,
@@ -57,14 +116,18 @@ async function resolveAnggotaGroup(userId: string, schoolId: string | null) {
         ...(schoolId ? { schoolId } : {}),
       },
     },
-    include: { group: { select: { id: true, schoolId: true, pembinaId: true } } },
+    include: { group: { select: { id: true, schoolId: true, pembinaId: true, level: true } } },
   });
 
-  if (!memberships.length) {
-    throw new AppError(400, 'Anda belum terdaftar di kelompok yang relevan');
+  const eligible = targetLevels.length
+    ? memberships.filter((m) => targetLevels.includes(m.group.level))
+    : memberships;
+
+  if (!eligible.length) {
+    throw new AppError(400, 'Event ini tidak tersedia untuk level kelompok Anda');
   }
 
-  return memberships[0]!;
+  return eligible[0]!;
 }
 
 function isEventOngoing(startAt: Date, endAt: Date, now = new Date()) {
@@ -81,6 +144,7 @@ function parseEventBody(body: Record<string, unknown>) {
     pointValue: body.pointValue !== undefined ? Number(body.pointValue) : 0,
     imageUrl: body.imageUrl || undefined,
     schoolId: body.schoolId === '' || body.schoolId === 'all' ? null : body.schoolId || undefined,
+    targetLevels: parseTargetLevels(body.targetLevels),
     isPublished: body.isPublished === undefined ? true : body.isPublished === true || body.isPublished === 'true',
   });
 }
@@ -187,6 +251,7 @@ router.post(
           pointValue: parsed.pointValue,
           imageUrl,
           schoolId,
+          targetLevels: parsed.targetLevels,
           isPublished: parsed.isPublished,
           createdById: req.user!.userId,
         },
@@ -366,6 +431,7 @@ router.put(
           pointValue: parsed.pointValue,
           imageUrl,
           isPublished: parsed.isPublished,
+          targetLevels: parsed.targetLevels,
         },
         include: { school: { select: { id: true, name: true } } },
       });
@@ -415,7 +481,7 @@ router.post('/:id/check-in', checkRole(Role.ANGGOTA), upload.single('photo'), as
     if (now < event.startAt) throw new AppError(400, 'Check-in belum dibuka, event belum dimulai');
     if (now > event.endAt) throw new AppError(400, 'Event sudah berakhir');
 
-    const membership = await resolveAnggotaGroup(userId, event.schoolId);
+    const membership = await resolveAnggotaGroup(userId, event.schoolId, event.targetLevels);
     const photoUrl = getPublicUrl(req.file.filename);
 
     const existing = await prisma.eventAttendance.findUnique({

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
+import { invalidateGroupQueries, invalidateInvitationQueries } from '@/lib/queryInvalidation';
 
 type PembinaOption = { id: string; name: string; email: string };
 
@@ -86,9 +87,8 @@ export default function NewSchoolGroupPage() {
             };
 
       const res = await api.post(`/schools/${id}/groups`, payload);
-      await queryClient.invalidateQueries({ queryKey: ['school', id] });
-      await queryClient.invalidateQueries({ queryKey: ['school-pembina', id] });
-      await queryClient.invalidateQueries({ queryKey: ['groups'] });
+      await invalidateGroupQueries(queryClient, { schoolId: id });
+      await invalidateInvitationQueries(queryClient);
 
       const mode = res.data?.data?.mode;
       if (mode === 'invite') {

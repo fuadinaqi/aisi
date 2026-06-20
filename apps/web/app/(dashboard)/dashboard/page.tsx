@@ -52,9 +52,9 @@ function getQuickActions(role: string) {
   if (role === 'PJ_SEKOLAH') {
     return [
       { href: '/schools', label: 'Sekolah', icon: School },
+      { href: '/analytics', label: 'Analitik', icon: BarChart3 },
       { href: '/pembina', label: 'Pembina', icon: Users },
       { href: '/events', label: 'Agenda', icon: Calendar },
-      { href: '/notifications', label: 'Notifikasi', icon: Bell },
     ];
   }
 
@@ -88,7 +88,7 @@ export default function DashboardPage() {
   const { data: overview, isLoading } = useQuery<OverviewData | null>({
     queryKey: ['analytics', role],
     queryFn: async () => {
-      if (role === 'SUPERADMIN' || role === 'ADMIN') {
+      if (role === 'SUPERADMIN' || role === 'ADMIN' || role === 'PJ_SEKOLAH') {
         const res = await api.get<ApiResponse<OverviewData>>('/analytics/overview');
         return res.data.data;
       }
@@ -140,12 +140,15 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {(role === 'SUPERADMIN' || role === 'ADMIN') && overview && (
+      {(role === 'SUPERADMIN' || role === 'ADMIN' || role === 'PJ_SEKOLAH') && overview && (
         <section className="space-y-3">
-          <AppSectionHeader title="Ringkasan" />
+          <AppSectionHeader title={role === 'PJ_SEKOLAH' ? 'Ringkasan sekolah' : 'Ringkasan'} />
           <MetricStrip
             items={[
-              { label: 'Sekolah', value: overview.totalSchools ?? 0 },
+              {
+                label: role === 'PJ_SEKOLAH' ? 'Sekolah saya' : 'Sekolah',
+                value: overview.totalSchools ?? 0,
+              },
               { label: 'Pembina', value: overview.totalPembina ?? 0 },
               { label: 'Kelompok', value: overview.totalGroups ?? 0 },
               { label: 'Anggota', value: overview.totalAnggota ?? 0 },

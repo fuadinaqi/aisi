@@ -60,6 +60,7 @@ const navByRole: Record<string, NavItem[]> = {
     { href: '/pembina', label: 'Pembina', icon: Users },
     { href: '/events', label: 'Agenda', icon: Calendar },
     { href: '/materi', label: 'Materi', icon: BookOpen },
+    { href: '/analytics', label: 'Analitik', icon: BarChart3 },
     { href: '/notifications', label: 'Notifikasi', icon: Bell },
     { href: '/profile', label: 'Profil', icon: User },
   ],

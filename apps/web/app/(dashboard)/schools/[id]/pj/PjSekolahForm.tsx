@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api';
+import { invalidateInvitationQueries, invalidateSchoolQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { RoleGuard } from '@/components/layout/RoleGuard';
@@ -59,7 +60,8 @@ export function PjSekolahForm({ replace = false, replaceUserId, replaceUserName 
                 replace,
                 ...(replaceUserId ? { replaceUserId } : {}),
               });
-              await queryClient.invalidateQueries({ queryKey: ['school', id] });
+              await invalidateSchoolQueries(queryClient, id);
+              await invalidateInvitationQueries(queryClient);
               router.push(`/schools/${id}`);
             }}
           />

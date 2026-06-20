@@ -10,11 +10,13 @@ import { useAuthStore } from '@/store/authStore';
 import { getPrimaryRole } from '@/lib/utils';
 import { PageContainer, PageHeader, Section } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup, ListRow } from '@/components/layout/AppUI';
+import { EvaluationInfiniteList } from '@/components/evaluasi/EvaluationInfiniteList';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
+import { invalidateSchoolQueries } from '@/lib/queryInvalidation';
 import type { SchoolDetail } from '@/lib/types';
 
 export default function SchoolDetailPage() {
@@ -36,7 +38,7 @@ export default function SchoolDetailPage() {
   const handleRemovePj = async () => {
     if (!pjToRemove) return;
     await api.delete(`/schools/${id}/pj/${pjToRemove.id}`);
-    await queryClient.invalidateQueries({ queryKey: ['school', id] });
+    await invalidateSchoolQueries(queryClient, id);
   };
 
   if (isLoading) {
@@ -189,6 +191,17 @@ export default function SchoolDetailPage() {
               ))}
             </ListGroup>
           )}
+        </section>
+
+        <section className="space-y-3">
+          <AppSectionHeader title="Riwayat evaluasi sekolah" />
+          <EvaluationInfiniteList
+            queryKey={['evaluations', 'school', id]}
+            params={{ schoolId: id }}
+            compact
+            emptyTitle="Belum ada evaluasi"
+            emptyDescription="Evaluasi dari kelompok di sekolah ini akan muncul di sini."
+          />
         </section>
 
         <ConfirmDialog

@@ -51,7 +51,7 @@ export interface EvaluationItem {
   weekDate: string;
   isSubmitted: boolean;
   notes?: string;
-  group: { name: string };
+  group: { id: string; name: string };
   attendances: { userId: string; status: string; note?: string; user: { name: string } }[];
 }
 
@@ -65,6 +65,7 @@ export interface EventItem {
   pointValue: number;
   imageUrl?: string | null;
   school?: { id: string; name: string } | null;
+  targetLevels?: string[];
   myCheckIn?: {
     id: string;
     status: 'PENDING' | 'APPROVED' | 'REJECTED';

@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api';
+import { invalidateInvitationQueries, invalidateSchoolQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { RoleGuard } from '@/components/layout/RoleGuard';
@@ -62,7 +63,8 @@ export default function NewSchoolPage() {
       };
 
       const res = await api.post('/schools', payload);
-      await queryClient.invalidateQueries({ queryKey: ['schools'] });
+      await invalidateSchoolQueries(queryClient);
+      await invalidateInvitationQueries(queryClient);
 
       const mode = res.data?.data?.mode;
       setSuccess(

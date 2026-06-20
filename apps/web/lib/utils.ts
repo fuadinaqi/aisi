@@ -59,3 +59,11 @@ export function getPrimaryRole(roles: string[]): string {
 export function isPointEligibleRole(roles: string[]): boolean {
   return roles.some((r) => r === 'PEMBINA' || r === 'ANGGOTA');
 }
+
+export function formatEventTargetLevels(
+  targetLevels: string[] | undefined,
+  labels: Record<string, string>,
+) {
+  if (!targetLevels?.length) return 'Semua level';
+  return targetLevels.map((level) => labels[level] || level).join(', ');
+}

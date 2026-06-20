@@ -14,6 +14,7 @@ import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import type { GroupMemberDetail } from '@/lib/types';
 
 type FormData = {
@@ -60,7 +61,7 @@ export default function EditAnggotaPage() {
         phone: data.phone.trim() || null,
       });
       await queryClient.invalidateQueries({ queryKey: ['group-member', id, userId] });
-      await queryClient.invalidateQueries({ queryKey: ['group', id] });
+      await invalidateGroupQueries(queryClient, { groupId: id });
       router.push(`/kelompok/${id}/anggota/${userId}`);
     } catch (err: unknown) {
       setError(

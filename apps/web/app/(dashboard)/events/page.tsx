@@ -9,7 +9,7 @@ import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, getMediaUrl, getPrimaryRole } from '@/lib/utils';
+import { formatDate, formatEventTargetLevels, getMediaUrl, getPrimaryRole } from '@/lib/utils';
 import type { EventItem } from '@/lib/types';
 
 const checkInLabels: Record<string, string> = {
@@ -28,6 +28,14 @@ export default function EventsPage() {
     queryKey: ['events'],
     queryFn: async () => (await api.get<ApiResponse<EventItem[]>>('/events')).data.data,
   });
+
+  const { data: levelConfigs = [] } = useQuery<{ level: string; label: string }[]>({
+    queryKey: ['group-levels'],
+    queryFn: async () =>
+      (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
+  });
+
+  const levelLabels = Object.fromEntries(levelConfigs.map((cfg) => [cfg.level, cfg.label]));
 
   return (
     <PageContainer tight>
@@ -99,6 +107,9 @@ export default function EventsPage() {
                         ) : (
                           <p className="mt-1 text-xs text-muted-foreground">Semua sekolah</p>
                         )}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatEventTargetLevels(e.targetLevels, levelLabels)}
+                        </p>
                         {e.location && (
                           <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                             <MapPin className="h-3 w-3 shrink-0" />

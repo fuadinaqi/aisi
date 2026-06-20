@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type ApiResponse } from '@/lib/api';
+import { invalidateConfigQueries } from '@/lib/queryInvalidation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 
 export default function ConfigPage() {
-  const { data, refetch } = useQuery<{ level: string; label: string }[]>({
+  const queryClient = useQueryClient();
+  const { data } = useQuery<{ level: string; label: string }[]>({
     queryKey: ['group-levels'],
     queryFn: async () => (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
   });
@@ -17,7 +19,7 @@ export default function ConfigPage() {
 
   const save = async (level: string) => {
     await api.put('/config/group-levels', { level, label: labels[level] });
-    refetch();
+    await invalidateConfigQueries(queryClient);
   };
 
   return (

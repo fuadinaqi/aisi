@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { invalidateInvitationQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { RoleGuard } from '@/components/layout/RoleGuard';
@@ -11,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export default function InviteAdminPage() {
+  const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const { register, handleSubmit, formState: { isSubmitting } } = useForm<{
@@ -23,6 +26,7 @@ export default function InviteAdminPage() {
       setError('');
       setSuccess('');
       await api.post('/invitations', { ...data, role: 'ADMIN' });
+      await invalidateInvitationQueries(queryClient);
       setSuccess('Undangan admin berhasil dikirim. Cek log API untuk link aktivasi.');
     } catch (err: unknown) {
       setError(

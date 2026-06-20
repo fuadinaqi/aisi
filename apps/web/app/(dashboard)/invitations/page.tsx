@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type ApiResponse } from '@/lib/api';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { InvitationStatusBadge, LoadingSkeleton } from '@/components/shared/Badges';
@@ -8,17 +8,19 @@ import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils';
+import { invalidateInvitationQueries } from '@/lib/queryInvalidation';
 import type { InvitationItem } from '@/lib/types';
 
 export default function InvitationsPage() {
-  const { data, isLoading, refetch } = useQuery<InvitationItem[]>({
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery<InvitationItem[]>({
     queryKey: ['invitations'],
     queryFn: async () => (await api.get<ApiResponse<InvitationItem[]>>('/invitations')).data.data,
   });
 
   const resend = async (id: string) => {
     await api.post(`/invitations/${id}/resend`);
-    refetch();
+    await invalidateInvitationQueries(queryClient);
   };
 
   return (

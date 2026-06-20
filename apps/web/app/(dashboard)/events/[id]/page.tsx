@@ -11,7 +11,8 @@ import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, getMediaUrl, getPrimaryRole } from '@/lib/utils';
+import { formatDate, formatEventTargetLevels, getMediaUrl, getPrimaryRole } from '@/lib/utils';
+import { invalidateEventQueries } from '@/lib/queryInvalidation';
 import type { EventItem } from '@/lib/types';
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -39,6 +40,14 @@ export default function EventDetailPage() {
     enabled: !!id,
   });
 
+  const { data: levelConfigs = [] } = useQuery<{ level: string; label: string }[]>({
+    queryKey: ['group-levels'],
+    queryFn: async () =>
+      (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
+  });
+
+  const levelLabels = Object.fromEntries(levelConfigs.map((cfg) => [cfg.level, cfg.label]));
+
   const handlePhotoChange = (file: File | null) => {
     setPhoto(file);
     if (preview) URL.revokeObjectURL(preview);
@@ -58,8 +67,7 @@ export default function EventDetailPage() {
       await api.post(`/events/${id}/check-in`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      await queryClient.invalidateQueries({ queryKey: ['event', id] });
-      await queryClient.invalidateQueries({ queryKey: ['events'] });
+      await invalidateEventQueries(queryClient, id);
       setPhoto(null);
       handlePhotoChange(null);
       if (fileRef.current) fileRef.current.value = '';
@@ -133,6 +141,9 @@ export default function EventDetailPage() {
         <div className="px-4 py-4 md:px-5">
           <p className="text-xs text-muted-foreground">Cakupan</p>
           <p className="mt-1 font-medium">{event.school?.name || 'Semua sekolah'}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatEventTargetLevels(event.targetLevels, levelLabels)}
+          </p>
         </div>
 
         {event.pointValue > 0 && (

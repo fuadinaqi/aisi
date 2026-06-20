@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
+import { invalidateNotificationQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { Button } from '@/components/ui/button';
@@ -10,14 +11,18 @@ import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { formatDate } from '@/lib/utils';
 
 export default function NotificationsPage() {
-  const { data, isLoading, refetch } = useQuery({
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery<{
+    unreadCount: number;
+    items: { id: string; title: string; body: string; isRead: boolean; createdAt: string }[];
+  }>({
     queryKey: ['notifications'],
     queryFn: async () => (await api.get<ApiResponse>('/notifications')).data.data,
   });
 
   const markAllRead = async () => {
     await api.put('/notifications/read-all');
-    refetch();
+    await invalidateNotificationQueries(queryClient);
   };
 
   const unreadCount = data?.unreadCount ?? 0;

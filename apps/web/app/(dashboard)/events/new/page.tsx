@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -13,11 +13,13 @@ import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { invalidateEventQueries } from '@/lib/queryInvalidation';
 import { getPrimaryRole, toDateTimeLocalValue } from '@/lib/utils';
 import type { SchoolItem } from '@/lib/types';
 
 export default function NewEventPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const role = user ? getPrimaryRole(user.roles) : '';
   const canPickSchool = role === 'SUPERADMIN' || role === 'ADMIN';
@@ -33,6 +35,8 @@ export default function NewEventPage() {
   const [endAt, setEndAt] = useState(toDateTimeLocalValue(defaultEndDate));
   const [pointValue, setPointValue] = useState('0');
   const [schoolId, setSchoolId] = useState('all');
+  const [levelMode, setLevelMode] = useState<'all' | 'specific'>('all');
+  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,11 +47,29 @@ export default function NewEventPage() {
     enabled: canPickSchool,
   });
 
+  const { data: levelConfigs = [] } = useQuery<{ level: string; label: string }[]>({
+    queryKey: ['group-levels'],
+    queryFn: async () =>
+      (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
+  });
+
+  const toggleLevel = (level: string) => {
+    setSelectedLevels((prev) =>
+      prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level],
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
       setError('');
+
+      if (levelMode === 'specific' && !selectedLevels.length) {
+        setError('Pilih minimal satu level kelompok');
+        setLoading(false);
+        return;
+      }
 
       const formData = new FormData();
       formData.append('title', title.trim());
@@ -58,12 +80,17 @@ export default function NewEventPage() {
       formData.append('pointValue', pointValue);
       formData.append('isPublished', 'true');
       if (canPickSchool) formData.append('schoolId', schoolId);
+      formData.append(
+        'targetLevels',
+        levelMode === 'specific' ? JSON.stringify(selectedLevels) : '[]',
+      );
       if (image) formData.append('image', image);
 
       await api.post('/events', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      await invalidateEventQueries(queryClient);
       router.push('/events');
     } catch (err: unknown) {
       setError(
@@ -179,6 +206,59 @@ export default function NewEventPage() {
                 Event ini hanya untuk anggota di sekolah Anda.
               </p>
             )}
+
+            <div className="space-y-3">
+              <Label>Cakupan level kelompok</Label>
+              <div className="space-y-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3">
+                  <input
+                    type="radio"
+                    name="levelMode"
+                    checked={levelMode === 'all'}
+                    onChange={() => setLevelMode('all')}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">Semua level</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Default — terbuka untuk semua kelompok
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3">
+                  <input
+                    type="radio"
+                    name="levelMode"
+                    checked={levelMode === 'specific'}
+                    onChange={() => setLevelMode('specific')}
+                    className="mt-1"
+                  />
+                  <span className="flex-1">
+                    <span className="block text-sm font-medium">Level tertentu saja</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Hanya kelompok dengan level yang dipilih
+                    </span>
+                    {levelMode === 'specific' && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {levelConfigs.map((cfg) => (
+                          <label
+                            key={cfg.level}
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 px-3 py-1.5 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedLevels.includes(cfg.level)}
+                              onChange={() => toggleLevel(cfg.level)}
+                            />
+                            {cfg.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </span>
+                </label>
+              </div>
+            </div>
 
             {error && (
               <div className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>

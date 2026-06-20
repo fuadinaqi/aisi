@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api';
+import { invalidateMateriQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
@@ -24,6 +26,7 @@ const contentTypes: { value: ContentType; label: string; hint: string }[] = [
 
 export default function NewMateriPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [weekDate, setWeekDate] = useState(toDateInputValue());
@@ -61,6 +64,7 @@ export default function NewMateriPage() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      await invalidateMateriQueries(queryClient);
       router.push('/materi');
     } catch (err: unknown) {
       setError(

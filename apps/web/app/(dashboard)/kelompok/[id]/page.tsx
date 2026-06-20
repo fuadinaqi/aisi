@@ -10,10 +10,12 @@ import { useAuthStore } from '@/store/authStore';
 import { getPrimaryRole } from '@/lib/utils';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
+import { EvaluationInfiniteList } from '@/components/evaluasi/EvaluationInfiniteList';
 import { LoadingSkeleton, PointBadge } from '@/components/shared/Badges';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
 import { Button } from '@/components/ui/button';
+import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import type { GroupItem } from '@/lib/types';
 
 export default function KelompokDetailPage() {
@@ -31,10 +33,19 @@ export default function KelompokDetailPage() {
     queryFn: async () => (await api.get<ApiResponse<GroupItem>>(`/groups/${id}`)).data.data,
   });
 
+  const { data: levelConfigs = [] } = useQuery<{ level: string; label: string }[]>({
+    queryKey: ['group-levels'],
+    queryFn: async () =>
+      (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
+  });
+
+  const levelLabel =
+    levelConfigs.find((cfg) => cfg.level === group?.level)?.label || group?.level || '-';
+
   const handleRemoveMember = async () => {
     if (!memberToRemove) return;
     await api.delete(`/groups/${id}/members/${memberToRemove.userId}`);
-    await queryClient.invalidateQueries({ queryKey: ['group', id] });
+    await invalidateGroupQueries(queryClient, { groupId: id });
   };
 
   if (isLoading) {
@@ -84,7 +95,7 @@ export default function KelompokDetailPage() {
 
       <p className="px-0.5 text-sm text-muted-foreground">{group.school.name}</p>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <ListGroup className="p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pembina</p>
           <p className="mt-1 font-medium">{group.pembina.name}</p>
@@ -93,7 +104,12 @@ export default function KelompokDetailPage() {
           )}
         </ListGroup>
 
-        <ListGroup className="flex items-center justify-between p-4">
+        <ListGroup className="p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Level</p>
+          <p className="mt-1 font-medium">{levelLabel}</p>
+        </ListGroup>
+
+        <ListGroup className="flex items-center justify-between p-4 sm:col-span-2 lg:col-span-1">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Kehadiran Kelompok
@@ -170,6 +186,18 @@ export default function KelompokDetailPage() {
             ))
           )}
         </ListGroup>
+      </section>
+
+      <section className="space-y-3">
+        <AppSectionHeader title="Riwayat evaluasi" />
+        <EvaluationInfiniteList
+          queryKey={['evaluations', 'group', id]}
+          params={{ groupId: id }}
+          showGroupName={false}
+          compact
+          emptyTitle="Belum ada evaluasi"
+          emptyDescription="Evaluasi mingguan kelompok ini akan muncul di sini."
+        />
       </section>
 
       <ConfirmDialog

@@ -139,6 +139,7 @@ export const eventSchema = z
     pointValue: z.number().int().min(0).default(0),
     imageUrl: z.string().optional(),
     schoolId: z.string().nullable().optional(),
+    targetLevels: z.array(z.enum(['LEVEL_1', 'LEVEL_2'])).default([]),
     isPublished: z.boolean().default(true),
   })
   .refine((data) => data.endAt > data.startAt, {

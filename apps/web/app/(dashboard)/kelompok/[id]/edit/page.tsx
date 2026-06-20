@@ -16,6 +16,7 @@ import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import type { GroupItem } from '@/lib/types';
 
 type PembinaOption = { id: string; name: string; email: string };
@@ -76,9 +77,7 @@ export default function EditKelompokPage() {
       }
 
       await api.put(`/groups/${id}`, payload);
-      await queryClient.invalidateQueries({ queryKey: ['group', id] });
-      await queryClient.invalidateQueries({ queryKey: ['school', group?.school.id] });
-      await queryClient.invalidateQueries({ queryKey: ['groups'] });
+      await invalidateGroupQueries(queryClient, { groupId: id, schoolId: group?.school.id });
       router.push(`/kelompok/${id}`);
     } catch (err: unknown) {
       setError(

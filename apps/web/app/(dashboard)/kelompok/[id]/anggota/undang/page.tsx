@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api';
+import { invalidateGroupQueries, invalidateInvitationQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { InviteForm } from '@/components/shared/InviteForm';
@@ -37,7 +38,8 @@ export default function UndangAnggotaPage() {
           onCancel={() => router.back()}
           onSubmit={async (data) => {
             await api.post('/invitations', { ...data, role: 'ANGGOTA', groupId: id });
-            await queryClient.invalidateQueries({ queryKey: ['group', id] });
+            await invalidateGroupQueries(queryClient, { groupId: id });
+            await invalidateInvitationQueries(queryClient);
             router.push(`/kelompok/${id}`);
           }}
         />

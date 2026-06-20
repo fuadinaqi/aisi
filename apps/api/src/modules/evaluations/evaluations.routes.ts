@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { param } from '../../utils/param.js';
 import { evaluationSchema, paginationSchema, POINT_RULES, isPointEligible } from '@dakwah/shared';
 import { prisma } from '../../lib/prisma.js';
-import { checkAuth, validate, isPembinaOfGroup } from '../../middleware/auth.js';
+import { checkAuth, validate, isPembinaOfGroup, getUserSchoolIds, canAccessSchool } from '../../middleware/auth.js';
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
 import { getMonday, isSubmitOnTime, assertWeekDateNotFuture } from '../../utils/weekDate.js';
@@ -13,15 +13,87 @@ const router = Router();
 
 router.use(checkAuth);
 
+async function buildEvaluationWhere(
+  userId: string,
+  roles: string[],
+  filters: { groupId?: string; weekDate?: Date; schoolId?: string },
+) {
+  const where: Record<string, unknown> = {};
+  if (filters.groupId) where.groupId = filters.groupId;
+  if (filters.weekDate) where.weekDate = filters.weekDate;
+
+  const isAdmin = roles.includes('SUPERADMIN') || roles.includes('ADMIN');
+  const groupFilter: Record<string, unknown> = {};
+
+  if (!isAdmin && roles.includes('PEMBINA')) {
+    if (filters.groupId) {
+      const isOwner = await isPembinaOfGroup(userId, filters.groupId);
+      if (!isOwner) throw new AppError(403, 'Akses ditolak');
+    }
+    groupFilter.pembinaId = userId;
+  } else if (!isAdmin && roles.includes('PJ_SEKOLAH')) {
+    const schoolIds = await getUserSchoolIds(userId);
+    if (filters.schoolId) {
+      if (!schoolIds.includes(filters.schoolId)) throw new AppError(403, 'Akses ditolak');
+      groupFilter.schoolId = filters.schoolId;
+    } else {
+      groupFilter.schoolId = { in: schoolIds };
+    }
+    if (filters.groupId) {
+      const group = await prisma.group.findFirst({
+        where: { id: filters.groupId, schoolId: { in: schoolIds } },
+        select: { id: true },
+      });
+      if (!group) throw new AppError(403, 'Akses ditolak');
+    }
+  } else if (filters.schoolId) {
+    groupFilter.schoolId = filters.schoolId;
+  }
+
+  if (Object.keys(groupFilter).length > 0) {
+    where.group = groupFilter;
+  }
+
+  return where;
+}
+
+async function assertCanAccessEvaluation(
+  userId: string,
+  roles: string[],
+  groupId: string,
+) {
+  const isAdmin = roles.includes('SUPERADMIN') || roles.includes('ADMIN');
+  if (isAdmin) return;
+
+  if (roles.includes('PEMBINA')) {
+    const isOwner = await isPembinaOfGroup(userId, groupId);
+    if (!isOwner) throw new AppError(403, 'Akses ditolak');
+    return;
+  }
+
+  if (roles.includes('PJ_SEKOLAH')) {
+    const group = await prisma.group.findUnique({ where: { id: groupId }, select: { schoolId: true } });
+    if (!group) throw new AppError(404, 'Kelompok tidak ditemukan');
+    const allowed = await canAccessSchool(userId, roles, group.schoolId);
+    if (!allowed) throw new AppError(403, 'Akses ditolak');
+  }
+}
+
 router.get('/', validate(paginationSchema, 'query'), async (req, res, next) => {
   try {
     const { page, limit } = req.query as unknown as { page: number; limit: number };
-    const { groupId, weekDate } = req.query as { groupId?: string; weekDate?: string };
+    const { groupId, weekDate, schoolId } = req.query as {
+      groupId?: string;
+      weekDate?: string;
+      schoolId?: string;
+    };
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
-    if (groupId) where.groupId = groupId;
-    if (weekDate) where.weekDate = getMonday(new Date(weekDate));
+    const where = await buildEvaluationWhere(req.user!.userId, req.user!.roles, {
+      groupId,
+      weekDate: weekDate ? getMonday(new Date(weekDate)) : undefined,
+      schoolId,
+    });
 
     const [evaluations, total] = await Promise.all([
       prisma.weeklyEvaluation.findMany({
@@ -57,20 +129,20 @@ router.post('/', validate(evaluationSchema), async (req, res, next) => {
 
     const normalizedWeek = getMonday(new Date(weekDate));
 
-    const evaluation = await prisma.weeklyEvaluation.upsert({
+    const existing = await prisma.weeklyEvaluation.findUnique({
       where: { groupId_weekDate: { groupId, weekDate: normalizedWeek } },
-      update: {
-        notes,
-        attendances: {
-          deleteMany: {},
-          create: attendances.map((a: { userId: string; status: AttendanceStatus; note?: string }) => ({
-            userId: a.userId,
-            status: a.status,
-            note: a.note,
-          })),
-        },
-      },
-      create: {
+    });
+    if (existing) {
+      throw new AppError(
+        409,
+        existing.isSubmitted
+          ? 'Evaluasi pekan ini sudah dikirim'
+          : 'Evaluasi untuk pekan ini sudah ada. Silakan edit evaluasi yang ada.',
+      );
+    }
+
+    const evaluation = await prisma.weeklyEvaluation.create({
+      data: {
         groupId,
         createdById: req.user!.userId,
         weekDate: normalizedWeek,
@@ -102,6 +174,9 @@ router.get('/:id', async (req, res, next) => {
       },
     });
     if (!evaluation) throw new AppError(404, 'Evaluasi tidak ditemukan');
+
+    await assertCanAccessEvaluation(req.user!.userId, req.user!.roles, evaluation.groupId);
+
     sendSuccess(res, evaluation);
   } catch (err) {
     next(err);
