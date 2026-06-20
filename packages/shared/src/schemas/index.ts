@@ -6,6 +6,10 @@ export const passwordSchema = z
   .regex(/[A-Z]/, 'Password harus mengandung minimal 1 huruf besar')
   .regex(/[0-9]/, 'Password harus mengandung minimal 1 angka');
 
+export const genderSchema = z.enum(['IKHWAN', 'AKHWAT'], {
+  required_error: 'Jenis kelamin wajib dipilih',
+});
+
 export const loginSchema = z.object({
   email: z.string().email('Email tidak valid'),
   password: z.string().min(1, 'Password wajib diisi'),
@@ -37,6 +41,7 @@ export const invitationSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
   email: z.string().email('Email tidak valid'),
   role: z.enum(['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA']),
+  gender: genderSchema.optional(),
   schoolId: z.string().optional(),
   groupId: z.string().optional(),
 });
@@ -65,6 +70,7 @@ export const createSchoolWithPjSchema = z.object({
     name: z.string().min(2, 'Nama PJ minimal 2 karakter'),
     email: z.string().email('Email PJ tidak valid'),
     phone: z.string().optional(),
+    gender: genderSchema,
     password: passwordSchema.optional(),
   }),
 });
@@ -73,6 +79,7 @@ export const invitePjSchema = z.object({
   name: z.string().min(2, 'Nama PJ minimal 2 karakter'),
   email: z.string().email('Email PJ tidak valid'),
   phone: z.string().optional(),
+  gender: genderSchema,
   password: passwordSchema.optional(),
   replace: z.boolean().default(false),
   replaceUserId: z.string().optional(),
@@ -81,18 +88,21 @@ export const invitePjSchema = z.object({
 export const inviteAnggotaSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
   email: z.string().email('Email tidak valid'),
+  gender: genderSchema.optional(),
 });
 
 export const updateGroupMemberSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter').optional(),
   email: z.string().email('Email tidak valid').optional(),
   phone: z.string().optional().nullable(),
+  gender: genderSchema.optional(),
 });
 
 const pembinaInputSchema = z.object({
   name: z.string().min(2, 'Nama pembina minimal 2 karakter'),
   email: z.string().email('Email pembina tidak valid'),
   phone: z.string().optional(),
+  gender: genderSchema,
   password: passwordSchema.optional(),
 });
 
@@ -100,6 +110,7 @@ export const createSchoolGroupSchema = z
   .object({
     name: z.string().min(2, 'Nama kelompok minimal 2 karakter'),
     level: z.enum(['LEVEL_1', 'LEVEL_2']),
+    gender: genderSchema,
     pembinaId: z.string().optional(),
     pembina: pembinaInputSchema.optional(),
   })
@@ -111,6 +122,7 @@ export const createSchoolGroupSchema = z
 export const groupSchema = z.object({
   name: z.string().min(2),
   level: z.enum(['LEVEL_1', 'LEVEL_2']),
+  gender: genderSchema,
   schoolId: z.string(),
   pembinaId: z.string(),
 });
@@ -118,6 +130,7 @@ export const groupSchema = z.object({
 export const updateGroupSchema = z.object({
   name: z.string().min(2, 'Nama kelompok minimal 2 karakter').optional(),
   level: z.enum(['LEVEL_1', 'LEVEL_2']).optional(),
+  gender: genderSchema.optional(),
   pembinaId: z.string().optional(),
   isActive: z.boolean().optional(),
 });
@@ -297,6 +310,30 @@ export const memberICProgressSchema = z.object({
   isAchieved: z.boolean(),
 });
 
+export const createKksSchema = z.object({
+  type: z.enum(['KELUHAN', 'KRITIK', 'SARAN']),
+  subject: z.string().min(3, 'Subjek minimal 3 karakter').max(200, 'Subjek maksimal 200 karakter'),
+  message: z.string().min(10, 'Pesan minimal 10 karakter').max(5000, 'Pesan maksimal 5000 karakter'),
+});
+
+export const updateKksSchema = z
+  .object({
+    status: z.enum(['PENDING', 'READ', 'RESOLVED']).optional(),
+    adminNotes: z.string().max(5000).optional().nullable(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'Minimal satu field harus diisi',
+  });
+
+export const kksListQuerySchema = paginationSchema.extend({
+  status: z.enum(['PENDING', 'READ', 'RESOLVED']).optional(),
+  type: z.enum(['KELUHAN', 'KRITIK', 'SARAN']).optional(),
+  mine: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
 export type InvitationInput = z.infer<typeof invitationSchema>;
@@ -305,3 +342,5 @@ export type CreateSchoolWithPjInput = z.infer<typeof createSchoolWithPjSchema>;
 export type CreateSchoolGroupInput = z.infer<typeof createSchoolGroupSchema>;
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
 export type UpdateGroupMemberInput = z.infer<typeof updateGroupMemberSchema>;
+export type CreateKksInput = z.infer<typeof createKksSchema>;
+export type UpdateKksInput = z.infer<typeof updateKksSchema>;

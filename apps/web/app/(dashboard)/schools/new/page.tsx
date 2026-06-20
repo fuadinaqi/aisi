@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
+import { GenderSelect } from '@/components/shared/GenderField';
 
 type FormData = {
   name: string;
@@ -22,6 +23,7 @@ type FormData = {
   pjName: string;
   pjEmail: string;
   pjPhone: string;
+  pjGender: 'IKHWAN' | 'AKHWAT';
   pjPassword: string;
   useDirectPassword: boolean;
 };
@@ -40,6 +42,7 @@ export default function NewSchoolPage() {
   } = useForm<FormData>({
     defaultValues: {
       city: 'Depok',
+      pjGender: 'IKHWAN',
       useDirectPassword: false,
     },
   });
@@ -58,6 +61,7 @@ export default function NewSchoolPage() {
           name: data.pjName.trim(),
           email: data.pjEmail.trim(),
           phone: data.pjPhone.trim() || undefined,
+          gender: data.pjGender,
           ...(data.useDirectPassword && data.pjPassword ? { password: data.pjPassword } : {}),
         },
       };
@@ -148,6 +152,11 @@ export default function NewSchoolPage() {
                     className="rounded-xl"
                     {...register('pjEmail', { required: true })}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pjGender">Jenis kelamin</Label>
+                  <GenderSelect id="pjGender" {...register('pjGender', { required: true })} />
                 </div>
 
                 <div className="space-y-2">

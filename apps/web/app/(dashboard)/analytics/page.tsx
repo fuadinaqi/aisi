@@ -6,10 +6,12 @@ import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { getPrimaryRole } from '@/lib/utils';
 import { StatCard, LoadingSkeleton } from '@/components/shared/Badges';
+import { GenderBreakdownPanel } from '@/components/analytics/GenderBreakdownPanel';
 import { Users, School, ClipboardList, LayoutGrid } from 'lucide-react';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
+import type { GenderBreakdown } from '@/lib/types';
 
 interface AnalyticsOverview {
   scope?: 'city' | 'school';
@@ -20,6 +22,7 @@ interface AnalyticsOverview {
   submissionRate: number;
   evaluationsThisWeek?: number;
   attendanceTrend?: { week: string; rate: number }[];
+  genderBreakdown?: GenderBreakdown;
 }
 
 export default function AnalyticsPage() {
@@ -50,7 +53,7 @@ export default function AnalyticsPage() {
         ) : (
           data && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
                 <StatCard
                   icon={School}
                   label={isPj ? 'Sekolah saya' : 'Sekolah aktif'}
@@ -58,12 +61,15 @@ export default function AnalyticsPage() {
                 />
                 <StatCard icon={LayoutGrid} label="Kelompok aktif" value={data.totalGroups} />
                 <StatCard icon={Users} label="Pembina" value={data.totalPembina} />
+                <StatCard icon={Users} label="Anggota" value={data.totalAnggota} />
                 <StatCard icon={ClipboardList} label="Submit rate" value={`${data.submissionRate}%`} />
               </div>
 
+              {data.genderBreakdown && <GenderBreakdownPanel data={data.genderBreakdown} />}
+
               {isPj && (
                 <p className="px-0.5 text-sm text-muted-foreground">
-                  {data.totalAnggota} anggota · {data.evaluationsThisWeek ?? 0} evaluasi terkirim pekan ini
+                  {data.evaluationsThisWeek ?? 0} evaluasi terkirim pekan ini
                 </p>
               )}
 

@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
+import { GenderSelect } from '@/components/shared/GenderField';
 
 type InviteFormData = {
   name: string;
   email: string;
   phone?: string;
+  gender?: 'IKHWAN' | 'AKHWAT';
   password?: string;
   useDirectPassword?: boolean;
 };
@@ -20,11 +22,13 @@ type InviteFormProps = {
   description?: string;
   submitLabel?: string;
   showPhone?: boolean;
+  showGender?: boolean;
   showPasswordOption?: boolean;
   onSubmit: (data: {
     name: string;
     email: string;
     phone?: string;
+    gender?: 'IKHWAN' | 'AKHWAT';
     password?: string;
   }) => Promise<void>;
   onCancel?: () => void;
@@ -35,6 +39,7 @@ export function InviteForm({
   description,
   submitLabel = 'Kirim undangan',
   showPhone = false,
+  showGender = false,
   showPasswordOption = false,
   onSubmit,
   onCancel,
@@ -47,7 +52,9 @@ export function InviteForm({
     handleSubmit,
     watch,
     formState: { isSubmitting },
-  } = useForm<InviteFormData>();
+  } = useForm<InviteFormData>({
+    defaultValues: { gender: 'IKHWAN' },
+  });
 
   const useDirectPassword = watch('useDirectPassword');
 
@@ -59,6 +66,7 @@ export function InviteForm({
         name: data.name.trim(),
         email: data.email.trim(),
         phone: data.phone?.trim() || undefined,
+        ...(showGender ? { gender: data.gender || 'IKHWAN' } : {}),
         ...(showPasswordOption && data.useDirectPassword && data.password
           ? { password: data.password }
           : {}),
@@ -95,6 +103,13 @@ export function InviteForm({
           placeholder="email@domain.com"
         />
       </div>
+
+      {showGender && (
+        <div className="space-y-2">
+          <Label>Jenis kelamin</Label>
+          <GenderSelect {...register('gender', { required: showGender })} />
+        </div>
+      )}
 
       {showPhone && (
         <div className="space-y-2">

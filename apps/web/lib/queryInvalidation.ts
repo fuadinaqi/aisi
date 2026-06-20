@@ -88,3 +88,9 @@ export async function invalidateICQueries(queryClient: QueryClient) {
 export async function invalidateNotificationQueries(queryClient: QueryClient) {
   await queryClient.invalidateQueries({ queryKey: ['notifications'] });
 }
+
+/** Invalidate daftar KKS setelah kirim/update. */
+export async function invalidateKksQueries(queryClient: QueryClient) {
+  await queryClient.invalidateQueries({ queryKey: ['kks'] });
+  await invalidateNotificationQueries(queryClient);
+}

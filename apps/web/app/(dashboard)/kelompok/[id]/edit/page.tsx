@@ -18,12 +18,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import type { GroupItem } from '@/lib/types';
+import { GenderSelect } from '@/components/shared/GenderField';
 
-type PembinaOption = { id: string; name: string; email: string };
+type PembinaOption = { id: string; name: string; email: string; gender?: string };
 
 type FormData = {
   name: string;
   level: 'LEVEL_1' | 'LEVEL_2';
+  gender: 'IKHWAN' | 'AKHWAT';
   pembinaId: string;
 };
 
@@ -43,10 +45,14 @@ export default function EditKelompokPage() {
   });
 
   const { data: pembinaList = [], isLoading: pembinaLoading } = useQuery<PembinaOption[]>({
-    queryKey: ['school-pembina', group?.school.id],
+    queryKey: ['school-pembina', group?.school.id, group?.gender],
     queryFn: async () =>
-      (await api.get<ApiResponse<PembinaOption[]>>(`/schools/${group!.school.id}/pembina`)).data.data,
-    enabled: !!group?.school.id && canChangePembina,
+      (
+        await api.get<ApiResponse<PembinaOption[]>>(
+          `/schools/${group!.school.id}/pembina?gender=${group!.gender}`,
+        )
+      ).data.data,
+    enabled: !!group?.school.id && !!group?.gender && canChangePembina,
   });
 
   const {
@@ -61,6 +67,7 @@ export default function EditKelompokPage() {
     reset({
       name: group.name,
       level: (group.level as 'LEVEL_1' | 'LEVEL_2') || 'LEVEL_1',
+      gender: (group.gender as 'IKHWAN' | 'AKHWAT') || 'IKHWAN',
       pembinaId: group.pembina.id,
     });
   }, [group, reset]);
@@ -71,6 +78,7 @@ export default function EditKelompokPage() {
       const payload: Record<string, string> = {
         name: data.name.trim(),
         level: data.level,
+        gender: data.gender,
       };
       if (canChangePembina && data.pembinaId) {
         payload.pembinaId = data.pembinaId;
@@ -133,6 +141,20 @@ export default function EditKelompokPage() {
                 <option value="LEVEL_1">Muda (Level 1)</option>
                 <option value="LEVEL_2">Pratama (Level 2)</option>
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gender">Jenis kelompok</Label>
+              <GenderSelect
+                id="gender"
+                disabled={(group.members?.length ?? 0) > 0}
+                {...register('gender')}
+              />
+              {(group.members?.length ?? 0) > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Jenis kelompok tidak dapat diubah selama masih ada anggota.
+                </p>
+              )}
             </div>
 
             {canChangePembina && (

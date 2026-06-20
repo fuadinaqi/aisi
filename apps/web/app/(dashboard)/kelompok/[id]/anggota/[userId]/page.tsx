@@ -7,11 +7,12 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Calendar, Mail, Pencil, Phone, School, Users } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
+import { cn, getPrimaryRole } from '@/lib/utils';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup, ProfileHeader } from '@/components/layout/AppUI';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
 import { LoadingSkeleton, PointBadge, RoleBadge } from '@/components/shared/Badges';
+import { getGroupGenderTheme } from '@/components/shared/GenderField';
 import { Button } from '@/components/ui/button';
 import { formatDate, formatWeekRange, toDateInputValue } from '@/lib/utils';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
@@ -53,8 +54,13 @@ export default function AnggotaDetailPage() {
 
   if (!member) return null;
 
+  const groupGender = member.group.gender ?? 'IKHWAN';
+  const theme = getGroupGenderTheme(groupGender);
+  const cardClass = cn('p-4', theme.card);
+  const cardLabelClass = cn('text-xs font-medium uppercase tracking-wide', theme.cardLabel);
+
   return (
-    <PageContainer tight>
+    <PageContainer tight className={cn('relative', theme.pageGlow)}>
       <Button variant="ghost" size="sm" className="-ml-2 mb-1 rounded-xl text-muted-foreground" asChild>
         <Link href={`/kelompok/${id}`}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />
@@ -62,12 +68,21 @@ export default function AnggotaDetailPage() {
         </Link>
       </Button>
 
+      <div className={cn('relative mb-4 overflow-hidden rounded-2xl px-4 py-3.5', theme.banner)}>
+        <div>
+          <p className={cn('text-sm font-semibold', theme.bannerTitleClass)}>{member.user.name}</p>
+          <p className={cn('mt-0.5 text-xs', theme.bannerSubtitle)}>
+            {theme.bannerTitle} · {member.group.name}
+          </p>
+        </div>
+      </div>
+
       <PageHeader
         title="Detail anggota"
         compact
         action={
           canEdit ? (
-            <Button asChild size="sm" variant="outline" className="rounded-xl">
+            <Button asChild size="sm" variant="outline" className={cn('rounded-xl', theme.outlineButton)}>
               <Link href={`/kelompok/${id}/anggota/${userId}/edit`}>
                 <Pencil className="mr-1 h-4 w-4" />
                 Edit
@@ -82,11 +97,13 @@ export default function AnggotaDetailPage() {
         email={member.user.email}
         badge={<RoleBadge role="ANGGOTA" />}
         points={<PointBadge points={member.user.totalPoints} />}
+        className={theme.card}
+        avatarClassName={theme.profileAvatar}
       />
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <ListGroup className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Kehadiran</p>
+        <ListGroup className={cardClass}>
+          <p className={cardLabelClass}>Kehadiran</p>
           <div className="mt-2 flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">Di kelompok ini</p>
             <AttendanceRate
@@ -97,8 +114,8 @@ export default function AnggotaDetailPage() {
           </div>
         </ListGroup>
 
-        <ListGroup className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Bergabung</p>
+        <ListGroup className={cardClass}>
+          <p className={cardLabelClass}>Bergabung</p>
           <p className="mt-2 flex items-center gap-2 text-sm font-medium">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             {formatDate(member.joinedAt)}
@@ -106,7 +123,7 @@ export default function AnggotaDetailPage() {
         </ListGroup>
       </div>
 
-      <ListGroup className="mt-4 divide-y divide-border/60">
+      <ListGroup className={cn('mt-4 divide-y divide-border/60', theme.card)}>
         <div className="flex items-start gap-3 px-4 py-4 md:px-5">
           <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
@@ -140,12 +157,10 @@ export default function AnggotaDetailPage() {
         </div>
       </ListGroup>
 
-      <ListGroup className="mt-4 p-4">
+      <ListGroup className={cn('mt-4 p-4', theme.card)}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Mutabaah yaumiyah
-            </p>
+            <p className={cardLabelClass}>Mutabaah yaumiyah</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Laporan ibadah harian anggota per pekan · {formatWeekRange(mutabaahWeek)}
             </p>
@@ -167,7 +182,7 @@ export default function AnggotaDetailPage() {
       </ListGroup>
 
       {canViewIC && (
-        <ListGroup className="mt-4 p-4">
+        <ListGroup className={cn('mt-4 p-4', theme.card)}>
           <ICMemberPanel userId={userId} groupId={id} canEdit={canCheckIC} />
         </ListGroup>
       )}

@@ -1,4 +1,4 @@
-import { PrismaClient, Role, GroupLevel, AttendanceStatus, InvitationStatus } from '@prisma/client';
+import { PrismaClient, Role, GroupLevel, AttendanceStatus, InvitationStatus, Gender } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { IC_SEED_DATA } from './ic-seed-data.js';
 
@@ -15,68 +15,104 @@ const PASSWORD = {
 const SCHOOLS = ['SMAN 1 Depok', 'SMAN 2 Depok', 'SMAN 3 Depok'] as const;
 
 const PJ_SEKOLAH = [
-  { name: 'Usamah', email: 'usamah_sman1@gmail.com', school: 'SMAN 1 Depok' },
-  { name: 'Naufal', email: 'naufal_sman2@gmail.com', school: 'SMAN 2 Depok' },
-  { name: 'Farid', email: 'farid_sman3@gmail.com', school: 'SMAN 3 Depok' },
+  { name: 'Usamah', email: 'usamah_sman1@gmail.com', school: 'SMAN 1 Depok', phone: '081234560001' },
+  { name: 'Naufal', email: 'naufal_sman2@gmail.com', school: 'SMAN 2 Depok', phone: '081234560002' },
+  { name: 'Farid', email: 'farid_sman3@gmail.com', school: 'SMAN 3 Depok', phone: '081234560003' },
 ] as const;
 
 /** Jumlah kelompok per sekolah (acak 2–3) */
 const GROUPS_PER_SCHOOL = [3, 2, 3] as const;
 
-const PEMBINA_NAMES = [
+const PEMBINA_IKHWAN_NAMES = [
   'Budi Santoso',
-  'Siti Rahmawati',
   'Agus Prasetyo',
-  'Dewi Lestari',
   'Rizki Maulana',
-  'Fitriani Putri',
   'Hendra Wijaya',
-  'Nurul Hidayah',
   'Eko Saputra',
-  'Maya Anggraini',
+  'Fajar Nugroho',
+  'Galih Ramadhan',
+  'Indra Kusuma',
+  'Wahyu Setiawan',
+  'Adit Mahendra',
 ] as const;
 
-const ANGGOTA_NAMES = [
+const PEMBINA_AKHWAT_NAMES = [
+  'Siti Rahmawati',
+  'Dewi Lestari',
+  'Fitriani Putri',
+  'Nurul Hidayah',
+  'Maya Anggraini',
+  'Kartika Sari',
+  'Putri Ayu',
+  'Salsa Maharani',
+  'Zahra Nabila',
+  'Nisa Rahmawati',
+] as const;
+
+const ANGGOTA_IKHWAN_NAMES = [
   'Ahmad Fauzi',
   'Bima Aditya',
   'Candra Wijaya',
-  'Dian Pratama',
   'Eka Suryadi',
   'Fajar Nugroho',
   'Galih Ramadhan',
-  'Hana Safitri',
   'Indra Kusuma',
   'Joko Susilo',
-  'Kartika Sari',
   'Lutfi Hakim',
-  'Mira Delima',
   'Nanda Permana',
   'Oki Pratama',
-  'Putri Ayu',
   'Qori Sandi',
   'Rafi Akbar',
-  'Salsa Maharani',
   'Teguh Prasetyo',
   'Umar Faruq',
-  'Vina Oktavia',
   'Wahyu Setiawan',
   'Yusuf Ibrahim',
-  'Zahra Nabila',
   'Adit Mahendra',
   'Bayu Ramadani',
-  'Citra Lestari',
   'Doni Pratama',
-  'Elsa Anggraini',
   'Fadhil Rahman',
-  'Gita Puspita',
   'Hafiz Maulana',
-  'Intan Permata',
   'Jaya Kusuma',
   'Kevin Alfarizi',
-  'Lia Marlina',
   'Miko Ardiansyah',
-  'Nisa Rahmawati',
   'Omar Syarif',
+  'Rizal Pratama',
+  'Syafiq Rahman',
+  'Tommy Wijaya',
+  'Yoga Saputra',
+] as const;
+
+const ANGGOTA_AKHWAT_NAMES = [
+  'Hana Safitri',
+  'Kartika Sari',
+  'Mira Delima',
+  'Putri Ayu',
+  'Salsa Maharani',
+  'Vina Oktavia',
+  'Zahra Nabila',
+  'Citra Lestari',
+  'Elsa Anggraini',
+  'Gita Puspita',
+  'Intan Permata',
+  'Lia Marlina',
+  'Nisa Rahmawati',
+  'Aisyah Putri',
+  'Dinda Maharani',
+  'Farah Lestari',
+  'Grace Anggraini',
+  'Hani Permata',
+  'Ika Safitri',
+  'Jihan Nabila',
+  'Kirana Sari',
+  'Laila Rahmawati',
+  'Mutiara Ayu',
+  'Nadia Oktavia',
+  'Olivia Putri',
+  'Pratiwi Sari',
+  'Qonita Maharani',
+  'Rani Delima',
+  'Siti Aminah',
+  'Tiara Anggraini',
 ] as const;
 
 const GROUP_LABELS = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta'];
@@ -90,6 +126,15 @@ function slugify(name: string) {
     .toLowerCase()
     .replace(/\s+/g, '.')
     .replace(/[^a-z0-9.]/g, '');
+}
+
+function pickName(pool: readonly string[], index: number) {
+  return pool[index % pool.length]!;
+}
+
+/** Nomor HP dummy untuk seed — prefix 08123456xxxx */
+function seedPhone(seq: number) {
+  return `08123456${String(seq).padStart(4, '0')}`;
 }
 
 function getMonday(date: Date): Date {
@@ -107,6 +152,7 @@ async function clearDatabase() {
   await prisma.weeklyEvaluation.deleteMany();
   await prisma.groupMember.deleteMany();
   await prisma.pointLog.deleteMany();
+  await prisma.feedback.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.eventAttendance.deleteMany();
@@ -280,6 +326,7 @@ async function main() {
     data: {
       name: 'Fuad Inaqi',
       email: 'fuadinaqi@gmail.com',
+      gender: Gender.IKHWAN,
       password: hash(PASSWORD.superadmin),
       roles: { create: { role: Role.SUPERADMIN } },
     },
@@ -289,16 +336,19 @@ async function main() {
     data: {
       name: 'Fuad Project',
       email: 'fuadiproject@gmail.com',
+      gender: Gender.IKHWAN,
       password: hash(PASSWORD.admin),
       roles: { create: { role: Role.ADMIN } },
     },
   });
 
-  for (const pj of PJ_SEKOLAH) {
+  for (const [i, pj] of PJ_SEKOLAH.entries()) {
     await prisma.user.create({
       data: {
         name: pj.name,
         email: pj.email,
+        phone: pj.phone,
+        gender: i % 2 === 0 ? Gender.IKHWAN : Gender.AKHWAT,
         password: hash(PASSWORD.pj),
         roles: { create: { role: Role.PJ_SEKOLAH } },
         schools: { create: { schoolId: schoolByName[pj.school]!.id } },
@@ -306,8 +356,11 @@ async function main() {
     });
   }
 
-  let pembinaIndex = 0;
-  let anggotaIndex = 0;
+  let pembinaIkhwanIndex = 0;
+  let pembinaAkhwatIndex = 0;
+  let anggotaIkhwanIndex = 0;
+  let anggotaAkhwatIndex = 0;
+  let phoneSeq = 1000;
   const groups = [];
 
   for (let sIdx = 0; sIdx < SCHOOLS.length; sIdx++) {
@@ -317,26 +370,34 @@ async function main() {
     const schoolShort = `sman${sIdx + 1}`;
 
     for (let gIdx = 0; gIdx < groupCount; gIdx++) {
-      const pembinaName = PEMBINA_NAMES[pembinaIndex]!;
-      pembinaIndex += 1;
+      const level = gIdx % 2 === 0 ? GroupLevel.LEVEL_1 : GroupLevel.LEVEL_2;
+      const levelLabel = level === GroupLevel.LEVEL_1 ? 'Muda' : 'Pratama';
+      const groupGender = gIdx % 2 === 0 ? Gender.IKHWAN : Gender.AKHWAT;
+      const genderLabel = groupGender === Gender.IKHWAN ? 'Ikhwan' : 'Akhwat';
+      const isIkhwan = groupGender === Gender.IKHWAN;
+
+      const pembinaName = pickName(
+        isIkhwan ? PEMBINA_IKHWAN_NAMES : PEMBINA_AKHWAT_NAMES,
+        isIkhwan ? pembinaIkhwanIndex++ : pembinaAkhwatIndex++,
+      );
 
       const pembina = await prisma.user.create({
         data: {
           name: pembinaName,
           email: `${slugify(pembinaName)}.${schoolShort}.pembina@gmail.com`,
+          phone: seedPhone(phoneSeq++),
+          gender: groupGender,
           password: hash(PASSWORD.pembina),
           roles: { create: { role: Role.PEMBINA } },
           schools: { create: { schoolId: school.id } },
         },
       });
 
-      const level = gIdx % 2 === 0 ? GroupLevel.LEVEL_1 : GroupLevel.LEVEL_2;
-      const levelLabel = level === GroupLevel.LEVEL_1 ? 'Muda' : 'Pratama';
-
       const group = await prisma.group.create({
         data: {
-          name: `Kelompok ${levelLabel} ${GROUP_LABELS[gIdx] ?? gIdx + 1}`,
+          name: `Kelompok ${genderLabel} ${levelLabel} ${GROUP_LABELS[gIdx] ?? gIdx + 1}`,
           level,
+          gender: groupGender,
           schoolId: school.id,
           pembinaId: pembina.id,
         },
@@ -345,13 +406,17 @@ async function main() {
 
       const memberCount = 5 + (gIdx % 3);
       for (let m = 0; m < memberCount; m++) {
-        const anggotaName = ANGGOTA_NAMES[anggotaIndex % ANGGOTA_NAMES.length]!;
-        anggotaIndex += 1;
+        const anggotaName = pickName(
+          isIkhwan ? ANGGOTA_IKHWAN_NAMES : ANGGOTA_AKHWAT_NAMES,
+          isIkhwan ? anggotaIkhwanIndex++ : anggotaAkhwatIndex++,
+        );
 
         const anggota = await prisma.user.create({
           data: {
             name: anggotaName,
             email: `${slugify(anggotaName)}.${schoolShort}.g${gIdx + 1}@gmail.com`,
+            phone: m < 2 ? seedPhone(phoneSeq++) : null,
+            gender: groupGender,
             password: hash(PASSWORD.anggota),
             roles: { create: { role: Role.ANGGOTA } },
           },

@@ -7,6 +7,7 @@ import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
 import { Role } from '@prisma/client';
 import { computeMemberAttendance, computeGroupAttendance } from '../../utils/attendance.js';
+import { assertGenderMatch } from '../../utils/gender.js';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/', validate(paginationSchema, 'query'), async (req, res, next) => {
         where,
         include: {
           school: { select: { id: true, name: true } },
-          pembina: { select: { id: true, name: true } },
+          pembina: { select: { id: true, name: true, gender: true, phone: true } },
           _count: { select: { members: true } },
         },
         skip,
@@ -67,10 +68,21 @@ router.get('/:id', async (req, res, next) => {
       where: { id: param(req.params.id) },
       include: {
         school: true,
-        pembina: { select: { id: true, name: true, email: true } },
+        pembina: { select: { id: true, name: true, email: true, gender: true, phone: true } },
         members: {
           where: { isActive: true },
-          include: { user: { select: { id: true, name: true, email: true, totalPoints: true } } },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+                totalPoints: true,
+                gender: true,
+              },
+            },
+          },
         },
       },
     });
@@ -124,9 +136,10 @@ router.put('/:id', validate(updateGroupSchema), async (req, res, next) => {
       throw new AppError(403, 'Akses ditolak');
     }
 
-    const { name, level, pembinaId, isActive } = req.body as {
+    const { name, level, gender, pembinaId, isActive } = req.body as {
       name?: string;
       level?: 'LEVEL_1' | 'LEVEL_2';
+      gender?: 'IKHWAN' | 'AKHWAT';
       pembinaId?: string;
       isActive?: boolean;
     };
@@ -134,7 +147,10 @@ router.put('/:id', validate(updateGroupSchema), async (req, res, next) => {
     const data: Record<string, unknown> = {};
     if (name !== undefined) data.name = name;
     if (level !== undefined) data.level = level;
+    if (gender !== undefined) data.gender = gender;
     if (isActive !== undefined) data.isActive = isActive;
+
+    const targetGender = (gender ?? group.gender) as 'IKHWAN' | 'AKHWAT';
 
     if (pembinaId !== undefined && pembinaId !== group.pembinaId) {
       if (!roles.includes('PJ_SEKOLAH') && !roles.includes('ADMIN') && !roles.includes('SUPERADMIN')) {
@@ -145,6 +161,7 @@ router.put('/:id', validate(updateGroupSchema), async (req, res, next) => {
         where: {
           id: pembinaId,
           isActive: true,
+          gender: targetGender,
           roles: { some: { role: Role.PEMBINA } },
           OR: [
             { schools: { some: { schoolId: group.schoolId } } },
@@ -153,8 +170,21 @@ router.put('/:id', validate(updateGroupSchema), async (req, res, next) => {
         },
         select: { id: true },
       });
-      if (!pembina) throw new AppError(400, 'Pembina tidak valid untuk sekolah ini');
+      if (!pembina) {
+        throw new AppError(400, 'Pembina tidak valid untuk sekolah dan jenis kelompok ini');
+      }
       data.pembinaId = pembinaId;
+    }
+
+    if (gender !== undefined && gender !== group.gender) {
+      const [pembinaUser, memberCount] = await Promise.all([
+        prisma.user.findUnique({ where: { id: group.pembinaId }, select: { gender: true } }),
+        prisma.groupMember.count({ where: { groupId: group.id, isActive: true } }),
+      ]);
+      assertGenderMatch(pembinaUser?.gender, gender, 'Pembina kelompok');
+      if (memberCount > 0) {
+        throw new AppError(400, 'Jenis kelompok tidak dapat diubah karena masih ada anggota');
+      }
     }
 
     const updated = await prisma.group.update({
@@ -184,7 +214,7 @@ router.get('/:id/members', async (req, res, next) => {
   try {
     const members = await prisma.groupMember.findMany({
       where: { groupId: param(req.params.id), isActive: true },
-      include: { user: { select: { id: true, name: true, email: true, totalPoints: true } } },
+      include: { user: { select: { id: true, name: true, email: true, phone: true, totalPoints: true } } },
     });
     sendSuccess(res, members);
   } catch (err) {
@@ -195,11 +225,25 @@ router.get('/:id/members', async (req, res, next) => {
 router.post('/:id/members', async (req, res, next) => {
   try {
     const { userId } = req.body;
-    const isOwner = await isPembinaOfGroup(req.user!.userId, param(req.params.id));
+    const groupId = param(req.params.id);
+    const isOwner = await isPembinaOfGroup(req.user!.userId, groupId);
     const roles = req.user!.roles;
     if (!isOwner && !roles.includes('PJ_SEKOLAH') && !roles.includes('ADMIN') && !roles.includes('SUPERADMIN')) {
       throw new AppError(403, 'Akses ditolak');
     }
+
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { gender: true },
+    });
+    if (!group) throw new AppError(404, 'Kelompok tidak ditemukan');
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { gender: true },
+    });
+    if (!user) throw new AppError(404, 'User tidak ditemukan');
+    assertGenderMatch(user.gender, group.gender, 'Anggota');
 
     const member = await prisma.groupMember.upsert({
       where: { groupId_userId: { groupId: param(req.params.id), userId } },
@@ -242,6 +286,7 @@ router.get('/:id/members/:userId', async (req, res, next) => {
             name: true,
             email: true,
             phone: true,
+            gender: true,
             totalPoints: true,
             lastLoginAt: true,
             createdAt: true,
@@ -269,7 +314,7 @@ router.get('/:id/members/:userId', async (req, res, next) => {
       joinedAt: member.joinedAt,
       ...stats,
       user: member.user,
-      group: { id: group.id, name: group.name, level: group.level },
+      group: { id: group.id, name: group.name, level: group.level, gender: group.gender },
       school: group.school,
     });
   } catch (err) {
@@ -310,10 +355,11 @@ router.put('/:id/members/:userId', validate(updateGroupMemberSchema), async (req
       throw new AppError(400, 'User bukan anggota');
     }
 
-    const { name, email, phone } = req.body as {
+    const { name, email, phone, gender } = req.body as {
       name?: string;
       email?: string;
       phone?: string | null;
+      gender?: 'IKHWAN' | 'AKHWAT';
     };
 
     if (email && email !== member.user.email) {
@@ -327,6 +373,10 @@ router.put('/:id/members/:userId', validate(updateGroupMemberSchema), async (req
     if (name !== undefined) userData.name = name;
     if (email !== undefined) userData.email = email;
     if (phone !== undefined) userData.phone = phone || null;
+    if (gender !== undefined) {
+      assertGenderMatch(gender, group.gender, 'Anggota');
+      userData.gender = gender;
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id: memberUserId },
@@ -336,6 +386,7 @@ router.put('/:id/members/:userId', validate(updateGroupMemberSchema), async (req
         name: true,
         email: true,
         phone: true,
+        gender: true,
         totalPoints: true,
         lastLoginAt: true,
         createdAt: true,
@@ -360,7 +411,7 @@ router.put('/:id/members/:userId', validate(updateGroupMemberSchema), async (req
       joinedAt: member.joinedAt,
       ...stats,
       user: updatedUser,
-      group: { id: group.id, name: group.name, level: group.level },
+      group: { id: group.id, name: group.name, level: group.level, gender: group.gender },
       school: group.school,
     }, 'Data anggota berhasil diperbarui');
   } catch (err) {

@@ -17,6 +17,8 @@ import { attachGroupAttendance } from '../../utils/attendance.js';
 import { getMonday } from '../../utils/weekDate.js';
 import { emailProvider } from '../../lib/email.js';
 import { env } from '../../config/env.js';
+import { assertGenderMatch } from '../../utils/gender.js';
+import { Gender } from '@prisma/client';
 
 const router = Router();
 
@@ -79,6 +81,7 @@ router.post(
               name: pj.name,
               email: pj.email,
               phone: pj.phone || null,
+              gender: pj.gender,
               password: hashed,
               roles: { create: { role: Role.PJ_SEKOLAH } },
               schools: { create: { schoolId: school.id } },
@@ -96,6 +99,7 @@ router.post(
           data: {
             name: pj.name,
             email: pj.email,
+            gender: pj.gender,
             role: Role.PJ_SEKOLAH,
             schoolId: school.id,
             invitedById: req.user!.userId,
@@ -162,7 +166,7 @@ router.post(
   async (req, res, next) => {
     try {
       const schoolId = param(req.params.id);
-      const { name, email, phone, password, replace, replaceUserId } = req.body;
+      const { name, email, phone, gender, password, replace, replaceUserId } = req.body;
 
       const school = await prisma.school.findUnique({ where: { id: schoolId } });
       if (!school || !school.isActive) throw new AppError(404, 'Sekolah tidak ditemukan');
@@ -217,6 +221,7 @@ router.post(
               name,
               email,
               phone: phone || null,
+              gender,
               password: hashed,
               roles: { create: { role: Role.PJ_SEKOLAH } },
               schools: { create: { schoolId } },
@@ -233,6 +238,7 @@ router.post(
           data: {
             name,
             email,
+            gender,
             role: Role.PJ_SEKOLAH,
             schoolId,
             invitedById: req.user!.userId,
@@ -319,18 +325,19 @@ async function assertSchoolManager(userId: string, roles: string[], schoolId: st
   if (!canAccess) throw new AppError(403, 'Akses ditolak');
 }
 
-async function findPembinaInSchool(schoolId: string, pembinaId: string) {
+async function findPembinaInSchool(schoolId: string, pembinaId: string, gender?: Gender) {
   return prisma.user.findFirst({
     where: {
       id: pembinaId,
       isActive: true,
+      ...(gender ? { gender } : {}),
       roles: { some: { role: Role.PEMBINA } },
       OR: [
         { schools: { some: { schoolId } } },
         { groupsAsPembina: { some: { schoolId, isActive: true } } },
       ],
     },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, gender: true },
   });
 }
 
@@ -342,16 +349,22 @@ router.get('/:id/pembina', checkAuth, async (req, res, next) => {
     const school = await prisma.school.findUnique({ where: { id: schoolId } });
     if (!school || !school.isActive) throw new AppError(404, 'Sekolah tidak ditemukan');
 
+    const genderFilter = req.query.gender as Gender | undefined;
+    const validGenders: Gender[] = ['IKHWAN', 'AKHWAT'];
+    const genderWhere =
+      genderFilter && validGenders.includes(genderFilter) ? { gender: genderFilter } : {};
+
     const pembina = await prisma.user.findMany({
       where: {
         isActive: true,
+        ...genderWhere,
         roles: { some: { role: Role.PEMBINA } },
         OR: [
           { schools: { some: { schoolId } } },
           { groupsAsPembina: { some: { schoolId, isActive: true } } },
         ],
       },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, gender: true, phone: true },
       orderBy: { name: 'asc' },
     });
 
@@ -373,14 +386,16 @@ router.post(
       const school = await prisma.school.findUnique({ where: { id: schoolId } });
       if (!school || !school.isActive) throw new AppError(404, 'Sekolah tidak ditemukan');
 
-      const { name, level, pembinaId, pembina } = req.body;
+      const { name, level, gender, pembinaId, pembina } = req.body;
 
       if (pembinaId) {
-        const existingPembina = await findPembinaInSchool(schoolId, pembinaId);
-        if (!existingPembina) throw new AppError(400, 'Pembina tidak ditemukan di sekolah ini');
+        const existingPembina = await findPembinaInSchool(schoolId, pembinaId, gender);
+        if (!existingPembina) {
+          throw new AppError(400, 'Pembina tidak ditemukan atau jenis kelamin tidak sesuai kelompok');
+        }
 
         const group = await prisma.group.create({
-          data: { name, level, schoolId, pembinaId },
+          data: { name, level, gender, schoolId, pembinaId },
           include: {
             pembina: { select: { id: true, name: true, email: true } },
             school: { select: { id: true, name: true } },
@@ -391,7 +406,8 @@ router.post(
         return;
       }
 
-      const { name: pName, email, phone, password } = pembina!;
+      const { name: pName, email, phone, gender: pembinaGender, password } = pembina!;
+      assertGenderMatch(pembinaGender, gender, 'Pembina');
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser?.isActive) throw new AppError(400, 'Email pembina sudah terdaftar');
 
@@ -412,6 +428,7 @@ router.post(
               name: pName,
               email,
               phone: phone || null,
+              gender: pembinaGender,
               password: hashed,
               roles: { create: { role: Role.PEMBINA } },
               schools: { create: { schoolId } },
@@ -420,7 +437,7 @@ router.post(
           });
 
           const group = await tx.group.create({
-            data: { name, level, schoolId, pembinaId: newPembina.id },
+            data: { name, level, gender, schoolId, pembinaId: newPembina.id },
             include: {
               pembina: { select: { id: true, name: true, email: true } },
               school: { select: { id: true, name: true } },
@@ -441,6 +458,7 @@ router.post(
         data: {
           name: pName,
           email,
+          gender: pembinaGender,
           role: Role.PEMBINA,
           schoolId,
           invitedById: req.user!.userId,

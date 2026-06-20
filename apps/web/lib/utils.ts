@@ -100,6 +100,10 @@ export function getRoleLabel(role: string) {
   return labels[role] || role;
 }
 
+export function getGenderLabel(gender: string) {
+  return gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan';
+}
+
 export function getPrimaryRole(roles: string[]): string {
   const priority = ['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA'];
   for (const r of priority) {
@@ -118,4 +122,19 @@ export function formatEventTargetLevels(
 ) {
   if (!targetLevels?.length) return 'Semua level';
   return targetLevels.map((level) => labels[level] || level).join(', ');
+}
+
+/** Normalisasi nomor HP ke format wa.me (62...) */
+export function formatWhatsAppPhone(phone: string): string | null {
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+  if (digits.startsWith('62')) return digits;
+  return digits;
+}
+
+export function getWhatsAppUrl(phone?: string | null): string | null {
+  if (!phone?.trim()) return null;
+  const formatted = formatWhatsAppPhone(phone);
+  return formatted ? `https://wa.me/${formatted}` : null;
 }

@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma.js';
 import { checkAuth, checkRole, canAccessSchool, isPembinaOfGroup, getUserSchoolIds } from '../../middleware/auth.js';
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
-import { Role } from '@prisma/client';
+import { Role, Gender } from '@prisma/client';
 import { getMonday } from '../../utils/weekDate.js';
 
 const router = Router();
@@ -43,6 +43,37 @@ async function getAttendanceTrend(eightWeeksAgo: Date, schoolIds?: string[]) {
   `.catch(() => []);
 }
 
+async function getGenderBreakdown(groupWhere: { isActive: boolean; schoolId?: { in: string[] } }) {
+  const [groupsIkhwan, groupsAkhwat, anggotaIkhwan, anggotaAkhwat, pembinaRows] = await Promise.all([
+    prisma.group.count({ where: { ...groupWhere, gender: Gender.IKHWAN } }),
+    prisma.group.count({ where: { ...groupWhere, gender: Gender.AKHWAT } }),
+    prisma.groupMember.count({
+      where: { isActive: true, group: groupWhere, user: { gender: Gender.IKHWAN } },
+    }),
+    prisma.groupMember.count({
+      where: { isActive: true, group: groupWhere, user: { gender: Gender.AKHWAT } },
+    }),
+    prisma.group.findMany({
+      where: groupWhere,
+      select: { pembina: { select: { gender: true } } },
+      distinct: ['pembinaId'],
+    }),
+  ]);
+
+  let pembinaIkhwan = 0;
+  let pembinaAkhwat = 0;
+  for (const row of pembinaRows) {
+    if (row.pembina.gender === Gender.AKHWAT) pembinaAkhwat += 1;
+    else pembinaIkhwan += 1;
+  }
+
+  return {
+    groups: { ikhwan: groupsIkhwan, akhwat: groupsAkhwat },
+    pembina: { ikhwan: pembinaIkhwan, akhwat: pembinaAkhwat },
+    anggota: { ikhwan: anggotaIkhwan, akhwat: anggotaAkhwat },
+  };
+}
+
 async function buildOverview(schoolIds?: string[]) {
   const thisMonday = getMonday(new Date());
   const eightWeeksAgo = new Date(thisMonday);
@@ -53,7 +84,8 @@ async function buildOverview(schoolIds?: string[]) {
     : { isActive: true };
 
   if (schoolIds?.length) {
-    const [totalGroups, pembinaRows, totalAnggota, evaluationsThisWeek, attendanceTrend] = await Promise.all([
+    const [totalGroups, pembinaRows, totalAnggota, evaluationsThisWeek, attendanceTrend, genderBreakdown] =
+      await Promise.all([
       prisma.group.count({ where: groupWhere }),
       prisma.group.findMany({ where: groupWhere, select: { pembinaId: true }, distinct: ['pembinaId'] }),
       prisma.groupMember.count({ where: { isActive: true, group: groupWhere } }),
@@ -61,6 +93,7 @@ async function buildOverview(schoolIds?: string[]) {
         where: { weekDate: thisMonday, isSubmitted: true, group: groupWhere },
       }),
       getAttendanceTrend(eightWeeksAgo, schoolIds),
+      getGenderBreakdown(groupWhere),
     ]);
 
     const totalPembina = pembinaRows.length;
@@ -74,18 +107,21 @@ async function buildOverview(schoolIds?: string[]) {
       submissionRate: totalGroups > 0 ? Math.round((evaluationsThisWeek / totalGroups) * 100) : 0,
       evaluationsThisWeek,
       attendanceTrend,
+      genderBreakdown,
       topSchools: [],
     };
   }
 
-  const [totalSchools, totalGroups, totalPembina, totalAnggota, evaluationsThisWeek, totalGroupsActive, attendanceTrend, topSchools] =
+  const groupWhereAll = { isActive: true as const };
+
+  const [totalSchools, totalGroups, totalPembina, totalAnggota, evaluationsThisWeek, totalGroupsActive, attendanceTrend, topSchools, genderBreakdown] =
     await Promise.all([
       prisma.school.count({ where: { isActive: true } }),
-      prisma.group.count({ where: { isActive: true } }),
+      prisma.group.count({ where: groupWhereAll }),
       prisma.userRole.count({ where: { role: Role.PEMBINA } }),
       prisma.userRole.count({ where: { role: Role.ANGGOTA } }),
       prisma.weeklyEvaluation.count({ where: { weekDate: thisMonday, isSubmitted: true } }),
-      prisma.group.count({ where: { isActive: true } }),
+      prisma.group.count({ where: groupWhereAll }),
       getAttendanceTrend(eightWeeksAgo),
       prisma.school.findMany({
         where: { isActive: true },
@@ -104,6 +140,7 @@ async function buildOverview(schoolIds?: string[]) {
           },
         },
       }),
+      getGenderBreakdown(groupWhereAll),
     ]);
 
   return {
@@ -115,6 +152,7 @@ async function buildOverview(schoolIds?: string[]) {
     submissionRate: totalGroupsActive > 0 ? Math.round((evaluationsThisWeek / totalGroupsActive) * 100) : 0,
     evaluationsThisWeek,
     attendanceTrend,
+    genderBreakdown,
     topSchools: topSchools.map((s) => ({
       id: s.id,
       name: s.name,

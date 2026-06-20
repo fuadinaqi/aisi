@@ -14,6 +14,9 @@ import { EvaluationInfiniteList } from '@/components/evaluasi/EvaluationInfinite
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
+import { WhatsAppButton } from '@/components/shared/WhatsAppButton';
+import { GenderBadge } from '@/components/shared/GenderField';
+import { getGenderLabel } from '@/lib/utils';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { invalidateSchoolQueries } from '@/lib/queryInvalidation';
@@ -111,25 +114,28 @@ export default function SchoolDetailPage() {
                         {[pj.email, pj.phone].filter(Boolean).join(' · ')}
                       </p>
                     </div>
-                    {canManagePj && (
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs">
-                          <Link href={`/schools/${id}/pj/${pj.id}/ganti`}>Ganti</Link>
-                        </Button>
-                        {canRemovePj && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive"
-                            onClick={() => setPjToRemove({ id: pj.id, name: pj.name })}
-                            aria-label={`Hapus ${pj.name}`}
-                          >
-                            <UserMinus className="h-4 w-4" />
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <WhatsAppButton phone={pj.phone} size="sm" />
+                      {canManagePj && (
+                        <>
+                          <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs">
+                            <Link href={`/schools/${id}/pj/${pj.id}/ganti`}>Ganti</Link>
                           </Button>
-                        )}
-                      </div>
-                    )}
+                          {canRemovePj && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive"
+                              onClick={() => setPjToRemove({ id: pj.id, name: pj.name })}
+                              aria-label={`Hapus ${pj.name}`}
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -175,7 +181,7 @@ export default function SchoolDetailPage() {
                     href={`/kelompok/${g.id}`}
                     icon={Users}
                     title={g.name}
-                    subtitle={`Pembina: ${g.pembina.name} · ${g._count.members} anggota`}
+                    subtitle={`${getGenderLabel(g.gender)} · Pembina: ${g.pembina.name} · ${g._count.members} anggota`}
                     trailing={
                       <AttendanceRate
                         variant="group"

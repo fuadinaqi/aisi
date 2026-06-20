@@ -27,12 +27,30 @@ enum GroupLevel {
   LEVEL_2
 }
 
+enum Gender {
+  IKHWAN
+  AKHWAT
+}
+
 enum NotifType {
   REMINDER_FORM
   NEW_EVENT
   NEW_MATERI
   POINT_EARNED
+  NEW_KKS
   GENERAL
+}
+
+enum FeedbackType {
+  KELUHAN
+  KRITIK
+  SARAN
+}
+
+enum FeedbackStatus {
+  PENDING
+  READ
+  RESOLVED
 }
 
 enum EventCheckInStatus {
@@ -98,6 +116,7 @@ model User {
   phone       String?
   password    String
   avatarUrl   String?
+  gender      Gender    @default(IKHWAN)
   totalPoints Int       @default(0)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
@@ -119,6 +138,7 @@ model User {
   mutabaahEntries    MutabaahEntry[]
   icProgressAsMember MemberICProgress[] @relation("ICMember")
   icProgressChecked  MemberICProgress[] @relation("ICChecker")
+  feedbacks          Feedback[]
 }
 
 model UserRole {
@@ -153,6 +173,7 @@ model Group {
   id        String     @id @default(cuid())
   name      String
   level     GroupLevel
+  gender    Gender
   schoolId  String
   pembinaId String
   isActive  Boolean    @default(true)
@@ -325,6 +346,7 @@ model UserInvitation {
   role        Role
   schoolId    String?
   groupId     String?
+  gender      Gender?
   token       String           @unique @default(uuid())
   status      InvitationStatus @default(PENDING)
   invitedById String
@@ -427,4 +449,24 @@ model MemberICProgress {
 
   @@unique([userId, groupId, indikatorId])
   @@index([groupId, userId])
+}
+
+model Feedback {
+  id          String         @id @default(cuid())
+  userId      String
+  type        FeedbackType
+  subject     String
+  message     String         @db.Text
+  status      FeedbackStatus @default(PENDING)
+  adminNotes  String?        @db.Text
+  schoolId    String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  readAt      DateTime?
+  resolvedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId])
 }

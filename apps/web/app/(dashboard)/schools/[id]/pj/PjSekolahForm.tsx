@@ -52,6 +52,7 @@ export function PjSekolahForm({ replace = false, replaceUserId, replaceUserName 
             }
             submitLabel={replace ? 'Ganti PJ' : 'Tambah PJ Sekolah'}
             showPhone
+            showGender
             showPasswordOption
             onCancel={() => router.back()}
             onSubmit={async (data) => {

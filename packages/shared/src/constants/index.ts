@@ -57,6 +57,23 @@ export const INVITATION_RULES: Record<string, string[]> = {
   PEMBINA: ['ANGGOTA'],
 };
 
+export const KKS_TYPE_LABELS: Record<string, string> = {
+  KELUHAN: 'Keluhan',
+  KRITIK: 'Kritik',
+  SARAN: 'Saran',
+};
+
+export const KKS_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Menunggu',
+  READ: 'Dibaca',
+  RESOLVED: 'Selesai',
+};
+
+export const GENDER_LABELS: Record<string, string> = {
+  IKHWAN: 'Ikhwan',
+  AKHWAT: 'Akhwat',
+};
+
 export * from './ic.js';
 
 export const SCHOOLS_DEPOK = [

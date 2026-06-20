@@ -16,11 +16,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import type { GroupMemberDetail } from '@/lib/types';
+import { GenderSelect } from '@/components/shared/GenderField';
 
 type FormData = {
   name: string;
   email: string;
   phone: string;
+  gender: 'IKHWAN' | 'AKHWAT';
 };
 
 export default function EditAnggotaPage() {
@@ -49,6 +51,7 @@ export default function EditAnggotaPage() {
       name: member.user.name,
       email: member.user.email,
       phone: member.user.phone || '',
+      gender: (member.user.gender as 'IKHWAN' | 'AKHWAT') || 'IKHWAN',
     });
   }, [member, reset]);
 
@@ -59,6 +62,7 @@ export default function EditAnggotaPage() {
         name: data.name.trim(),
         email: data.email.trim(),
         phone: data.phone.trim() || null,
+        gender: data.gender,
       });
       await queryClient.invalidateQueries({ queryKey: ['group-member', id, userId] });
       await invalidateGroupQueries(queryClient, { groupId: id });
@@ -112,6 +116,11 @@ export default function EditAnggotaPage() {
                 className="rounded-xl"
                 {...register('email', { required: true })}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gender">Jenis kelamin</Label>
+              <GenderSelect id="gender" {...register('gender', { required: true })} />
             </div>
 
             <div className="space-y-2">

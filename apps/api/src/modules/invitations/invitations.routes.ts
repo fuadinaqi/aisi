@@ -8,7 +8,8 @@ import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
 import { emailProvider } from '../../lib/email.js';
 import { env } from '../../config/env.js';
-import { InvitationStatus, Role } from '@prisma/client';
+import { InvitationStatus, Role, Gender } from '@prisma/client';
+import { assertGenderMatch } from '../../utils/gender.js';
 
 const router = Router();
 
@@ -16,7 +17,7 @@ router.use(checkAuth);
 
 router.post('/', validate(invitationSchema), async (req, res, next) => {
   try {
-    const { name, email, role, schoolId, groupId } = req.body;
+    const { name, email, role, gender, schoolId, groupId } = req.body;
     const inviterRoles = req.user!.roles;
 
     const canInvite = inviterRoles.some((r) => {
@@ -24,6 +25,20 @@ router.post('/', validate(invitationSchema), async (req, res, next) => {
       return allowed?.includes(role);
     });
     if (!canInvite) throw new AppError(403, 'Anda tidak berhak mengundang role ini');
+
+    let resolvedGender: Gender | null = gender ?? null;
+
+    if (groupId && role === 'ANGGOTA') {
+      const group = await prisma.group.findUnique({
+        where: { id: groupId },
+        select: { gender: true, isActive: true },
+      });
+      if (!group || !group.isActive) throw new AppError(404, 'Kelompok tidak ditemukan');
+      resolvedGender = gender ?? group.gender;
+      assertGenderMatch(resolvedGender, group.gender, 'Anggota');
+    } else if (role === 'PEMBINA' || role === 'ANGGOTA' || role === 'PJ_SEKOLAH') {
+      if (!resolvedGender) throw new AppError(400, 'Jenis kelamin wajib dipilih');
+    }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser?.isActive) throw new AppError(400, 'Email sudah terdaftar sebagai user aktif');
@@ -41,6 +56,7 @@ router.post('/', validate(invitationSchema), async (req, res, next) => {
         name,
         email,
         role: role as Role,
+        gender: resolvedGender,
         schoolId: schoolId || null,
         groupId: groupId || null,
         invitedById: req.user!.userId,

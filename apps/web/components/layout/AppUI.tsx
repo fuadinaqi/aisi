@@ -217,12 +217,14 @@ export function ProfileHeader({
   badge,
   points,
   className,
+  avatarClassName,
 }: {
   name: string;
   email?: string;
   badge?: React.ReactNode;
   points?: React.ReactNode;
   className?: string;
+  avatarClassName?: string;
 }) {
   return (
     <div
@@ -231,7 +233,12 @@ export function ProfileHeader({
         className,
       )}
     >
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg font-bold text-primary">
+      <div
+        className={cn(
+          'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg font-bold text-primary',
+          avatarClassName,
+        )}
+      >
         {name.charAt(0).toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">

@@ -7,13 +7,15 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, ChevronRight, Pencil, UserMinus, UserPlus } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
+import { cn, getPrimaryRole } from '@/lib/utils';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { EvaluationInfiniteList } from '@/components/evaluasi/EvaluationInfiniteList';
 import { LoadingSkeleton, PointBadge } from '@/components/shared/Badges';
+import { getGroupGenderTheme } from '@/components/shared/GenderField';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
+import { WhatsAppButton } from '@/components/shared/WhatsAppButton';
 import { Button } from '@/components/ui/button';
 import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import type { GroupItem } from '@/lib/types';
@@ -58,11 +60,15 @@ export default function KelompokDetailPage() {
 
   if (!group) return null;
 
+  const theme = getGroupGenderTheme(group.gender);
+  const cardClass = cn('p-4', theme.card);
+  const cardLabelClass = cn('text-xs font-medium uppercase tracking-wide', theme.cardLabel);
+
   const backHref =
     role === 'PEMBINA' ? '/dashboard' : `/schools/${group.school.id}`;
 
   return (
-    <PageContainer tight>
+    <PageContainer tight className={cn('relative', theme.pageGlow)}>
       <Button variant="ghost" size="sm" className="-ml-2 mb-1 rounded-xl text-muted-foreground" asChild>
         <Link href={backHref}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />
@@ -70,19 +76,37 @@ export default function KelompokDetailPage() {
         </Link>
       </Button>
 
+      <div className={cn('relative mb-4 overflow-hidden rounded-2xl px-4 py-3.5', theme.banner)}>
+        <div>
+          <p className={cn('text-sm font-semibold', theme.bannerTitleClass)}>{theme.bannerTitle}</p>
+          <p className={cn('mt-0.5 text-xs', theme.bannerSubtitle)}>
+            {group.school.name} · {levelLabel}
+          </p>
+        </div>
+      </div>
+
       <PageHeader
         title={group.name}
         compact
         action={
           canManageMembers ? (
             <div className="flex items-center gap-2">
-              <Button asChild size="sm" variant="outline" className="rounded-xl">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className={cn('rounded-xl', theme.outlineButton)}
+              >
                 <Link href={`/kelompok/${id}/edit`}>
                   <Pencil className="mr-1 h-4 w-4" />
                   Edit
                 </Link>
               </Button>
-              <Button asChild size="sm" className="rounded-xl">
+              <Button
+                asChild
+                size="sm"
+                className={cn('rounded-xl', theme.primaryButton)}
+              >
                 <Link href={`/kelompok/${id}/anggota/undang`}>
                   <UserPlus className="mr-1 h-4 w-4" />
                   Undang
@@ -96,24 +120,27 @@ export default function KelompokDetailPage() {
       <p className="px-0.5 text-sm text-muted-foreground">{group.school.name}</p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <ListGroup className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pembina</p>
-          <p className="mt-1 font-medium">{group.pembina.name}</p>
-          {group.pembina.email && (
-            <p className="text-sm text-muted-foreground">{group.pembina.email}</p>
-          )}
+        <ListGroup className={cardClass}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className={cardLabelClass}>Pembina</p>
+              <p className="mt-1 font-medium">{group.pembina.name}</p>
+              {group.pembina.email && (
+                <p className="text-sm text-muted-foreground">{group.pembina.email}</p>
+              )}
+            </div>
+            <WhatsAppButton phone={group.pembina.phone} size="sm" />
+          </div>
         </ListGroup>
 
-        <ListGroup className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Level</p>
+        <ListGroup className={cardClass}>
+          <p className={cardLabelClass}>Level</p>
           <p className="mt-1 font-medium">{levelLabel}</p>
         </ListGroup>
 
-        <ListGroup className="flex items-center justify-between p-4 sm:col-span-2 lg:col-span-1">
+        <ListGroup className={cn('flex items-center justify-between', cardClass)}>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Kehadiran Kelompok
-            </p>
+            <p className={cardLabelClass}>Kehadiran Kelompok</p>
             <p className="mt-1 text-xs text-muted-foreground">Sejak kelompok dibuat</p>
           </div>
           <AttendanceRate
@@ -128,14 +155,17 @@ export default function KelompokDetailPage() {
 
       <section className="space-y-3">
         <AppSectionHeader title={`Anggota (${group.members?.length ?? 0})`} />
-        <ListGroup>
+        <ListGroup className={theme.card}>
           {!group.members?.length ? (
             <div className="px-5 py-8 text-center text-sm text-muted-foreground">
               Belum ada anggota.
               {canManageMembers && (
                 <>
                   {' '}
-                  <Link href={`/kelompok/${id}/anggota/undang`} className="font-medium text-primary">
+                  <Link
+                    href={`/kelompok/${id}/anggota/undang`}
+                    className={cn('font-medium', theme.inlineLink)}
+                  >
                     Undang anggota
                   </Link>
                 </>
@@ -152,10 +182,12 @@ export default function KelompokDetailPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium group-hover/link:text-primary">{m.user.name}</p>
+                        <p className={cn('font-medium', theme.memberLink)}>{m.user.name}</p>
                         <p className="truncate text-sm text-muted-foreground">{m.user.email}</p>
                       </div>
-                      <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground group-hover/link:text-primary" />
+                      <ChevronRight
+                        className={cn('mt-0.5 h-4 w-4 shrink-0 text-muted-foreground', theme.memberChevron)}
+                      />
                     </div>
                     <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-border/60 pt-2.5">
                       <p className="text-xs text-muted-foreground">Kehadiran</p>
@@ -167,6 +199,7 @@ export default function KelompokDetailPage() {
                     </div>
                   </Link>
                   <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
+                    <WhatsAppButton phone={m.user.phone} size="sm" />
                     <PointBadge points={m.user.totalPoints} />
                     {canManageMembers && (
                       <Button

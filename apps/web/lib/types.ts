@@ -8,11 +8,12 @@ export interface GroupMemberDetail {
     name: string;
     email: string;
     phone: string | null;
+    gender?: string;
     totalPoints: number;
     lastLoginAt: string | null;
     createdAt: string;
   };
-  group: { id: string; name: string; level: string };
+  group: { id: string; name: string; level: string; gender?: string };
   school: { id: string; name: string };
 }
 
@@ -20,8 +21,9 @@ export interface GroupItem {
   id: string;
   name: string;
   level: string;
+  gender: string;
   school: { id: string; name: string };
-  pembina: { id: string; name: string; email?: string };
+  pembina: { id: string; name: string; email?: string; phone?: string | null };
   _count: { members: number };
   attendanceRate?: number | null;
   totalHadir?: number;
@@ -29,7 +31,7 @@ export interface GroupItem {
   totalSlots?: number;
   members?: {
     joinedAt: string;
-    user: { id: string; name: string; email: string; totalPoints: number };
+    user: { id: string; name: string; email: string; phone?: string | null; totalPoints: number };
     attendanceRate: number | null;
     totalHadir: number;
     totalPekan: number;
@@ -43,7 +45,19 @@ export interface OverviewData {
   totalAnggota: number;
   submissionRate: number;
   evaluationsThisWeek: number;
+  genderBreakdown?: GenderBreakdown;
   groups?: GroupItem[];
+}
+
+export interface GenderCount {
+  ikhwan: number;
+  akhwat: number;
+}
+
+export interface GenderBreakdown {
+  groups: GenderCount;
+  pembina: GenderCount;
+  anggota: GenderCount;
 }
 
 export interface EvaluationItem {
@@ -128,4 +142,30 @@ export interface SchoolDetail extends SchoolItem {
   groups: GroupItem[];
   totalGroups: number;
   totalAnggota: number;
+}
+
+export interface KksItem {
+  id: string;
+  type: 'KELUHAN' | 'KRITIK' | 'SARAN';
+  subject: string;
+  message: string;
+  status: 'PENDING' | 'READ' | 'RESOLVED';
+  adminNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  readAt?: string | null;
+  resolvedAt?: string | null;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string | null;
+    roles?: { role: string }[];
+    schools?: { school: { id: string; name: string } }[];
+  };
+}
+
+export interface KksListData {
+  items: KksItem[];
+  pendingCount: number;
 }

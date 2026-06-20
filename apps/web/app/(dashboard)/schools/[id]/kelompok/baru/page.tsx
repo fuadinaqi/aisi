@@ -16,12 +16,14 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { invalidateGroupQueries, invalidateInvitationQueries } from '@/lib/queryInvalidation';
+import { GenderToggle } from '@/components/shared/GenderField';
 
-type PembinaOption = { id: string; name: string; email: string };
+type PembinaOption = { id: string; name: string; email: string; gender?: string };
 
 type FormData = {
   name: string;
   level: 'LEVEL_1' | 'LEVEL_2';
+  gender: 'IKHWAN' | 'AKHWAT';
   pembinaMode: 'existing' | 'new';
   pembinaId: string;
   pembinaName: string;
@@ -38,20 +40,16 @@ export default function NewSchoolGroupPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const { data: pembinaList = [], isLoading } = useQuery<PembinaOption[]>({
-    queryKey: ['school-pembina', id],
-    queryFn: async () => (await api.get<ApiResponse<PembinaOption[]>>(`/schools/${id}/pembina`)).data.data,
-    enabled: !!id,
-  });
-
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { isSubmitting },
   } = useForm<FormData>({
     defaultValues: {
       level: 'LEVEL_1',
+      gender: 'IKHWAN',
       pembinaMode: 'new',
       pembinaId: '',
       useDirectPassword: false,
@@ -60,6 +58,18 @@ export default function NewSchoolGroupPage() {
 
   const pembinaMode = watch('pembinaMode');
   const useDirectPassword = watch('useDirectPassword');
+  const groupGender = watch('gender');
+
+  const { data: pembinaList = [], isLoading } = useQuery<PembinaOption[]>({
+    queryKey: ['school-pembina', id, groupGender],
+    queryFn: async () =>
+      (
+        await api.get<ApiResponse<PembinaOption[]>>(
+          `/schools/${id}/pembina?gender=${groupGender}`,
+        )
+      ).data.data,
+    enabled: !!id && !!groupGender,
+  });
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -71,15 +81,18 @@ export default function NewSchoolGroupPage() {
           ? {
               name: data.name.trim(),
               level: data.level,
+              gender: data.gender,
               pembinaId: data.pembinaId,
             }
           : {
               name: data.name.trim(),
               level: data.level,
+              gender: data.gender,
               pembina: {
                 name: data.pembinaName.trim(),
                 email: data.pembinaEmail.trim(),
                 phone: data.pembinaPhone.trim() || undefined,
+                gender: data.gender,
                 ...(data.useDirectPassword && data.pembinaPassword
                   ? { password: data.pembinaPassword }
                   : {}),
@@ -155,6 +168,21 @@ export default function NewSchoolGroupPage() {
                 </select>
               </div>
 
+              <div className="space-y-2">
+                <Label>Jenis kelompok</Label>
+                <GenderToggle
+                  value={groupGender}
+                  onChange={(value) => {
+                    setValue('gender', value);
+                    setValue('pembinaId', '');
+                    if (pembinaMode === 'existing' && pembinaList.length === 0) {
+                      setValue('pembinaMode', 'new');
+                    }
+                  }}
+                />
+                <input type="hidden" {...register('gender')} />
+              </div>
+
               <div className="border-t border-border/60 pt-5">
                 <p className="mb-3 text-sm font-semibold">Pembina kelompok</p>
 
@@ -191,7 +219,8 @@ export default function NewSchoolGroupPage() {
                     </select>
                     {pembinaList.length === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Belum ada pembina. Pilih opsi &quot;Pembina baru&quot;.
+                        Belum ada pembina {groupGender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}. Pilih opsi
+                        &quot;Pembina baru&quot;.
                       </p>
                     )}
                   </div>

@@ -14,7 +14,8 @@ import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
 import { param } from '../../utils/param.js';
 import { env } from '../../config/env.js';
-import { Role, InvitationStatus } from '@prisma/client';
+import { Role, InvitationStatus, Gender } from '@prisma/client';
+import { assertGenderMatch } from '../../utils/gender.js';
 
 const router = Router();
 
@@ -143,6 +144,23 @@ router.post('/set-password', validate(setPasswordSchema), async (req, res, next)
     const existing = await prisma.user.findUnique({ where: { email: invitation.email } });
     if (existing) throw new AppError(400, 'Email sudah terdaftar');
 
+    const userGender: Gender = invitation.gender ?? Gender.IKHWAN;
+    if (
+      !invitation.gender &&
+      invitation.role !== Role.ADMIN &&
+      invitation.role !== Role.SUPERADMIN
+    ) {
+      throw new AppError(400, 'Data undangan tidak lengkap (jenis kelamin)');
+    }
+
+    if (invitation.groupId && invitation.role === Role.ANGGOTA) {
+      const group = await prisma.group.findUnique({
+        where: { id: invitation.groupId },
+        select: { gender: true },
+      });
+      if (group) assertGenderMatch(userGender, group.gender, 'Anggota');
+    }
+
     const hashed = await bcrypt.hash(password, 12);
 
     await prisma.$transaction(async (tx) => {
@@ -150,6 +168,7 @@ router.post('/set-password', validate(setPasswordSchema), async (req, res, next)
         data: {
           name: invitation.name,
           email: invitation.email,
+          gender: userGender,
           password: hashed,
           roles: { create: { role: invitation.role as Role } },
           ...(invitation.schoolId && {

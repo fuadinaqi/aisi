@@ -15,22 +15,31 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 
 | Peran | Kemampuan utama |
 | ----- | --------------- |
-| **Superadmin / Admin** | Kelola sekolah, PJ Sekolah, kelompok, undangan admin, konfigurasi label level, master mutabaah & indikator capaian, analitik kota |
-| **PJ Sekolah** | Kelola kelompok & pembina di sekolahnya, lihat evaluasi sekolah, lihat master IC (read-only), pantau progress IC anggota, analitik sekolah, buat agenda |
-| **Pembina** | Isi evaluasi mingguan anggota, checklist indikator capaian anggota, lihat mutabaah anggota per pekan, lihat master IC (read-only), kelola agenda & persetujuan check-in |
-| **Anggota** | Isi mutabaah yaumiyah per pekan, lihat agenda sesuai level kelompok, check-in event dengan foto, lihat poin & profil |
+| **Superadmin / Admin** | Kelola sekolah, PJ Sekolah, kelompok, undangan admin, konfigurasi label level, master mutabaah & indikator capaian, inbox KKS, analitik kota (termasuk breakdown gender), hubungi PJ via WhatsApp |
+| **PJ Sekolah** | Kelola kelompok & pembina di sekolahnya, daftar pembina, lihat evaluasi sekolah, lihat master IC (read-only), pantau progress IC anggota, analitik sekolah, buat agenda, kirim KKS |
+| **Pembina** | Isi evaluasi mingguan anggota, checklist indikator capaian anggota, lihat mutabaah anggota per pekan, lihat master IC (read-only), kelola agenda & persetujuan check-in, kirim KKS |
+| **Anggota** | Isi mutabaah yaumiyah per pekan, lihat agenda sesuai level kelompok, check-in event dengan foto, lihat poin & profil, kirim KKS |
 
 ### Modul
 
-- **Sekolah & Kelompok** — CRUD sekolah, PJ Sekolah (multi-PJ), kelompok dengan level (`LEVEL_1` / `LEVEL_2`), undangan pembina & anggota
+- **Sekolah & Kelompok** — CRUD sekolah, PJ Sekolah (multi-PJ), kelompok dengan level (`LEVEL_1` / `LEVEL_2`) dan jenis **Ikhwan / Akhwat**, undangan pembina & anggota; validasi gender pembina/anggota harus sesuai kelompok
 - **Evaluasi Mingguan** — Pembina mengisi kehadiran per pekan (satu evaluasi per kelompok per pekan); create-only (409 jika sudah ada), edit via PUT; tampilan mutabaah anggota per pekan evaluasi
 - **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina lihat di detail evaluasi & detail anggota
-- **Indikator Capaian (IC)** — Master kurikulum per level kelompok (5 kategori: Keagamaan, Kebangsaan, Kemasyarakatan, Keorganisasian, Kepemimpinan Kewirausahaan; masing-masing Primer & Sekunder); 78 IC Level Muda, 106 IC Level Pratama; pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
+- **Indikator Capaian (IC)** — Master kurikulum per level kelompok (5 kategori: Keagamaan, Kebangsaan, Kemasyarakatan, Keorganisarian, Kepemimpinan Kewirausahaan; masing-masing Primer & Sekunder); 78 IC Level Muda, 106 IC Level Pratama; pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
 - **Agenda & Check-in** — Event dengan target level (semua level jika kosong); anggota check-in berfoto; pembina menyetujui/menolak
 - **Materi** — Upload file, link eksternal, atau rich text
 - **Poin & Leaderboard** — Poin evaluasi tepat waktu, hadir pembinaan, kirim mutabaah (+2), dan check-in event yang disetujui
-- **Analitik** — Ringkasan kota (admin) atau per sekolah (PJ Sekolah): kelompok, pembina, anggota, tingkat submit evaluasi, tren kehadiran
+- **Analitik** — Ringkasan kota (admin) atau per sekolah (PJ Sekolah): kelompok, pembina, anggota, tingkat submit evaluasi, tren kehadiran, **breakdown Ikhwan/Akhwat**
+- **KKS (Keluhan, Kritik & Saran)** — Semua role dapat mengirim masukan; admin/superadmin kelola inbox, ubah status (Baru → Diproses → Selesai), dan balas; notifikasi otomatis ke admin saat KKS baru
+- **Kontak WhatsApp** — Tombol CTA WhatsApp di daftar PJ Sekolah, pembina, dan anggota; hijau jika nomor HP tersedia, abu-abu jika belum diisi; link `wa.me/62...` (normalisasi awalan `0` → `62`)
 - **Notifikasi & Undangan** — Undangan email / set-password langsung; daftar undangan untuk admin
+
+### Tema UI Gender
+
+Kelompok dan halaman anggota memakai tema warna berdasarkan jenis kelompok:
+
+- **Ikhwan** — indigo / biru
+- **Akhwat** — pink / fuchsia
 
 ## Quick Start
 
@@ -77,13 +86,17 @@ pnpm dev
 | PJ Sekolah | usamah_sman1@gmail.com (SMAN 1), naufal_sman2@gmail.com (SMAN 2), farid_sman3@gmail.com (SMAN 3) | `!Password123` |
 | Pembina / Anggota | Lihat output `pnpm db:seed` | `!Password123` |
 
+Seed menyertakan **nomor telepon dummy** untuk testing WhatsApp:
+
+- PJ Sekolah: `081234560001` – `081234560003`
+- Semua pembina: `081234561000` dst.
+- 2 anggota pertama per kelompok: nomor HP tersedia; sisanya kosong (untuk uji tombol disabled)
+
 ### Undangan Uji
 
 Seed menyertakan undangan pending. Aktivasi di `/set-password?token=...`:
 
 - `00000000-0000-4000-8000-000000000001`
-- `00000000-0000-4000-8000-000000000002`
-- `00000000-0000-4000-8000-000000000003`
 
 ## Project Structure
 
@@ -108,6 +121,26 @@ packages/shared/   Zod schemas, constants, Prisma schema & migrations
 See `.github/workflows/deploy.yml` for CI/CD pipeline and `deploy/nginx.conf` for Nginx config.
 
 ## Changelog
+
+### 2026-06-20 — KKS, gender Ikhwan/Akhwat, analitik gender & WhatsApp
+
+#### Backend
+- **KKS:** Modul `/kks` — kirim masukan (semua role), list & filter (admin lihat semua, user lihat milik sendiri), update status & balasan (admin); notifikasi `NEW_KKS` ke admin/superadmin
+- **Gender:** Enum `Gender` (`IKHWAN`, `AKHWAT`) pada `User`, `Group`, `UserInvitation`; validasi pembina & anggota harus sesuai gender kelompok saat create/update/undangan
+- **Analitik:** `genderBreakdown` di `/analytics/overview` — jumlah kelompok, pembina, dan anggota per Ikhwan/Akhwat (+ persentase)
+- **Kontak:** Field `phone` di response API daftar pembina, anggota kelompok, dan PJ Sekolah
+
+#### Frontend
+- **KKS:** Halaman `/kks` (form kirim + daftar) dan `/kks/[id]` (detail & balasan admin); menu sidebar semua role
+- **Gender:** Komponen `GenderField` / `GenderToggle` / `GenderBadge`; tema warna kelompok via `getGroupGenderTheme()`; form buat/edit kelompok, undangan, PJ, dan edit anggota
+- **Analitik:** Panel `GenderBreakdownPanel` di halaman `/analytics`
+- **WhatsApp:** Komponen `WhatsAppButton` — CTA di detail sekolah (PJ), daftar pembina (`/pembina`), detail kelompok (pembina & anggota); normalisasi nomor `0xxx` → `62xxx`
+- **Detail kelompok:** Banner gender, kartu pembina dengan WA, daftar anggota bertema warna
+
+#### Database
+- Migration `20260620180000_add_feedback_kks` — model `Feedback`, enum `FeedbackType`, `FeedbackStatus`, `NotifType.NEW_KKS`
+- Migration `20260620190000_add_gender_ikhwan_akhwat` — enum `Gender`, kolom gender di `User`, `Group`, `UserInvitation`
+- Seed: nama pembina/anggota terpisah per gender; nomor telepon dummy untuk PJ, pembina, dan sebagian anggota
 
 ### 2026-06-20 — Indikator Capaian (IC)
 

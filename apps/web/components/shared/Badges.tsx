@@ -79,6 +79,52 @@ export function LoadingSkeleton({ className }: { className?: string }) {
   return <div className={cn('animate-pulse rounded-lg bg-muted', className)} />;
 }
 
+export function KksTypeBadge({ type }: { type: string }) {
+  const labels: Record<string, string> = {
+    KELUHAN: 'Keluhan',
+    KRITIK: 'Kritik',
+    SARAN: 'Saran',
+  };
+  const styles: Record<string, string> = {
+    KELUHAN: 'bg-rose-50 text-rose-700 ring-rose-600/10',
+    KRITIK: 'bg-amber-50 text-amber-800 ring-amber-600/10',
+    SARAN: 'bg-sky-50 text-sky-700 ring-sky-600/10',
+  };
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+        styles[type] || 'bg-muted text-muted-foreground',
+      )}
+    >
+      {labels[type] || type}
+    </span>
+  );
+}
+
+export function KksStatusBadge({ status }: { status: string }) {
+  const labels: Record<string, string> = {
+    PENDING: 'Menunggu',
+    READ: 'Dibaca',
+    RESOLVED: 'Selesai',
+  };
+  const styles: Record<string, string> = {
+    PENDING: 'bg-amber-50 text-amber-800 ring-amber-600/10',
+    READ: 'bg-sky-50 text-sky-700 ring-sky-600/10',
+    RESOLVED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/10',
+  };
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+        styles[status] || 'bg-muted text-muted-foreground',
+      )}
+    >
+      {labels[status] || status}
+    </span>
+  );
+}
+
 export function StatCard({
   icon: Icon,
   label,
