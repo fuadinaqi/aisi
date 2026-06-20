@@ -78,6 +78,12 @@ export async function invalidateMutabaahQueries(queryClient: QueryClient) {
   await invalidateDashboardQueries(queryClient);
 }
 
+/** Invalidate master & progress indikator capaian. */
+export async function invalidateICQueries(queryClient: QueryClient) {
+  await queryClient.invalidateQueries({ queryKey: ['ic-items'] });
+  await queryClient.invalidateQueries({ queryKey: ['ic-member'] });
+}
+
 /** Invalidate notifikasi setelah ditandai dibaca. */
 export async function invalidateNotificationQueries(queryClient: QueryClient) {
   await queryClient.invalidateQueries({ queryKey: ['notifications'] });

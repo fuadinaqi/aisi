@@ -15,9 +15,9 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 
 | Peran | Kemampuan utama |
 | ----- | --------------- |
-| **Superadmin / Admin** | Kelola sekolah, PJ Sekolah, kelompok, undangan admin, konfigurasi label level & master mutabaah, analitik kota |
-| **PJ Sekolah** | Kelola kelompok & pembina di sekolahnya, lihat evaluasi sekolah, analitik sekolah, buat agenda |
-| **Pembina** | Isi evaluasi mingguan anggota, lihat mutabaah anggota per pekan, buat materi, kelola agenda & persetujuan check-in |
+| **Superadmin / Admin** | Kelola sekolah, PJ Sekolah, kelompok, undangan admin, konfigurasi label level, master mutabaah & indikator capaian, analitik kota |
+| **PJ Sekolah** | Kelola kelompok & pembina di sekolahnya, lihat evaluasi sekolah, lihat master IC (read-only), pantau progress IC anggota, analitik sekolah, buat agenda |
+| **Pembina** | Isi evaluasi mingguan anggota, checklist indikator capaian anggota, lihat mutabaah anggota per pekan, lihat master IC (read-only), kelola agenda & persetujuan check-in |
 | **Anggota** | Isi mutabaah yaumiyah per pekan, lihat agenda sesuai level kelompok, check-in event dengan foto, lihat poin & profil |
 
 ### Modul
@@ -25,6 +25,7 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 - **Sekolah & Kelompok** — CRUD sekolah, PJ Sekolah (multi-PJ), kelompok dengan level (`LEVEL_1` / `LEVEL_2`), undangan pembina & anggota
 - **Evaluasi Mingguan** — Pembina mengisi kehadiran per pekan (satu evaluasi per kelompok per pekan); create-only (409 jika sudah ada), edit via PUT; tampilan mutabaah anggota per pekan evaluasi
 - **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina lihat di detail evaluasi & detail anggota
+- **Indikator Capaian (IC)** — Master kurikulum per level kelompok (5 kategori: Keagamaan, Kebangsaan, Kemasyarakatan, Keorganisasian, Kepemimpinan Kewirausahaan; masing-masing Primer & Sekunder); 78 IC Level Muda, 106 IC Level Pratama; pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
 - **Agenda & Check-in** — Event dengan target level (semua level jika kosong); anggota check-in berfoto; pembina menyetujui/menolak
 - **Materi** — Upload file, link eksternal, atau rich text
 - **Poin & Leaderboard** — Poin evaluasi tepat waktu, hadir pembinaan, kirim mutabaah (+2), dan check-in event yang disetujui
@@ -107,6 +108,23 @@ packages/shared/   Zod schemas, constants, Prisma schema & migrations
 See `.github/workflows/deploy.yml` for CI/CD pipeline and `deploy/nginx.conf` for Nginx config.
 
 ## Changelog
+
+### 2026-06-20 — Indikator Capaian (IC)
+
+#### Backend
+- **IC:** Modul `/ic` — CRUD master (admin/superadmin), lihat master (pembina ke atas), progress anggota per kelompok
+- **Checklist:** `PUT /ic/member/:userId/progress` — hanya pembina kelompok yang dapat menandai/uncheck capaian kumulatif
+- **Authorization:** Anggota tidak dapat mengakses endpoint IC; PJ Sekolah lihat progress anggota di sekolahnya
+
+#### Frontend
+- **Master IC:** Halaman `/config/ic` — tab level Muda/Pratama, filter kategori, form CRUD (admin) atau read-only (pembina & PJ Sekolah)
+- **Detail anggota:** Panel `ICMemberPanel` — progress bar, accordion per kategori, checklist interaktif untuk pembina
+- **Navigasi:** Menu "Indikator Capaian" di sidebar pembina & PJ Sekolah; link dari halaman Pengaturan (admin)
+
+#### Database
+- Migration `20260620145831_add_indikator_capaian` — model `IndikatorCapaian`, `MemberICProgress`, enum `ICCategory` & `ICType`
+- Migration `20260620150500_fix_ic_unique_constraint` — unique `(level, category, type, number)` agar nomor IC dapat sama antar Primer/Sekunder
+- Seed 184 item IC (`ic-seed-data.ts`) — 78 Level Muda, 106 Level Pratama
 
 ### 2025-06-19 — Mutabaah yaumiyah, perbaikan evaluasi & poin
 

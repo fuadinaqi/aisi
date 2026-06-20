@@ -20,6 +20,7 @@ import pointRoutes from './modules/points/points.routes.js';
 import notificationRoutes from './modules/notifications/notifications.routes.js';
 import analyticsRoutes from './modules/analytics/analytics.routes.js';
 import mutabaahRoutes from './modules/mutabaah/mutabaah.routes.js';
+import icRoutes from './modules/ic/ic.routes.js';
 import configRoutes from './modules/config/config.routes.js';
 
 const app = express();
@@ -58,6 +59,7 @@ v1.use('/points', pointRoutes);
 v1.use('/notifications', notificationRoutes);
 v1.use('/analytics', analyticsRoutes);
 v1.use('/mutabaah', mutabaahRoutes);
+v1.use('/ic', icRoutes);
 v1.use('/config', configRoutes);
 
 app.use('/api/v1', v1);

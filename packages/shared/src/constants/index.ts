@@ -57,6 +57,8 @@ export const INVITATION_RULES: Record<string, string[]> = {
   PEMBINA: ['ANGGOTA'],
 };
 
+export * from './ic.js';
+
 export const SCHOOLS_DEPOK = [
   'SMAN 1 Depok',
   'SMAN 2 Depok',

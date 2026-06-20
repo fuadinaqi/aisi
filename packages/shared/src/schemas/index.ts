@@ -268,6 +268,35 @@ export const manualPointSchema = z.object({
   description: z.string().min(1),
 });
 
+export const indikatorCapaianSchema = z.object({
+  level: z.enum(['LEVEL_1', 'LEVEL_2']),
+  category: z.enum([
+    'KEAGAMAAN',
+    'KEBANGSAAN',
+    'KEMASYARAKATAN',
+    'KEORGANISASIAN',
+    'KEPEMIMPINAN_KEWIRAUSAHAAN',
+  ]),
+  type: z.enum(['PRIMER', 'SEKUNDER']),
+  number: z.number().int().min(1),
+  title: z.string().min(1, 'Indikator capaian wajib diisi'),
+  materi: z.string().nullable().optional(),
+  sortOrder: z.number().int().min(0).default(0),
+  isActive: z.boolean().default(true),
+});
+
+export const updateIndikatorCapaianSchema = indikatorCapaianSchema
+  .partial()
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'Minimal satu field harus diisi',
+  });
+
+export const memberICProgressSchema = z.object({
+  groupId: z.string(),
+  indikatorId: z.string(),
+  isAchieved: z.boolean(),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
 export type InvitationInput = z.infer<typeof invitationSchema>;

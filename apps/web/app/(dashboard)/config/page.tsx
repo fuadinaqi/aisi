@@ -55,6 +55,16 @@ export default function ConfigPage() {
             <Link href="/config/mutabaah">Kelola master mutabaah</Link>
           </Button>
         </ListGroup>
+
+        <ListGroup className="p-5">
+          <p className="font-medium">Indikator Capaian</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Atur master IC per level kelompok (kategori, primer/sekunder, materi).
+          </p>
+          <Button asChild className="mt-4 rounded-xl">
+            <Link href="/config/ic">Kelola indikator capaian</Link>
+          </Button>
+        </ListGroup>
       </PageContainer>
     </RoleGuard>
   );

@@ -65,6 +65,19 @@ enum MutabaahInputScope {
   DAILY
 }
 
+enum ICCategory {
+  KEAGAMAAN
+  KEBANGSAAN
+  KEMASYARAKATAN
+  KEORGANISASIAN
+  KEPEMIMPINAN_KEWIRAUSAHAAN
+}
+
+enum ICType {
+  PRIMER
+  SEKUNDER
+}
+
 model School {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -104,6 +117,8 @@ model User {
   eventApprovals     EventAttendance[]      @relation("EventApprover")
   invitationsSent    UserInvitation[]       @relation("InvitationCreator")
   mutabaahEntries    MutabaahEntry[]
+  icProgressAsMember MemberICProgress[] @relation("ICMember")
+  icProgressChecked  MemberICProgress[] @relation("ICChecker")
 }
 
 model UserRole {
@@ -150,6 +165,7 @@ model Group {
   evaluations     WeeklyEvaluation[]
   eventAttendances EventAttendance[]
   mutabaahEntries MutabaahEntry[]
+  icProgress      MemberICProgress[]
 
   @@index([schoolId])
   @@index([pembinaId])
@@ -374,4 +390,41 @@ model MutabaahAnswer {
   item  MutabaahItem  @relation(fields: [itemId], references: [id])
 
   @@unique([entryId, itemId])
+}
+
+model IndikatorCapaian {
+  id        String     @id @default(cuid())
+  level     GroupLevel
+  category  ICCategory
+  type      ICType
+  number    Int
+  title     String
+  materi    String?
+  sortOrder Int        @default(0)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  progress MemberICProgress[]
+
+  @@unique([level, category, type, number])
+  @@index([level, category, type, sortOrder])
+}
+
+model MemberICProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  groupId     String
+  indikatorId String
+  isAchieved  Boolean  @default(false)
+  checkedById String
+  checkedAt   DateTime @default(now())
+
+  user      User             @relation("ICMember", fields: [userId], references: [id])
+  group     Group            @relation(fields: [groupId], references: [id])
+  indikator IndikatorCapaian @relation(fields: [indikatorId], references: [id])
+  checkedBy User             @relation("ICChecker", fields: [checkedById], references: [id])
+
+  @@unique([userId, groupId, indikatorId])
+  @@index([groupId, userId])
 }

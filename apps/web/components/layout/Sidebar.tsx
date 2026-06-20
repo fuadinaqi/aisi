@@ -17,6 +17,7 @@ import {
   BarChart3,
   LayoutGrid,
   BookHeart,
+  ListChecks,
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -59,6 +60,7 @@ const navByRole: Record<string, NavItem[]> = {
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
     { href: '/schools', label: 'Sekolah', icon: School },
     { href: '/pembina', label: 'Pembina', icon: Users },
+    { href: '/config/ic', label: 'Indikator Capaian', icon: ListChecks },
     { href: '/events', label: 'Agenda', icon: Calendar },
     { href: '/materi', label: 'Materi', icon: BookOpen },
     { href: '/analytics', label: 'Analitik', icon: BarChart3 },
@@ -68,6 +70,7 @@ const navByRole: Record<string, NavItem[]> = {
   PEMBINA: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
     { href: '/evaluasi', label: 'Evaluasi', icon: ClipboardList },
+    { href: '/config/ic', label: 'Indikator Capaian', icon: ListChecks },
     { href: '/events', label: 'Agenda', icon: Calendar },
     { href: '/materi', label: 'Materi', icon: BookOpen },
     { href: '/notifications', label: 'Notifikasi', icon: Bell },

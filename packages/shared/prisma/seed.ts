@@ -1,5 +1,6 @@
 import { PrismaClient, Role, GroupLevel, AttendanceStatus, InvitationStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { IC_SEED_DATA } from './ic-seed-data.js';
 
 const prisma = new PrismaClient();
 
@@ -115,6 +116,8 @@ async function clearDatabase() {
   await prisma.mutabaahAnswer.deleteMany();
   await prisma.mutabaahEntry.deleteMany();
   await prisma.mutabaahItem.deleteMany();
+  await prisma.memberICProgress.deleteMany();
+  await prisma.indikatorCapaian.deleteMany();
   await prisma.group.deleteMany();
   await prisma.event.deleteMany();
   await prisma.weeklyMateri.deleteMany();
@@ -239,6 +242,29 @@ async function main() {
       },
     ],
   });
+
+  console.log('Seeding Indikator Capaian...');
+  for (const item of IC_SEED_DATA) {
+    await prisma.indikatorCapaian.upsert({
+      where: {
+        level_category_type_number: {
+          level: item.level,
+          category: item.category,
+          type: item.type,
+          number: item.number,
+        },
+      },
+      update: {
+        category: item.category,
+        type: item.type,
+        title: item.title,
+        materi: item.materi,
+        sortOrder: item.sortOrder,
+        isActive: true,
+      },
+      create: item,
+    });
+  }
 
   const schoolRecords = [];
   for (const name of SCHOOLS) {

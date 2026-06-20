@@ -15,6 +15,7 @@ import { LoadingSkeleton, PointBadge, RoleBadge } from '@/components/shared/Badg
 import { Button } from '@/components/ui/button';
 import { formatDate, formatWeekRange, toDateInputValue } from '@/lib/utils';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
+import { ICMemberPanel } from '@/components/ic/ICMemberPanel';
 import type { GroupMemberDetail } from '@/lib/types';
 
 const levelLabels: Record<string, string> = {
@@ -29,6 +30,8 @@ export default function AnggotaDetailPage() {
   const role = user ? getPrimaryRole(user.roles) : '';
   const canEdit =
     role === 'PEMBINA' || role === 'PJ_SEKOLAH' || role === 'ADMIN' || role === 'SUPERADMIN';
+  const canViewIC = role !== 'ANGGOTA';
+  const canCheckIC = role === 'PEMBINA';
   const [mutabaahWeek, setMutabaahWeek] = useState(
     searchParams.get('weekDate') || toDateInputValue(),
   );
@@ -162,6 +165,12 @@ export default function AnggotaDetailPage() {
           userName={member.user.name}
         />
       </ListGroup>
+
+      {canViewIC && (
+        <ListGroup className="mt-4 p-4">
+          <ICMemberPanel userId={userId} groupId={id} canEdit={canCheckIC} />
+        </ListGroup>
+      )}
 
       {member.user.lastLoginAt && (
         <p className="mt-4 px-0.5 text-xs text-muted-foreground">
