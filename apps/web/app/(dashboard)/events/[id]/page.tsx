@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { formatDate, formatEventTargetLevels, getMediaUrl, getPrimaryRole } from '@/lib/utils';
 import { invalidateEventQueries } from '@/lib/queryInvalidation';
 import type { EventItem } from '@/lib/types';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   PENDING: { label: 'Menunggu persetujuan pembina', className: 'bg-amber-50 text-amber-800' },
@@ -40,13 +41,7 @@ export default function EventDetailPage() {
     enabled: !!id,
   });
 
-  const { data: levelConfigs = [] } = useQuery<{ level: string; label: string }[]>({
-    queryKey: ['group-levels'],
-    queryFn: async () =>
-      (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
-  });
-
-  const levelLabels = Object.fromEntries(levelConfigs.map((cfg) => [cfg.level, cfg.label]));
+  const { levelLabels } = useGroupLevelLabels();
 
   const handlePhotoChange = (file: File | null) => {
     setPhoto(file);

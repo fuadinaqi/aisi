@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import type { GroupItem } from '@/lib/types';
 import { GenderSelect } from '@/components/shared/GenderField';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 type PembinaOption = { id: string; name: string; email: string; gender?: string };
 
@@ -37,6 +38,7 @@ export default function EditKelompokPage() {
   const role = user ? getPrimaryRole(user.roles) : '';
   const canChangePembina = role === 'PJ_SEKOLAH' || role === 'ADMIN' || role === 'SUPERADMIN';
   const [error, setError] = useState('');
+  const { configs: levelConfigs } = useGroupLevelLabels();
 
   const { data: group, isLoading } = useQuery<GroupItem>({
     queryKey: ['group', id],
@@ -126,7 +128,7 @@ export default function EditKelompokPage() {
               <Input
                 id="name"
                 className="rounded-xl"
-                placeholder="Kelompok Muda Alpha"
+                placeholder="Kelompok Alpha"
                 {...register('name', { required: true })}
               />
             </div>
@@ -138,8 +140,11 @@ export default function EditKelompokPage() {
                 className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
                 {...register('level')}
               >
-                <option value="LEVEL_1">Muda (Level 1)</option>
-                <option value="LEVEL_2">Pratama (Level 2)</option>
+                {levelConfigs.map((cfg) => (
+                  <option key={cfg.level} value={cfg.level}>
+                    {cfg.label}
+                  </option>
+                ))}
               </select>
             </div>
 

@@ -11,6 +11,7 @@ import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
 import { formatDate, formatEventTargetLevels, getMediaUrl, getPrimaryRole } from '@/lib/utils';
 import type { EventItem } from '@/lib/types';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 const checkInLabels: Record<string, string> = {
   PENDING: 'Menunggu persetujuan',
@@ -30,13 +31,7 @@ export default function EventsPage() {
     queryFn: async () => (await api.get<ApiResponse<EventItem[]>>('/events')).data.data,
   });
 
-  const { data: levelConfigs = [] } = useQuery<{ level: string; label: string }[]>({
-    queryKey: ['group-levels'],
-    queryFn: async () =>
-      (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
-  });
-
-  const levelLabels = Object.fromEntries(levelConfigs.map((cfg) => [cfg.level, cfg.label]));
+  const { levelLabels } = useGroupLevelLabels();
 
   return (
     <PageContainer tight>

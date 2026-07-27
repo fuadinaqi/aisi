@@ -11,7 +11,7 @@ import { checkAuth, validate, isPembinaOfGroup, getUserSchoolIds, canAccessSchoo
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
 import { getMonday, isSubmitOnTime, assertWeekDateNotFuture } from '../../utils/weekDate.js';
-import { upload, getPublicUrl } from '../../lib/storage.js';
+import { upload, putObjectsAndGetUrls } from '../../lib/storage.js';
 import { AttendanceStatus } from '@prisma/client';
 
 const router = Router();
@@ -313,7 +313,7 @@ router.post('/:id/photos', upload.array('photos', 5), async (req, res, next) => 
     if (!isOwner) throw new AppError(403, 'Akses ditolak');
 
     const files = req.files as Express.Multer.File[];
-    const urls = files.map((f) => getPublicUrl(f.filename));
+    const urls = await putObjectsAndGetUrls(files);
 
     const updated = await prisma.weeklyEvaluation.update({
       where: { id: param(req.params.id) },

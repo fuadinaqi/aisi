@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import { env } from '../config/env.js';
 
@@ -10,13 +11,32 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${uuidv4()}${ext}`);
-  },
-});
+function isR2Configured(): boolean {
+  return !!(env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY);
+}
+
+let s3Client: S3Client | null = null;
+
+function getS3Client(): S3Client {
+  if (!s3Client) {
+    s3Client = new S3Client({
+      region: 'auto',
+      endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: env.R2_ACCESS_KEY_ID!,
+        secretAccessKey: env.R2_SECRET_ACCESS_KEY!,
+      },
+    });
+  }
+  return s3Client;
+}
+
+function generateKey(originalname: string): string {
+  const ext = path.extname(originalname);
+  return `${uuidv4()}${ext}`;
+}
+
+const memoryStorage = multer.memoryStorage();
 
 const MATERI_MIME_TYPES = [
   'image/',
@@ -32,7 +52,7 @@ const MATERI_MIME_TYPES = [
 ];
 
 export const upload = multer({
-  storage,
+  storage: memoryStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -44,7 +64,7 @@ export const upload = multer({
 });
 
 export const uploadMateri = multer({
-  storage,
+  storage: memoryStorage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = MATERI_MIME_TYPES.some((t) =>
@@ -55,11 +75,39 @@ export const uploadMateri = multer({
   },
 });
 
-export function getPublicUrl(filename: string): string {
-  if (env.R2_PUBLIC_URL) {
-    return `${env.R2_PUBLIC_URL}/${filename}`;
+export async function putObject(file: Express.Multer.File): Promise<string> {
+  const key = generateKey(file.originalname);
+
+  if (isR2Configured()) {
+    await getS3Client().send(
+      new PutObjectCommand({
+        Bucket: env.R2_BUCKET_NAME,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }),
+    );
+    return key;
   }
-  return `/uploads/${filename}`;
+
+  fs.writeFileSync(path.join(uploadDir, key), file.buffer);
+  return key;
+}
+
+export async function putObjectAndGetUrl(file: Express.Multer.File): Promise<string> {
+  const key = await putObject(file);
+  return getPublicUrl(key);
+}
+
+export async function putObjectsAndGetUrls(files: Express.Multer.File[]): Promise<string[]> {
+  return Promise.all(files.map((file) => putObjectAndGetUrl(file)));
+}
+
+export function getPublicUrl(key: string): string {
+  if (env.R2_PUBLIC_URL) {
+    return `${env.R2_PUBLIC_URL.replace(/\/$/, '')}/${key}`;
+  }
+  return `/uploads/${key}`;
 }
 
 export function getUploadPath(filename: string): string {

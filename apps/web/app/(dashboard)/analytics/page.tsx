@@ -7,11 +7,13 @@ import { useAuthStore } from '@/store/authStore';
 import { getPrimaryRole } from '@/lib/utils';
 import { StatCard, LoadingSkeleton } from '@/components/shared/Badges';
 import { GenderBreakdownPanel } from '@/components/analytics/GenderBreakdownPanel';
+import { LevelBreakdownPanel } from '@/components/analytics/LevelBreakdownPanel';
+import { LevelGenderBreakdownPanel } from '@/components/analytics/LevelGenderBreakdownPanel';
 import { Users, School, ClipboardList, LayoutGrid } from 'lucide-react';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
-import type { GenderBreakdown } from '@/lib/types';
+import type { GenderBreakdown, LevelBreakdown, LevelGenderBreakdown } from '@/lib/types';
 
 interface AnalyticsOverview {
   scope?: 'city' | 'school';
@@ -23,6 +25,8 @@ interface AnalyticsOverview {
   evaluationsThisWeek?: number;
   attendanceTrend?: { week: string; rate: number }[];
   genderBreakdown?: GenderBreakdown;
+  levelBreakdown?: LevelBreakdown;
+  levelGenderBreakdown?: LevelGenderBreakdown;
 }
 
 export default function AnalyticsPage() {
@@ -66,6 +70,12 @@ export default function AnalyticsPage() {
               </div>
 
               {data.genderBreakdown && <GenderBreakdownPanel data={data.genderBreakdown} />}
+
+              {data.levelBreakdown && <LevelBreakdownPanel data={data.levelBreakdown} />}
+
+              {data.levelGenderBreakdown && (
+                <LevelGenderBreakdownPanel data={data.levelGenderBreakdown} />
+              )}
 
               {isPj && (
                 <p className="px-0.5 text-sm text-muted-foreground">

@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma.js';
 import { checkAuth, checkRole, canAccessSchool, isPembinaOfGroup, getUserSchoolIds } from '../../middleware/auth.js';
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
-import { Role, Gender } from '@prisma/client';
+import { Role, Gender, GroupLevel } from '@prisma/client';
 import { getMonday } from '../../utils/weekDate.js';
 
 const router = Router();
@@ -74,6 +74,92 @@ async function getGenderBreakdown(groupWhere: { isActive: boolean; schoolId?: { 
   };
 }
 
+async function getLevelBreakdown(groupWhere: { isActive: boolean; schoolId?: { in: string[] } }) {
+  const [groupsLevel1, groupsLevel2, anggotaLevel1, anggotaLevel2, pembinaLevel1, pembinaLevel2] =
+    await Promise.all([
+      prisma.group.count({ where: { ...groupWhere, level: GroupLevel.LEVEL_1 } }),
+      prisma.group.count({ where: { ...groupWhere, level: GroupLevel.LEVEL_2 } }),
+      prisma.groupMember.count({
+        where: { isActive: true, group: { ...groupWhere, level: GroupLevel.LEVEL_1 } },
+      }),
+      prisma.groupMember.count({
+        where: { isActive: true, group: { ...groupWhere, level: GroupLevel.LEVEL_2 } },
+      }),
+      prisma.group.findMany({
+        where: { ...groupWhere, level: GroupLevel.LEVEL_1 },
+        select: { pembinaId: true },
+        distinct: ['pembinaId'],
+      }),
+      prisma.group.findMany({
+        where: { ...groupWhere, level: GroupLevel.LEVEL_2 },
+        select: { pembinaId: true },
+        distinct: ['pembinaId'],
+      }),
+    ]);
+
+  return {
+    groups: { level1: groupsLevel1, level2: groupsLevel2 },
+    pembina: { level1: pembinaLevel1.length, level2: pembinaLevel2.length },
+    anggota: { level1: anggotaLevel1, level2: anggotaLevel2 },
+  };
+}
+
+type GroupWhere = { isActive: boolean; schoolId?: { in: string[] } };
+
+function levelGenderWhere(groupWhere: GroupWhere, level: GroupLevel, gender: Gender) {
+  return { ...groupWhere, level, gender };
+}
+
+async function getLevelGenderBreakdown(groupWhere: GroupWhere) {
+  const countGroups = (level: GroupLevel, gender: Gender) =>
+    prisma.group.count({ where: levelGenderWhere(groupWhere, level, gender) });
+
+  const countAnggota = (level: GroupLevel, gender: Gender) =>
+    prisma.groupMember.count({
+      where: {
+        isActive: true,
+        group: levelGenderWhere(groupWhere, level, gender),
+        user: { gender },
+      },
+    });
+
+  const countPembina = async (level: GroupLevel, gender: Gender) => {
+    const rows = await prisma.group.findMany({
+      where: levelGenderWhere(groupWhere, level, gender),
+      select: { pembinaId: true },
+      distinct: ['pembinaId'],
+    });
+    return rows.length;
+  };
+
+  const [
+    groupsL1I, groupsL1A, groupsL2I, groupsL2A,
+    pembinaL1I, pembinaL1A, pembinaL2I, pembinaL2A,
+    anggotaL1I, anggotaL1A, anggotaL2I, anggotaL2A,
+  ] = await Promise.all([
+    countGroups(GroupLevel.LEVEL_1, Gender.IKHWAN),
+    countGroups(GroupLevel.LEVEL_1, Gender.AKHWAT),
+    countGroups(GroupLevel.LEVEL_2, Gender.IKHWAN),
+    countGroups(GroupLevel.LEVEL_2, Gender.AKHWAT),
+    countPembina(GroupLevel.LEVEL_1, Gender.IKHWAN),
+    countPembina(GroupLevel.LEVEL_1, Gender.AKHWAT),
+    countPembina(GroupLevel.LEVEL_2, Gender.IKHWAN),
+    countPembina(GroupLevel.LEVEL_2, Gender.AKHWAT),
+    countAnggota(GroupLevel.LEVEL_1, Gender.IKHWAN),
+    countAnggota(GroupLevel.LEVEL_1, Gender.AKHWAT),
+    countAnggota(GroupLevel.LEVEL_2, Gender.IKHWAN),
+    countAnggota(GroupLevel.LEVEL_2, Gender.AKHWAT),
+  ]);
+
+  const cell = (ikhwan: number, akhwat: number) => ({ ikhwan, akhwat });
+
+  return {
+    groups: { level1: cell(groupsL1I, groupsL1A), level2: cell(groupsL2I, groupsL2A) },
+    pembina: { level1: cell(pembinaL1I, pembinaL1A), level2: cell(pembinaL2I, pembinaL2A) },
+    anggota: { level1: cell(anggotaL1I, anggotaL1A), level2: cell(anggotaL2I, anggotaL2A) },
+  };
+}
+
 async function buildOverview(schoolIds?: string[]) {
   const thisMonday = getMonday(new Date());
   const eightWeeksAgo = new Date(thisMonday);
@@ -84,7 +170,7 @@ async function buildOverview(schoolIds?: string[]) {
     : { isActive: true };
 
   if (schoolIds?.length) {
-    const [totalGroups, pembinaRows, totalAnggota, evaluationsThisWeek, attendanceTrend, genderBreakdown] =
+    const [totalGroups, pembinaRows, totalAnggota, evaluationsThisWeek, attendanceTrend, genderBreakdown, levelBreakdown, levelGenderBreakdown] =
       await Promise.all([
       prisma.group.count({ where: groupWhere }),
       prisma.group.findMany({ where: groupWhere, select: { pembinaId: true }, distinct: ['pembinaId'] }),
@@ -94,6 +180,8 @@ async function buildOverview(schoolIds?: string[]) {
       }),
       getAttendanceTrend(eightWeeksAgo, schoolIds),
       getGenderBreakdown(groupWhere),
+      getLevelBreakdown(groupWhere),
+      getLevelGenderBreakdown(groupWhere),
     ]);
 
     const totalPembina = pembinaRows.length;
@@ -108,13 +196,15 @@ async function buildOverview(schoolIds?: string[]) {
       evaluationsThisWeek,
       attendanceTrend,
       genderBreakdown,
+      levelBreakdown,
+      levelGenderBreakdown,
       topSchools: [],
     };
   }
 
   const groupWhereAll = { isActive: true as const };
 
-  const [totalSchools, totalGroups, totalPembina, totalAnggota, evaluationsThisWeek, totalGroupsActive, attendanceTrend, topSchools, genderBreakdown] =
+  const [totalSchools, totalGroups, totalPembina, totalAnggota, evaluationsThisWeek, totalGroupsActive, attendanceTrend, topSchools, genderBreakdown, levelBreakdown, levelGenderBreakdown] =
     await Promise.all([
       prisma.school.count({ where: { isActive: true } }),
       prisma.group.count({ where: groupWhereAll }),
@@ -141,6 +231,8 @@ async function buildOverview(schoolIds?: string[]) {
         },
       }),
       getGenderBreakdown(groupWhereAll),
+      getLevelBreakdown(groupWhereAll),
+      getLevelGenderBreakdown(groupWhereAll),
     ]);
 
   return {
@@ -153,6 +245,8 @@ async function buildOverview(schoolIds?: string[]) {
     evaluationsThisWeek,
     attendanceTrend,
     genderBreakdown,
+    levelBreakdown,
+    levelGenderBreakdown,
     topSchools: topSchools.map((s) => ({
       id: s.id,
       name: s.name,

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn, toDateInputValue } from '@/lib/utils';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 type ContentType = 'FILE' | 'LINK' | 'RICH_TEXT';
 
@@ -34,8 +35,18 @@ export default function NewMateriPage() {
   const [linkUrl, setLinkUrl] = useState('');
   const [contentHtml, setContentHtml] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [levelMode, setLevelMode] = useState<'all' | 'specific'>('all');
+  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const { configs: levelConfigs } = useGroupLevelLabels();
+
+  const toggleLevel = (level: string) => {
+    setSelectedLevels((prev) =>
+      prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level],
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +54,22 @@ export default function NewMateriPage() {
       setLoading(true);
       setError('');
 
+      if (levelMode === 'specific' && !selectedLevels.length) {
+        setError('Pilih minimal satu level kelompok');
+        setLoading(false);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('title', title.trim());
       if (description.trim()) formData.append('description', description.trim());
       formData.append('weekDate', weekDate);
       formData.append('contentType', contentType);
       formData.append('isPublished', 'true');
+      formData.append(
+        'targetLevels',
+        levelMode === 'specific' ? JSON.stringify(selectedLevels) : '[]',
+      );
 
       if (contentType === 'LINK') {
         formData.append('linkUrl', linkUrl.trim());
@@ -122,6 +143,59 @@ export default function NewMateriPage() {
                 value={weekDate}
                 onChange={(e) => setWeekDate(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-3">
+              <Label>Cakupan level kelompok</Label>
+              <div className="space-y-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3">
+                  <input
+                    type="radio"
+                    name="levelMode"
+                    checked={levelMode === 'all'}
+                    onChange={() => setLevelMode('all')}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">Semua level</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Default — materi tampil untuk semua pembina dan anggota
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3">
+                  <input
+                    type="radio"
+                    name="levelMode"
+                    checked={levelMode === 'specific'}
+                    onChange={() => setLevelMode('specific')}
+                    className="mt-1"
+                  />
+                  <span className="flex-1">
+                    <span className="block text-sm font-medium">Level tertentu saja</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Hanya pembina dan anggota di level yang dipilih
+                    </span>
+                    {levelMode === 'specific' && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {levelConfigs.map((cfg) => (
+                          <label
+                            key={cfg.level}
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 px-3 py-1.5 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedLevels.includes(cfg.level)}
+                              onChange={() => toggleLevel(cfg.level)}
+                            />
+                            {cfg.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </span>
+                </label>
+              </div>
             </div>
 
             <div className="space-y-3">

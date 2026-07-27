@@ -46,6 +46,8 @@ export interface OverviewData {
   submissionRate: number;
   evaluationsThisWeek: number;
   genderBreakdown?: GenderBreakdown;
+  levelBreakdown?: LevelBreakdown;
+  levelGenderBreakdown?: LevelGenderBreakdown;
   groups?: GroupItem[];
 }
 
@@ -58,6 +60,23 @@ export interface GenderBreakdown {
   groups: GenderCount;
   pembina: GenderCount;
   anggota: GenderCount;
+}
+
+export interface LevelCount {
+  level1: number;
+  level2: number;
+}
+
+export interface LevelBreakdown {
+  groups: LevelCount;
+  pembina: LevelCount;
+  anggota: LevelCount;
+}
+
+export interface LevelGenderBreakdown {
+  groups: { level1: GenderCount; level2: GenderCount };
+  pembina: { level1: GenderCount; level2: GenderCount };
+  anggota: { level1: GenderCount; level2: GenderCount };
 }
 
 export interface EvaluationItem {
@@ -102,6 +121,7 @@ export interface MateriItem {
   linkUrl?: string | null;
   contentHtml?: string | null;
   fileUrls: string[];
+  targetLevels?: string[];
   createdAt?: string;
 }
 

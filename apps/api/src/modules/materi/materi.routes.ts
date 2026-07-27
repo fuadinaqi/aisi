@@ -2,16 +2,83 @@ import { Router } from 'express';
 import { param } from '../../utils/param.js';
 import { materiSchema, paginationSchema } from '@dakwah/shared';
 import { prisma } from '../../lib/prisma.js';
-import { checkAuth, checkRole, validate } from '../../middleware/auth.js';
+import { checkAuth, checkRole, validate, getUserSchoolIds } from '../../middleware/auth.js';
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
-import { uploadMateri, getPublicUrl } from '../../lib/storage.js';
-import { Role, MateriContentType } from '@prisma/client';
+import { uploadMateri, putObjectsAndGetUrls } from '../../lib/storage.js';
+import { Role, MateriContentType, GroupLevel } from '@prisma/client';
 import { getMonday } from '../../utils/weekDate.js';
 
 const router = Router();
 
 router.use(checkAuth);
+
+function parseTargetLevels(value: unknown): GroupLevel[] {
+  if (value === undefined || value === null || value === '' || value === 'all') return [];
+  if (Array.isArray(value)) {
+    return value.filter((v): v is GroupLevel => v === 'LEVEL_1' || v === 'LEVEL_2');
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((v): v is GroupLevel => v === 'LEVEL_1' || v === 'LEVEL_2');
+      }
+    } catch {
+      if (value === 'LEVEL_1' || value === 'LEVEL_2') return [value];
+    }
+  }
+  return [];
+}
+
+async function getUserGroupLevels(userId: string, roles: string[]): Promise<GroupLevel[]> {
+  if (roles.includes('PJ_SEKOLAH')) {
+    const schoolIds = await getUserSchoolIds(userId);
+    const groups = await prisma.group.findMany({
+      where: { schoolId: { in: schoolIds }, isActive: true },
+      select: { level: true },
+    });
+    return [...new Set(groups.map((g) => g.level))];
+  }
+
+  if (roles.includes('PEMBINA')) {
+    const groups = await prisma.group.findMany({
+      where: { pembinaId: userId, isActive: true },
+      select: { level: true },
+    });
+    return [...new Set(groups.map((g) => g.level))];
+  }
+
+  if (roles.includes('ANGGOTA')) {
+    const memberships = await prisma.groupMember.findMany({
+      where: { userId, isActive: true },
+      include: { group: { select: { level: true } } },
+    });
+    return [...new Set(memberships.map((m) => m.group.level))];
+  }
+
+  return [];
+}
+
+async function buildMateriVisibilityWhere(userId: string, roles: string[]) {
+  const base = { isPublished: true };
+
+  if (roles.includes('SUPERADMIN') || roles.includes('ADMIN')) {
+    return base;
+  }
+
+  const userLevels = await getUserGroupLevels(userId, roles);
+  const levelFilter =
+    userLevels.length > 0
+      ? {
+          OR: [{ targetLevels: { isEmpty: true } }, { targetLevels: { hasSome: userLevels } }],
+        }
+      : { targetLevels: { isEmpty: true } };
+
+  return {
+    AND: [base, levelFilter],
+  };
+}
 
 function parseMateriBody(body: Record<string, unknown>, fileUrls: string[] = []) {
   return materiSchema.parse({
@@ -22,9 +89,22 @@ function parseMateriBody(body: Record<string, unknown>, fileUrls: string[] = [])
     linkUrl: body.linkUrl || undefined,
     contentHtml: body.contentHtml || undefined,
     fileUrls,
+    targetLevels: parseTargetLevels(body.targetLevels),
     isPublished: body.isPublished === undefined ? true : body.isPublished === true || body.isPublished === 'true',
   });
 }
+
+const materiSelect = {
+  id: true,
+  title: true,
+  description: true,
+  weekDate: true,
+  contentType: true,
+  linkUrl: true,
+  fileUrls: true,
+  targetLevels: true,
+  createdAt: true,
+} as const;
 
 router.get('/', validate(paginationSchema, 'query'), async (req, res, next) => {
   try {
@@ -32,8 +112,11 @@ router.get('/', validate(paginationSchema, 'query'), async (req, res, next) => {
     const { weekDate } = req.query as { weekDate?: string };
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = { isPublished: true };
-    if (weekDate) where.weekDate = getMonday(new Date(weekDate));
+    const visibilityWhere = await buildMateriVisibilityWhere(req.user!.userId, req.user!.roles);
+    const where: Record<string, unknown> = { ...visibilityWhere };
+    if (weekDate) {
+      where.weekDate = getMonday(new Date(weekDate));
+    }
 
     const [materi, total] = await Promise.all([
       prisma.weeklyMateri.findMany({
@@ -41,16 +124,7 @@ router.get('/', validate(paginationSchema, 'query'), async (req, res, next) => {
         skip,
         take: limit,
         orderBy: { weekDate: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          weekDate: true,
-          contentType: true,
-          linkUrl: true,
-          fileUrls: true,
-          createdAt: true,
-        },
+        select: materiSelect,
       }),
       prisma.weeklyMateri.count({ where }),
     ]);
@@ -62,8 +136,9 @@ router.get('/', validate(paginationSchema, 'query'), async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
+    const visibilityWhere = await buildMateriVisibilityWhere(req.user!.userId, req.user!.roles);
     const materi = await prisma.weeklyMateri.findFirst({
-      where: { id: param(req.params.id), isPublished: true },
+      where: { id: param(req.params.id), ...visibilityWhere },
     });
     if (!materi) throw new AppError(404, 'Materi tidak ditemukan');
     sendSuccess(res, materi);
@@ -79,7 +154,7 @@ router.post(
   async (req, res, next) => {
     try {
       const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-      const fileUrls = files.map((f) => getPublicUrl(f.filename));
+      const fileUrls = await putObjectsAndGetUrls(files);
       const parsed = parseMateriBody(req.body as Record<string, unknown>, fileUrls);
 
       const materi = await prisma.weeklyMateri.create({
@@ -91,6 +166,7 @@ router.post(
           linkUrl: parsed.contentType === 'LINK' ? parsed.linkUrl : null,
           contentHtml: parsed.contentType === 'RICH_TEXT' ? parsed.contentHtml : null,
           fileUrls: parsed.contentType === 'FILE' ? parsed.fileUrls : [],
+          targetLevels: parsed.targetLevels,
           isPublished: parsed.isPublished,
           createdById: req.user!.userId,
         },
@@ -113,7 +189,7 @@ router.put(
       if (!existing) throw new AppError(404, 'Materi tidak ditemukan');
 
       const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-      const uploadedUrls = files.map((f) => getPublicUrl(f.filename));
+      const uploadedUrls = await putObjectsAndGetUrls(files);
       const body = req.body as Record<string, unknown>;
 
       const keepFiles = typeof body.keepFileUrls === 'string'
@@ -135,6 +211,7 @@ router.put(
           linkUrl: parsed.contentType === 'LINK' ? parsed.linkUrl : null,
           contentHtml: parsed.contentType === 'RICH_TEXT' ? parsed.contentHtml : null,
           fileUrls: parsed.contentType === 'FILE' ? parsed.fileUrls : [],
+          targetLevels: parsed.targetLevels,
           isPublished: parsed.isPublished,
         },
       });

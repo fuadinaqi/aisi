@@ -118,7 +118,64 @@ packages/shared/   Zod schemas, constants, Prisma schema & migrations
 
 ## Deployment
 
-See `.github/workflows/deploy.yml` for CI/CD pipeline and `deploy/nginx.conf` for Nginx config.
+Deploy produksi: **1 VPS + Nginx + PM2 + Postgres (Docker) + Cloudflare R2**.
+
+### Arsitektur
+
+- Domain tunggal: web di `/`, API di `/api/v1` (same-origin, cookie refresh token aman)
+- Postgres hanya listen `127.0.0.1:5432`
+- Upload file ke Cloudflare R2 (fallback disk lokal di dev)
+
+### File deploy
+
+| File | Fungsi |
+| ---- | ------ |
+| [deploy/server-setup.sh](deploy/server-setup.sh) | Setup awal VPS (Node, PM2, Docker, Nginx, ufw) |
+| [deploy/deploy.sh](deploy/deploy.sh) | Install, migrate, build, restart PM2 |
+| [deploy/docker-compose.db.yml](deploy/docker-compose.db.yml) | Postgres produksi |
+| [deploy/nginx.conf](deploy/nginx.conf) | Reverse proxy + gzip |
+| [deploy/backup-db.sh](deploy/backup-db.sh) | Backup harian pg_dump |
+| [deploy/env/*.example](deploy/env/) | Template env produksi |
+| [.github/workflows/deploy.yml](.github/workflows/deploy.yml) | CI/CD via SSH |
+
+### Langkah cepat (server baru)
+
+```bash
+# 1. Setup VPS (sebagai root)
+sudo bash deploy/server-setup.sh
+
+# 2. Clone & env (sebagai user deploy)
+git clone <repo-url> /opt/aisi && cd /opt/aisi
+cp deploy/env/db.env.example deploy/env/db.env      # edit password
+cp deploy/env/api.env.example apps/api/.env         # edit JWT, R2, domain
+cp deploy/env/web.env.example apps/web/.env.local   # edit domain
+
+# 3. Postgres
+cd deploy && docker compose -f docker-compose.db.yml up -d && cd ..
+
+# 4. Deploy pertama (dengan seed)
+bash deploy/deploy.sh --seed
+
+# 5. Nginx + SSL
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/aisi
+sudo ln -sf /etc/nginx/sites-available/aisi /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d app.namadomain.id
+
+# 6. Backup harian (cron)
+chmod +x deploy/backup-db.sh
+# crontab -e → 0 2 * * * /opt/aisi/deploy/backup-db.sh
+```
+
+### GitHub Secrets (CI/CD)
+
+- `VPS_HOST` — IP/domain VPS
+- `VPS_USER` — user deploy (mis. `deploy`)
+- `VPS_SSH_KEY` — private key SSH
+
+### Estimasi biaya
+
+~€4.5/bln VPS + domain + R2 free tier (cukup untuk <3000 user).
 
 ## Changelog
 

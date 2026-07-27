@@ -19,6 +19,7 @@ import { WhatsAppButton } from '@/components/shared/WhatsAppButton';
 import { Button } from '@/components/ui/button';
 import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import type { GroupItem } from '@/lib/types';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 export default function KelompokDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,14 +36,9 @@ export default function KelompokDetailPage() {
     queryFn: async () => (await api.get<ApiResponse<GroupItem>>(`/groups/${id}`)).data.data,
   });
 
-  const { data: levelConfigs = [] } = useQuery<{ level: string; label: string }[]>({
-    queryKey: ['group-levels'],
-    queryFn: async () =>
-      (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
-  });
+  const { getLevelLabel } = useGroupLevelLabels();
 
-  const levelLabel =
-    levelConfigs.find((cfg) => cfg.level === group?.level)?.label || group?.level || '-';
+  const levelLabel = getLevelLabel(group?.level);
 
   const handleRemoveMember = async () => {
     if (!memberToRemove) return;

@@ -13,6 +13,7 @@ import {
   type MutabaahItemMaster,
 } from '@/lib/mutabaah';
 import { invalidateMutabaahQueries } from '@/lib/queryInvalidation';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { RoleGuard } from '@/components/layout/RoleGuard';
@@ -67,6 +68,7 @@ export default function MutabaahConfigPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { configs: levelConfigs } = useGroupLevelLabels();
 
   const { data: items = [], isLoading } = useQuery<MutabaahItemMaster[]>({
     queryKey: ['mutabaah-items', level],
@@ -168,18 +170,18 @@ export default function MutabaahConfigPage() {
         <PageHeader title="Master Mutabaah Yaumiyah" compact />
 
         <div className="mb-4 flex gap-2">
-          {(['LEVEL_1', 'LEVEL_2'] as const).map((lv) => (
+          {levelConfigs.map((cfg) => (
             <Button
-              key={lv}
+              key={cfg.level}
               size="sm"
-              variant={level === lv ? 'default' : 'outline'}
+              variant={level === cfg.level ? 'default' : 'outline'}
               className="rounded-xl"
               onClick={() => {
-                setLevel(lv);
+                setLevel(cfg.level as 'LEVEL_1' | 'LEVEL_2');
                 resetForm();
               }}
             >
-              {lv === 'LEVEL_1' ? 'Level Muda' : 'Level Pratama'}
+              {cfg.label}
             </Button>
           ))}
         </div>

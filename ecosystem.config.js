@@ -4,6 +4,7 @@ module.exports = {
       name: 'dakwah-api',
       script: 'apps/api/dist/server.js',
       instances: 1,
+      max_memory_restart: '512M',
       env: { NODE_ENV: 'production', PORT: 4000 },
     },
     {
@@ -12,6 +13,7 @@ module.exports = {
       args: 'start',
       cwd: 'apps/web',
       instances: 1,
+      max_memory_restart: '512M',
       env: { NODE_ENV: 'production', PORT: 3000 },
     },
   ],

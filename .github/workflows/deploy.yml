@@ -34,8 +34,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -43,9 +41,6 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /opt/dakwah-depok
+            cd /opt/aisi
             git pull origin main
-            pnpm install
-            pnpm db:generate
-            pnpm build
-            pm2 restart all
+            bash deploy/deploy.sh

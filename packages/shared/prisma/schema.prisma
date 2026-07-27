@@ -298,18 +298,19 @@ model EventAttendance {
 }
 
 model WeeklyMateri {
-  id          String            @id @default(cuid())
-  title       String
-  description String?
-  weekDate    DateTime
-  contentType MateriContentType @default(RICH_TEXT)
-  linkUrl     String?
-  contentHtml String?           @db.Text
-  fileUrls    String[]
-  createdById String
-  isPublished Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id           String            @id @default(cuid())
+  title        String
+  description  String?
+  weekDate     DateTime
+  contentType  MateriContentType @default(RICH_TEXT)
+  linkUrl      String?
+  contentHtml  String?           @db.Text
+  fileUrls     String[]
+  targetLevels GroupLevel[]      @default([])
+  createdById  String
+  isPublished  Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@index([weekDate])
 }

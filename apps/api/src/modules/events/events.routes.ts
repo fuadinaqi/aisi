@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma.js';
 import { checkAuth, checkRole, validate, getUserSchoolIds, isPembinaOfGroup } from '../../middleware/auth.js';
 import { sendSuccess } from '../../utils/response.js';
 import { AppError } from '../../utils/AppError.js';
-import { upload, getPublicUrl } from '../../lib/storage.js';
+import { upload, putObjectAndGetUrl } from '../../lib/storage.js';
 import { EventCheckInStatus, GroupLevel, Role } from '@prisma/client';
 
 const router = Router();
@@ -239,7 +239,7 @@ router.post(
         schoolId = schoolIds[0]!;
       }
 
-      const imageUrl = req.file ? getPublicUrl(req.file.filename) : parsed.imageUrl;
+      const imageUrl = req.file ? await putObjectAndGetUrl(req.file) : parsed.imageUrl;
 
       const event = await prisma.event.create({
         data: {
@@ -418,7 +418,7 @@ router.put(
       }
 
       const parsed = parseEventBody(req.body as Record<string, unknown>);
-      const imageUrl = req.file ? getPublicUrl(req.file.filename) : parsed.imageUrl ?? event.imageUrl;
+      const imageUrl = req.file ? await putObjectAndGetUrl(req.file) : parsed.imageUrl ?? event.imageUrl;
 
       const updated = await prisma.event.update({
         where: { id: param(req.params.id) },
@@ -482,7 +482,7 @@ router.post('/:id/check-in', checkRole(Role.ANGGOTA), upload.single('photo'), as
     if (now > event.endAt) throw new AppError(400, 'Event sudah berakhir');
 
     const membership = await resolveAnggotaGroup(userId, event.schoolId, event.targetLevels);
-    const photoUrl = getPublicUrl(req.file.filename);
+    const photoUrl = await putObjectAndGetUrl(req.file);
 
     const existing = await prisma.eventAttendance.findUnique({
       where: { eventId_userId: { eventId, userId } },

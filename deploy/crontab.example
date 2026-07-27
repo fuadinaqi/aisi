@@ -1,0 +1,7 @@
+# Contoh crontab untuk user deploy (crontab -e)
+
+# Backup database setiap hari jam 02:00 WIB
+0 2 * * * /opt/aisi/deploy/backup-db.sh >> /var/log/aisi-backup.log 2>&1
+
+# Healthcheck lokal (opsional, UptimeRobot lebih disarankan untuk alert eksternal)
+# */5 * * * * curl -sf http://127.0.0.1:4000/health || pm2 restart dakwah-api

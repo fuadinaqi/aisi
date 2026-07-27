@@ -9,8 +9,9 @@ import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, getPrimaryRole } from '@/lib/utils';
+import { formatDate, getPrimaryRole, formatEventTargetLevels } from '@/lib/utils';
 import type { MateriItem } from '@/lib/types';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 const typeLabels: Record<string, string> = {
   FILE: 'File',
@@ -28,6 +29,9 @@ export default function MateriPage() {
   const user = useAuthStore((s) => s.user);
   const role = user ? getPrimaryRole(user.roles) : '';
   const canCreate = role === 'SUPERADMIN' || role === 'ADMIN';
+  const isAnggota = role === 'ANGGOTA';
+
+  const { levelLabels } = useGroupLevelLabels();
 
   const { data, isLoading } = useQuery<MateriItem[]>({
     queryKey: ['materi'],
@@ -81,6 +85,9 @@ export default function MateriPage() {
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                             {typeLabels[m.contentType] || m.contentType}
+                          </span>
+                          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            {formatEventTargetLevels(m.targetLevels, levelLabels, isAnggota)}
                           </span>
                           {m.contentType === 'LINK' && m.linkUrl && (
                             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">

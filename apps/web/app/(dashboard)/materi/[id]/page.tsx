@@ -10,11 +10,17 @@ import { ListGroup } from '@/components/layout/AppUI';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { RichTextContent } from '@/components/shared/RichTextEditor';
 import { Button } from '@/components/ui/button';
-import { formatDate, getMediaUrl } from '@/lib/utils';
+import { formatDate, getMediaUrl, formatEventTargetLevels, getPrimaryRole } from '@/lib/utils';
 import type { MateriItem } from '@/lib/types';
+import { useAuthStore } from '@/store/authStore';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 export default function MateriDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const user = useAuthStore((s) => s.user);
+  const role = user ? getPrimaryRole(user.roles) : '';
+  const isAnggota = role === 'ANGGOTA';
+  const { levelLabels } = useGroupLevelLabels();
 
   const { data: materi, isLoading } = useQuery<MateriItem>({
     queryKey: ['materi', id],
@@ -43,7 +49,10 @@ export default function MateriDetailPage() {
 
       <PageHeader title={materi.title} compact />
 
-      <p className="mb-4 px-0.5 text-sm text-muted-foreground">Pekan {formatDate(materi.weekDate)}</p>
+      <p className="mb-1 px-0.5 text-sm text-muted-foreground">Pekan {formatDate(materi.weekDate)}</p>
+      <p className="mb-4 px-0.5 text-sm text-primary">
+        {formatEventTargetLevels(materi.targetLevels, levelLabels, isAnggota)}
+      </p>
 
       {materi.description && (
         <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{materi.description}</p>

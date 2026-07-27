@@ -17,6 +17,7 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { invalidateGroupQueries, invalidateInvitationQueries } from '@/lib/queryInvalidation';
 import { GenderToggle } from '@/components/shared/GenderField';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 type PembinaOption = { id: string; name: string; email: string; gender?: string };
 
@@ -39,6 +40,7 @@ export default function NewSchoolGroupPage() {
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const { configs: levelConfigs } = useGroupLevelLabels();
 
   const {
     register,
@@ -151,7 +153,7 @@ export default function NewSchoolGroupPage() {
                 <Input
                   id="name"
                   className="rounded-xl"
-                  placeholder="Kelompok Muda Alpha"
+                  placeholder="Kelompok Alpha"
                   {...register('name', { required: true })}
                 />
               </div>
@@ -163,8 +165,11 @@ export default function NewSchoolGroupPage() {
                   className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
                   {...register('level')}
                 >
-                  <option value="LEVEL_1">Muda (Level 1)</option>
-                  <option value="LEVEL_2">Pratama (Level 2)</option>
+                  {levelConfigs.map((cfg) => (
+                    <option key={cfg.level} value={cfg.level}>
+                      {cfg.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

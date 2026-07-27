@@ -18,11 +18,7 @@ import { formatDate, formatWeekRange, toDateInputValue } from '@/lib/utils';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import { ICMemberPanel } from '@/components/ic/ICMemberPanel';
 import type { GroupMemberDetail } from '@/lib/types';
-
-const levelLabels: Record<string, string> = {
-  LEVEL_1: 'Muda (Level 1)',
-  LEVEL_2: 'Pratama (Level 2)',
-};
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 export default function AnggotaDetailPage() {
   const { id, userId } = useParams<{ id: string; userId: string }>();
@@ -36,6 +32,7 @@ export default function AnggotaDetailPage() {
   const [mutabaahWeek, setMutabaahWeek] = useState(
     searchParams.get('weekDate') || toDateInputValue(),
   );
+  const { getLevelLabel } = useGroupLevelLabels();
 
   const { data: member, isLoading } = useQuery<GroupMemberDetail>({
     queryKey: ['group-member', id, userId],
@@ -144,7 +141,7 @@ export default function AnggotaDetailPage() {
             <p className="text-xs text-muted-foreground">Kelompok</p>
             <p className="font-medium">{member.group.name}</p>
             <p className="text-sm text-muted-foreground">
-              {levelLabels[member.group.level] || member.group.level}
+              {getLevelLabel(member.group.level)}
             </p>
           </div>
         </div>

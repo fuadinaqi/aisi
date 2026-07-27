@@ -16,18 +16,30 @@ function SetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token') || '';
-  const [inviteInfo, setInviteInfo] = useState<{ name: string; email: string; role: string } | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{
+    name: string;
+    email: string;
+    role: string;
+  } | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SetPasswordInput>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SetPasswordInput>({
     resolver: zodResolver(setPasswordSchema),
     defaultValues: { token },
   });
 
   useEffect(() => {
-    if (!token) { setError('Token tidak ditemukan'); return; }
-    api.get<ApiResponse>(`/auth/invitation/${token}`)
+    if (!token) {
+      setError('Token tidak ditemukan');
+      return;
+    }
+    api
+      .get<ApiResponse>(`/auth/invitation/${token}`)
       .then((res) => setInviteInfo(res.data.data))
       .catch((err) => setError(err.response?.data?.message || 'Token tidak valid'));
   }, [token]);
@@ -50,7 +62,9 @@ function SetPasswordForm() {
         <CardTitle>Buat Password</CardTitle>
         {inviteInfo && (
           <div className="mt-2 space-y-1">
-            <p className="text-sm">Halo, <strong>{inviteInfo.name}</strong></p>
+            <p className="text-sm">
+              Assalamu'alaikum, <strong>{inviteInfo.name}</strong>
+            </p>
             <p className="text-sm text-muted-foreground">{inviteInfo.email}</p>
             <RoleBadge role={inviteInfo.role} />
           </div>
@@ -65,12 +79,16 @@ function SetPasswordForm() {
             <div>
               <Label htmlFor="password">Password Baru</Label>
               <PasswordInput id="password" {...register('password')} />
-              {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>}
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>
+              )}
             </div>
             <div>
               <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
               <PasswordInput id="confirmPassword" {...register('confirmPassword')} />
-              {errors.confirmPassword && <p className="mt-1 text-sm text-red-500">{errors.confirmPassword.message}</p>}
+              {errors.confirmPassword && (
+                <p className="mt-1 text-sm text-red-500">{errors.confirmPassword.message}</p>
+              )}
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
             <Button type="submit" className="w-full" disabled={isSubmitting || !inviteInfo}>

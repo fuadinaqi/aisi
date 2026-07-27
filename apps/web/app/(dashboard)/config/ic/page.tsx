@@ -13,6 +13,7 @@ import {
   type IndikatorCapaianMaster,
 } from '@/lib/ic';
 import { invalidateICQueries } from '@/lib/queryInvalidation';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { useAuthStore } from '@/store/authStore';
 import { getPrimaryRole } from '@/lib/utils';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
@@ -53,6 +54,7 @@ export default function ICConfigPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { configs: levelConfigs } = useGroupLevelLabels();
 
   const { data: items = [], isLoading } = useQuery<IndikatorCapaianMaster[]>({
     queryKey: ['ic-items', level],
@@ -197,18 +199,18 @@ export default function ICConfigPage() {
         />
 
         <div className="mb-4 flex flex-wrap gap-2">
-          {(['LEVEL_1', 'LEVEL_2'] as const).map((lv) => (
+          {levelConfigs.map((cfg) => (
             <Button
-              key={lv}
+              key={cfg.level}
               size="sm"
-              variant={level === lv ? 'default' : 'outline'}
+              variant={level === cfg.level ? 'default' : 'outline'}
               className="rounded-xl"
               onClick={() => {
-                setLevel(lv);
+                setLevel(cfg.level as 'LEVEL_1' | 'LEVEL_2');
                 resetForm();
               }}
             >
-              {lv === 'LEVEL_1' ? 'Level Muda' : 'Level Pratama'}
+              {cfg.label}
             </Button>
           ))}
         </div>

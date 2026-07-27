@@ -1,0 +1,4 @@
+# Jangan commit file env produksi
+db.env
+api.env
+web.env

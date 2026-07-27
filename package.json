@@ -7,6 +7,7 @@
     "lint": "turbo lint",
     "db:generate": "pnpm --filter @dakwah/shared db:generate",
     "db:migrate": "pnpm --filter @dakwah/shared db:migrate",
+    "db:deploy": "pnpm --filter @dakwah/shared db:deploy",
     "db:seed": "pnpm --filter @dakwah/shared db:seed",
     "db:studio": "pnpm --filter @dakwah/shared db:studio"
   },

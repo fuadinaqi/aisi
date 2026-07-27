@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { invalidateEventQueries } from '@/lib/queryInvalidation';
 import { getPrimaryRole, toDateTimeLocalValue } from '@/lib/utils';
 import type { SchoolItem } from '@/lib/types';
+import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 export default function NewEventPage() {
   const router = useRouter();
@@ -47,11 +48,7 @@ export default function NewEventPage() {
     enabled: canPickSchool,
   });
 
-  const { data: levelConfigs = [] } = useQuery<{ level: string; label: string }[]>({
-    queryKey: ['group-levels'],
-    queryFn: async () =>
-      (await api.get<ApiResponse<{ level: string; label: string }[]>>('/config/group-levels')).data.data,
-  });
+  const { configs: levelConfigs } = useGroupLevelLabels();
 
   const toggleLevel = (level: string) => {
     setSelectedLevels((prev) =>

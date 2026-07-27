@@ -27,7 +27,7 @@ export function HeroGreeting({
       <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
           <p className="text-sm text-primary-foreground/80">Selamat datang</p>
-          <h1 className="truncate text-xl font-bold md:text-2xl">Halo, {name}</h1>
+          <h1 className="truncate text-xl font-bold md:text-2xl">Assalamu'alaikum, {name}</h1>
           {subtitle && <p className="text-sm text-primary-foreground/75">{subtitle}</p>}
           {badge && <div className="pt-2">{badge}</div>}
         </div>
@@ -45,7 +45,13 @@ export function QuickActionGrid({
   className?: string;
 }) {
   return (
-    <div className={cn('grid gap-2 sm:gap-3', actions.length <= 3 ? 'grid-cols-3' : 'grid-cols-4', className)}>
+    <div
+      className={cn(
+        'grid gap-2 sm:gap-3',
+        actions.length <= 3 ? 'grid-cols-3' : 'grid-cols-4',
+        className,
+      )}
+    >
       {actions.map((action) => (
         <Link
           key={action.href}
