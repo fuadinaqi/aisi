@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
@@ -17,7 +16,10 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const activeRole = useAuthStore((s) => s.activeRole);
   const [mounted, setMounted] = useState(false);
+
+  const effectiveRole = activeRole || (user ? getPrimaryRole(user.roles) : null);
 
   useEffect(() => {
     setMounted(true);
@@ -31,11 +33,10 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
       return;
     }
 
-    if (allowedRoles && user) {
-      const hasAccess = user.roles.some((r) => allowedRoles.includes(r));
-      if (!hasAccess) navigate('/dashboard', { replace: true });
+    if (allowedRoles && effectiveRole && !allowedRoles.includes(effectiveRole)) {
+      navigate('/dashboard', { replace: true });
     }
-  }, [mounted, accessToken, user, allowedRoles, navigate]);
+  }, [mounted, accessToken, effectiveRole, allowedRoles, navigate]);
 
   if (!mounted) {
     return <AuthLoadingShell />;
@@ -43,14 +44,23 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
 
   if (!accessToken) return null;
 
-  if (allowedRoles && user && !user.roles.some((r) => allowedRoles.includes(r))) {
+  if (allowedRoles && effectiveRole && !allowedRoles.includes(effectiveRole)) {
     return null;
   }
 
   return <>{children}</>;
 }
 
-export function usePrimaryRole() {
+/** Role aktif untuk UI (persona). Fallback ke primary jika belum ter-set. */
+export function useActiveRole(): string | null {
   const user = useAuthStore((s) => s.user);
-  return user ? getPrimaryRole(user.roles) : null;
+  const activeRole = useAuthStore((s) => s.activeRole);
+  if (!user) return null;
+  if (activeRole && user.roles.includes(activeRole)) return activeRole;
+  return getPrimaryRole(user.roles);
+}
+
+/** @deprecated Gunakan useActiveRole */
+export function usePrimaryRole() {
+  return useActiveRole();
 }

@@ -5,12 +5,12 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Camera, MapPin, Star } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, formatEventTargetLevels, getMediaUrl, getPrimaryRole } from '@/lib/utils';
+import { formatDate, formatEventTargetLevels, getMediaUrl } from '@/lib/utils';
 import { invalidateEventQueries } from '@/lib/queryInvalidation';
 import type { EventItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
@@ -26,8 +26,7 @@ export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const isAnggota = role === 'ANGGOTA';
 
   const [photo, setPhoto] = useState<File | null>(null);

@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -21,6 +23,8 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 	r.Get("/me", me(db))
 	r.Put("/me", updateMe(db))
 	r.With(middleware.RequireRole("SUPERADMIN")).Get("/", list(db))
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Post("/{id}/roles", addRole(db))
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Delete("/{id}/roles/{role}", removeRole(db))
 	r.Get("/{id}", get(db))
 	r.With(middleware.RequireRole("SUPERADMIN")).Put("/{id}", update(db))
 	r.With(middleware.RequireRole("SUPERADMIN")).Delete("/{id}", remove(db))
@@ -215,6 +219,113 @@ func remove(db *pgxpool.Pool) http.HandlerFunc {
 		httpx.Success(w, 200, nil, "User dinonaktifkan")
 	}
 }
+
+func validAssignableRole(role string) bool {
+	switch role {
+	case "ADMIN", "PJ_SEKOLAH", "PEMBINA", "ANGGOTA":
+		return true
+	default:
+		return false
+	}
+}
+
+func addRole(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, _ := middleware.Claims(r)
+		id := chi.URLParam(r, "id")
+		var in struct {
+			Role     string  `json:"role"`
+			SchoolID *string `json:"schoolId"`
+			GroupID  *string `json:"groupId"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil || !validAssignableRole(in.Role) {
+			httpx.Error(w, 400, "Role tidak valid")
+			return
+		}
+		if !constants.CanInvite(claims.Roles, in.Role) {
+			httpx.Error(w, 403, "Anda tidak berhak menambahkan role ini")
+			return
+		}
+		var exists bool
+		if db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE "id"=$1 AND "isActive")`, id).Scan(&exists) != nil || !exists {
+			httpx.Error(w, 404, "User tidak ditemukan")
+			return
+		}
+		if db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserRole" WHERE "userId"=$1 AND "role"=$2::"Role")`, id, in.Role).Scan(&exists) == nil && exists {
+			httpx.Error(w, 400, "User sudah memiliki role ini")
+			return
+		}
+		tx, err := db.Begin(r.Context())
+		if err != nil {
+			httpx.Error(w, 500, "Gagal menambahkan role")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		if _, err = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,$3::"Role")`, uuid.NewString(), id, in.Role); err != nil {
+			httpx.Error(w, 500, "Gagal menambahkan role")
+			return
+		}
+		if in.SchoolID != nil && *in.SchoolID != "" && (in.Role == "PJ_SEKOLAH" || in.Role == "PEMBINA" || in.Role == "ANGGOTA") {
+			var schoolOK bool
+			if tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "School" WHERE "id"=$1 AND "isActive")`, *in.SchoolID).Scan(&schoolOK) != nil || !schoolOK {
+				httpx.Error(w, 400, "Sekolah tidak valid")
+				return
+			}
+			_, _ = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), id, *in.SchoolID)
+		}
+		if in.GroupID != nil && *in.GroupID != "" && in.Role == "ANGGOTA" {
+			var groupOK bool
+			if tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "Group" WHERE "id"=$1 AND "isActive")`, *in.GroupID).Scan(&groupOK) != nil || !groupOK {
+				httpx.Error(w, 400, "Kelompok tidak valid")
+				return
+			}
+			_, _ = tx.Exec(r.Context(), `INSERT INTO "GroupMember" ("id","groupId","userId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "GroupMember" WHERE "groupId"=$2 AND "userId"=$3)`, uuid.NewString(), *in.GroupID, id)
+		}
+		if tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal menambahkan role")
+			return
+		}
+		u, _ := user(db, r, id)
+		httpx.Success(w, 200, u, "Role berhasil ditambahkan")
+	}
+}
+
+func removeRole(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, _ := middleware.Claims(r)
+		id := chi.URLParam(r, "id")
+		role := chi.URLParam(r, "role")
+		if !validAssignableRole(role) && role != "SUPERADMIN" {
+			httpx.Error(w, 400, "Role tidak valid")
+			return
+		}
+		if role == "SUPERADMIN" {
+			httpx.Error(w, 400, "Role SUPERADMIN tidak dapat dihapus lewat endpoint ini")
+			return
+		}
+		if !constants.CanInvite(claims.Roles, role) {
+			httpx.Error(w, 403, "Anda tidak berhak menghapus role ini")
+			return
+		}
+		var count int
+		if db.QueryRow(r.Context(), `SELECT count(*) FROM "UserRole" WHERE "userId"=$1`, id).Scan(&count) != nil || count == 0 {
+			httpx.Error(w, 404, "User tidak ditemukan")
+			return
+		}
+		if count <= 1 {
+			httpx.Error(w, 400, "Tidak dapat menghapus role terakhir user")
+			return
+		}
+		tag, e := db.Exec(r.Context(), `DELETE FROM "UserRole" WHERE "userId"=$1 AND "role"=$2::"Role"`, id, role)
+		if e != nil || tag.RowsAffected() == 0 {
+			httpx.Error(w, 404, "Role tidak ditemukan pada user")
+			return
+		}
+		u, _ := user(db, r, id)
+		httpx.Success(w, 200, u, "Role berhasil dihapus")
+	}
+}
+
 func has(roles []string, wanted string) bool {
 	for _, r := range roles {
 		if r == wanted {

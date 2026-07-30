@@ -21,8 +21,10 @@ import {
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { cn, getPrimaryRole, getRoleLabel } from '@/lib/utils';
+import { cn, getRoleLabel } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
+import { useActiveRole } from '@/components/layout/RoleGuard';
+import { RoleSwitcher } from '@/components/layout/RoleSwitcher';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/layout/AppLogo';
@@ -119,9 +121,10 @@ export function Sidebar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const activeRole = useActiveRole();
 
   if (!user) return null;
-  const role = getPrimaryRole(user.roles);
+  const role = activeRole || 'ANGGOTA';
   const nav = useNav(role);
 
   const handleLogout = async () => {
@@ -162,9 +165,9 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t border-border/60 p-3">
-        <div className="mb-2 rounded-xl bg-muted/50 px-3 py-3">
+        <div className="mb-2 space-y-2 rounded-xl bg-muted/50 px-3 py-3">
           <p className="truncate text-sm font-semibold">{user.name}</p>
-          <p className="truncate text-xs text-muted-foreground">{getRoleLabel(role)}</p>
+          <RoleSwitcher />
         </div>
         <Button
           variant="ghost"
@@ -188,6 +191,7 @@ function MobileMoreSheet({
   userName,
   roleLabel,
   onLogout,
+  multiRole,
 }: {
   open: boolean;
   onClose: () => void;
@@ -196,6 +200,7 @@ function MobileMoreSheet({
   userName: string;
   roleLabel: string;
   onLogout: () => void;
+  multiRole: boolean;
 }) {
   if (!open) return null;
 
@@ -204,11 +209,16 @@ function MobileMoreSheet({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
       <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-hidden rounded-t-3xl bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-          <div>
+          <div className="min-w-0 flex-1 pr-3">
             <p className="font-semibold">Menu</p>
             <p className="text-xs text-muted-foreground">
               {userName} · {roleLabel}
             </p>
+            {multiRole && (
+              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                <RoleSwitcher compact />
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -340,9 +350,10 @@ export function MobileNavbar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const activeRole = useActiveRole();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const role = user ? getPrimaryRole(user.roles) : 'ANGGOTA';
+  const role = activeRole || 'ANGGOTA';
   const nav = useNav(role);
   const primaryHrefs = mobilePrimaryByRole[role] || mobilePrimaryByRole.ANGGOTA;
 
@@ -404,6 +415,7 @@ export function MobileNavbar() {
         userName={user.name}
         roleLabel={getRoleLabel(role)}
         onLogout={handleLogout}
+        multiRole={user.roles.length > 1}
       />
     </>
   );

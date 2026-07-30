@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { RoleGuard } from '@/components/layout/RoleGuard';
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { invalidateEventQueries } from '@/lib/queryInvalidation';
-import { getPrimaryRole, toDateTimeLocalValue } from '@/lib/utils';
+import { toDateTimeLocalValue } from '@/lib/utils';
 import type { SchoolItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { toastError, toastSuccess } from '@/lib/toast';
@@ -21,8 +21,7 @@ import { toastError, toastSuccess } from '@/lib/toast';
 export default function NewEventPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const canPickSchool = role === 'SUPERADMIN' || role === 'ADMIN';
 
   const defaultStart = toDateTimeLocalValue();

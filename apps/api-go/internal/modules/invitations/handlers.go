@@ -112,8 +112,13 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if h.activeUserOrInvitation(r, in.Email) {
-		httpx.Error(w, 400, "Email sudah terdaftar atau memiliki undangan aktif")
+	if h.pendingInvitation(r, in.Email) {
+		httpx.Error(w, 400, "Email sudah memiliki undangan aktif")
+		return
+	}
+	existingUser := h.activeUser(r, in.Email)
+	if existingUser && h.userHasRole(r, in.Email, in.Role) {
+		httpx.Error(w, 400, "User sudah memiliki role ini")
 		return
 	}
 	id, token := uuid.NewString(), uuid.NewString()
@@ -123,11 +128,19 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, "Gagal membuat undangan")
 		return
 	}
-	if err := email.New(h.Config).SendInvitation(r.Context(), in.Email, in.Name, h.Config.AppURL+"/set-password?token="+token); err != nil {
+	link := h.Config.AppURL + "/set-password?token=" + token
+	if existingUser {
+		link = h.Config.AppURL + "/accept-role?token=" + token
+	}
+	if err := email.New(h.Config).SendInvitationWithKind(r.Context(), in.Email, in.Name, link, existingUser); err != nil {
 		httpx.Error(w, 502, "Undangan dibuat, namun email gagal dikirim")
 		return
 	}
-	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "status": "PENDING", "expiresAt": expires}, "Undangan berhasil dikirim")
+	msg := "Undangan berhasil dikirim"
+	if existingUser {
+		msg = "Undangan peran tambahan berhasil dikirim"
+	}
+	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "status": "PENDING", "expiresAt": expires, "existingUser": existingUser}, msg)
 }
 
 func (h Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -174,7 +187,12 @@ func (h Handler) resend(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, "Gagal mengirim ulang undangan")
 		return
 	}
-	if err = email.New(h.Config).SendInvitation(r.Context(), mail, name, h.Config.AppURL+"/set-password?token="+token); err != nil {
+	existingUser := h.activeUser(r, mail)
+	link := h.Config.AppURL + "/set-password?token=" + token
+	if existingUser {
+		link = h.Config.AppURL + "/accept-role?token=" + token
+	}
+	if err = email.New(h.Config).SendInvitationWithKind(r.Context(), mail, name, link, existingUser); err != nil {
 		httpx.Error(w, 502, "Undangan diperbarui, namun email gagal dikirim")
 		return
 	}
@@ -193,9 +211,21 @@ func (h Handler) cancel(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.Success(w, 200, nil, "Undangan dibatalkan")
 }
-func (h Handler) activeUserOrInvitation(r *http.Request, email string) bool {
+func (h Handler) pendingInvitation(r *http.Request, email string) bool {
 	var exists bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE "email"=$1 AND "isActive") OR EXISTS(SELECT 1 FROM "UserInvitation" WHERE "email"=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, email).Scan(&exists)
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserInvitation" WHERE "email"=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, email).Scan(&exists)
+	return exists
+}
+
+func (h Handler) activeUser(r *http.Request, email string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE "email"=$1 AND "isActive")`, email).Scan(&exists)
+	return exists
+}
+
+func (h Handler) userHasRole(r *http.Request, email, role string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."email"=$1 AND ur."role"=$2::"Role")`, email, role).Scan(&exists)
 	return exists
 }
 func validRole(v string) bool {

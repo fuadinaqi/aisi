@@ -13,8 +13,7 @@ import {
 } from '@/lib/ic';
 import { invalidateICQueries } from '@/lib/queryInvalidation';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
-import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { RoleGuard } from '@/components/layout/RoleGuard';
@@ -44,8 +43,7 @@ const emptyForm: FormState = {
 
 export default function ICConfigPage() {
   const queryClient = useQueryClient();
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const canEdit = role === 'SUPERADMIN' || role === 'ADMIN';
 
   const [level, setLevel] = useState<'LEVEL_1' | 'LEVEL_2'>('LEVEL_1');

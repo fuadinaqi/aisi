@@ -1,8 +1,9 @@
-
 import { useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { useActiveRole } from '@/components/layout/RoleGuard';
+import { RoleSwitcher } from '@/components/layout/RoleSwitcher';
 import { useMyPoints } from '@/hooks/useMyPoints';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import {
@@ -13,12 +14,13 @@ import {
 } from '@/components/layout/AppUI';
 import { PointBadge, RoleBadge, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { getPrimaryRole, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const activeRole = useActiveRole();
   const { totalPoints, logs, showPoints, isLoading } = useMyPoints();
 
   const handleLogout = async () => {
@@ -39,9 +41,30 @@ export default function ProfilePage() {
         <ProfileHeader
           name={user.name}
           email={user.email}
-          badge={<RoleBadge role={getPrimaryRole(user.roles)} />}
+          badge={
+            <div className="flex flex-wrap items-center gap-1.5">
+              {user.roles.map((r) => (
+                <RoleBadge
+                  key={r}
+                  role={r}
+                  className={r === activeRole ? 'ring-2 ring-primary/40' : 'opacity-70'}
+                />
+              ))}
+            </div>
+          }
           points={showPoints ? <PointBadge points={totalPoints} /> : undefined}
         />
+      )}
+
+      {user && user.roles.length > 1 && (
+        <section className="space-y-3">
+          <AppSectionHeader title="Ganti peran" />
+          <ListGroup>
+            <div className="px-4 py-4 md:px-5">
+              <RoleSwitcher />
+            </div>
+          </ListGroup>
+        </section>
       )}
 
       {showPoints && (

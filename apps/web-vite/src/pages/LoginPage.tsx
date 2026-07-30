@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@dakwah/shared';
@@ -16,8 +16,14 @@ import { toastError } from '@/lib/toast';
 const LOGIN_QUOTE =
   '"Tumbuh bersama, berdampak untuk umat, bersinar dengan kebaikan."';
 
+function safeRedirect(path: string | null): string {
+  if (!path || !path.startsWith('/') || path.startsWith('//')) return '/dashboard';
+  return path;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [error, setError] = useState('');
 
@@ -37,7 +43,7 @@ export default function LoginPage() {
         data,
       );
       setAuth(res.data.data.user, res.data.data.accessToken);
-      navigate('/dashboard', { replace: true });
+      navigate(safeRedirect(searchParams.get('redirect')), { replace: true });
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(msg || 'Login gagal');

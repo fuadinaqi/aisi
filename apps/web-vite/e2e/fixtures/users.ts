@@ -37,9 +37,17 @@ export const USERS = {
     password: '!Password123',
     label: 'Anggota',
   },
+  /** Default activeRole = PEMBINA (prioritas lebih tinggi) */
+  multiRole: {
+    role: 'PEMBINA',
+    email: 'multi.role.sman1@gmail.com',
+    password: '!Password123',
+    label: 'Multi-role PEMBINA+ANGGOTA',
+  },
 } as const satisfies Record<string, SeedUser>;
 
 export const SEED_INVITE_TOKEN = '00000000-0000-4000-8000-000000000001';
+export const SEED_ACCEPT_ROLE_TOKEN = '00000000-0000-4000-8000-000000000002';
 export const SEED_SCHOOL_NAME = 'SMAN 1 Depok';
 
 export const NAV_BY_ROLE: Record<SeedUser['role'], { href: string; label: string }[]> = {

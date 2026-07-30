@@ -27,6 +27,7 @@ func (h Handler) Routes() chi.Router {
 	r.Post("/logout", h.logout)
 	r.Post("/refresh", h.refresh)
 	r.With(middleware.RequireAuth(h.Config)).Post("/change-password", h.changePassword)
+	r.With(middleware.RequireAuth(h.Config)).Post("/accept-role", h.acceptRole)
 	r.Get("/invitation/{token}", h.invitation)
 	r.Post("/set-password", h.setPassword)
 	return r
@@ -202,7 +203,9 @@ func (h Handler) invitation(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "Undangan sudah expired")
 		return
 	}
-	httpx.Success(w, 200, map[string]string{"name": name, "email": email, "role": role}, "")
+	var existingUser bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE "email"=$1 AND "isActive")`, email).Scan(&existingUser)
+	httpx.Success(w, 200, map[string]any{"name": name, "email": email, "role": role, "existingUser": existingUser}, "")
 }
 
 func (h Handler) setPassword(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +238,7 @@ func (h Handler) setPassword(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE "email"=$1)`, email).Scan(&exists)
 	if exists {
-		httpx.Error(w, 400, "Email sudah terdaftar")
+		httpx.Error(w, 400, "Email sudah terdaftar. Login lalu buka tautan undangan untuk menerima peran tambahan.")
 		return
 	}
 	hash, err := auth.HashPassword(in.Password)
@@ -266,6 +269,72 @@ func (h Handler) setPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Success(w, 200, nil, "Akun berhasil dibuat, silakan login")
+}
+
+func (h Handler) acceptRole(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.Claims(r)
+	if !ok {
+		httpx.Error(w, 401, "Autentikasi diperlukan")
+		return
+	}
+	var in struct {
+		Token string `json:"token"`
+	}
+	if decode(r, &in) != nil || in.Token == "" {
+		httpx.Error(w, 400, "Token wajib diisi")
+		return
+	}
+	tx, err := h.DB.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, 500, "Gagal menerima peran")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	var id, name, email, role string
+	var schoolID, groupID *string
+	var expires time.Time
+	err = tx.QueryRow(r.Context(), `SELECT "id","name","email","role"::text,"schoolId","groupId","expiresAt" FROM "UserInvitation" WHERE "token"=$1 AND "status"='PENDING' FOR UPDATE`, in.Token).Scan(&id, &name, &email, &role, &schoolID, &groupID, &expires)
+	if err != nil || expires.Before(time.Now()) {
+		httpx.Error(w, 400, "Undangan tidak valid atau sudah expired")
+		return
+	}
+	if email != claims.Email {
+		httpx.Error(w, 403, "Undangan ini untuk email lain. Login dengan akun yang diundang.")
+		return
+	}
+	var uid string
+	var active bool
+	if tx.QueryRow(r.Context(), `SELECT "id","isActive" FROM "User" WHERE "email"=$1`, email).Scan(&uid, &active) != nil || !active {
+		httpx.Error(w, 400, "Akun tidak ditemukan. Gunakan tautan buat password.")
+		return
+	}
+	_, err = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") SELECT $1,$2,$3::"Role" WHERE NOT EXISTS (SELECT 1 FROM "UserRole" WHERE "userId"=$2 AND "role"=$3::"Role")`, uuid.NewString(), uid, role)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal menambahkan peran")
+		return
+	}
+	if schoolID != nil {
+		_, _ = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), uid, *schoolID)
+	}
+	if groupID != nil && role == "ANGGOTA" {
+		_, _ = tx.Exec(r.Context(), `INSERT INTO "GroupMember" ("id","groupId","userId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "GroupMember" WHERE "groupId"=$2 AND "userId"=$3)`, uuid.NewString(), *groupID, uid)
+	}
+	if _, err = tx.Exec(r.Context(), `UPDATE "UserInvitation" SET "status"='USED',"usedAt"=NOW() WHERE "id"=$1`, id); err != nil {
+		httpx.Error(w, 500, "Gagal menerima peran")
+		return
+	}
+	if tx.Commit(r.Context()) != nil {
+		httpx.Error(w, 500, "Gagal menerima peran")
+		return
+	}
+	var roles []string
+	_ = h.DB.QueryRow(r.Context(), `SELECT COALESCE(array_agg("role"::text) FILTER (WHERE "role" IS NOT NULL),'{}') FROM "UserRole" WHERE "userId"=$1`, uid).Scan(&roles)
+	access, err := auth.AccessToken(h.Config, uid, email, roles)
+	if err != nil {
+		httpx.Success(w, 200, map[string]any{"roles": roles, "addedRole": role, "name": name}, "Peran berhasil ditambahkan. Silakan login ulang.")
+		return
+	}
+	httpx.Success(w, 200, map[string]any{"roles": roles, "addedRole": role, "accessToken": access, "name": name}, "Peran berhasil ditambahkan")
 }
 
 func (h Handler) setCookie(w http.ResponseWriter, value string) {

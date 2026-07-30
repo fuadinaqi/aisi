@@ -3,12 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { BookOpen, ChevronRight, ExternalLink, FileText, Link2, Plus } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, getPrimaryRole, formatEventTargetLevels } from '@/lib/utils';
+import { formatDate, formatEventTargetLevels } from '@/lib/utils';
 import type { MateriItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
@@ -25,8 +25,7 @@ const typeIcons = {
 };
 
 export default function MateriPage() {
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const canCreate = role === 'SUPERADMIN' || role === 'ADMIN';
   const isAnggota = role === 'ANGGOTA';
 

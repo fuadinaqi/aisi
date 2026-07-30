@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/layouts/DashboardLayout';
 import HomeRedirect from '@/pages/HomeRedirect';
 import LoginPage from '@/pages/LoginPage';
 import SetPasswordPage from '@/pages/SetPasswordPage';
+import AcceptRolePage from '@/pages/AcceptRolePage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import ProfilePage from '@/pages/profile/ProfilePage';
 import NotificationsPage from '@/pages/notifications/NotificationsPage';
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/set-password" element={<SetPasswordPage />} />
+        <Route path="/accept-role" element={<AcceptRolePage />} />
 
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />

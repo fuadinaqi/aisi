@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Mail, Pencil, Phone, School, Users } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
-import { cn, getPrimaryRole } from '@/lib/utils';
+import { useActiveRole } from '@/components/layout/RoleGuard';
+import { cn } from '@/lib/utils';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup, ProfileHeader } from '@/components/layout/AppUI';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
@@ -22,8 +22,7 @@ import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 export default function AnggotaDetailPage() {
   const { id = '', userId = '' } = useParams<{ id: string; userId: string }>();
   const [searchParams] = useSearchParams();
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const canEdit =
     role === 'PEMBINA' || role === 'PJ_SEKOLAH' || role === 'ADMIN' || role === 'SUPERADMIN';
   const canViewIC = role !== 'ANGGOTA';

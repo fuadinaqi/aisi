@@ -9,15 +9,14 @@ import { ListGroup } from '@/components/layout/AppUI';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { RichTextContent } from '@/components/shared/RichTextEditor';
 import { Button } from '@/components/ui/button';
-import { formatDate, getMediaUrl, formatEventTargetLevels, getPrimaryRole } from '@/lib/utils';
+import { formatDate, getMediaUrl, formatEventTargetLevels } from '@/lib/utils';
 import type { MateriItem } from '@/lib/types';
-import { useAuthStore } from '@/store/authStore';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 export default function MateriDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const isAnggota = role === 'ANGGOTA';
   const { levelLabels } = useGroupLevelLabels();
 

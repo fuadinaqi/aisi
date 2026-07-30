@@ -45,19 +45,23 @@ export async function loginAs(page: Page, user: SeedUser): Promise<void> {
     sessionCache.set(user.email, session);
   }
 
+  const priority = ['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA'];
+  const activeRole =
+    priority.find((r) => session.user.roles.includes(r)) || session.user.roles[0] || user.role;
+
   await page.goto('/login');
   await page.evaluate(
-    ({ token, authUser }) => {
+    ({ token, authUser, activeRole: role }) => {
       localStorage.setItem('accessToken', token);
       localStorage.setItem(
         'auth-storage',
         JSON.stringify({
-          state: { user: authUser, accessToken: token },
+          state: { user: authUser, accessToken: token, activeRole: role },
           version: 0,
         }),
       );
     },
-    { token: session.accessToken, authUser: session.user },
+    { token: session.accessToken, authUser: session.user, activeRole },
   );
   await page.goto('/dashboard');
   await page.waitForURL(/\/dashboard/, { timeout: 20_000 });

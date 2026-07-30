@@ -3,12 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Calendar, ChevronRight, MapPin, Plus, Star } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, formatEventTargetLevels, getMediaUrl, getPrimaryRole } from '@/lib/utils';
+import { formatDate, formatEventTargetLevels, getMediaUrl } from '@/lib/utils';
 import type { EventItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
@@ -19,8 +19,7 @@ const checkInLabels: Record<string, string> = {
 };
 
 export default function EventsPage() {
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const isAnggota = role === 'ANGGOTA';
   const canCreate = role === 'SUPERADMIN' || role === 'ADMIN' || role === 'PJ_SEKOLAH';
   const isPembina = role === 'PEMBINA';

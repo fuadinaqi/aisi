@@ -18,17 +18,27 @@ type Sender struct {
 func New(c config.Config) Sender { return Sender{from: c.EmailFrom, apiKey: c.ResendAPIKey} }
 
 func (s Sender) SendInvitation(ctx context.Context, to, name, url string) error {
+	return s.SendInvitationWithKind(ctx, to, name, url, false)
+}
+
+func (s Sender) SendInvitationWithKind(ctx context.Context, to, name, url string, existingUser bool) error {
 	safeName := html.EscapeString(name)
 	safeURL := html.EscapeString(url)
+	subject := "Undangan AISI"
+	bodyHTML := "<p>Assalamu'alaikum " + safeName + ",</p><p><a href=\"" + safeURL + "\">Atur password akun</a></p>"
+	if existingUser {
+		subject = "Undangan peran tambahan AISI"
+		bodyHTML = "<p>Assalamu'alaikum " + safeName + ",</p><p>Anda diundang untuk menambahkan peran pada akun AISI yang sudah ada.</p><p><a href=\"" + safeURL + "\">Terima undangan peran</a></p>"
+	}
 	if s.apiKey == "" {
-		fmt.Printf("[email console] to=%s name=%s invitation=%s\n", to, name, url)
+		fmt.Printf("[email console] to=%s name=%s existing=%v invitation=%s\n", to, name, existingUser, url)
 		return nil
 	}
 	body, _ := json.Marshal(map[string]string{
 		"from":    s.from,
 		"to":      to,
-		"subject": "Undangan AISI",
-		"html":    "<p>Assalamu'alaikum " + safeName + ",</p><p><a href=\"" + safeURL + "\">Atur password akun</a></p>",
+		"subject": subject,
+		"html":    bodyHTML,
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(body))
 	if err != nil {

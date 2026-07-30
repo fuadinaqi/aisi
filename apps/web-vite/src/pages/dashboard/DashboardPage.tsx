@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { useMyPoints } from '@/hooks/useMyPoints';
-import { getPrimaryRole, getRoleLabel } from '@/lib/utils';
+import { getRoleLabel } from '@/lib/utils';
 import { PointBadge, RoleBadge, LoadingSkeleton } from '@/components/shared/Badges';
 import { AppLogo } from '@/components/layout/AppLogo';
 import { PageContainer } from '@/components/layout/PageShell';
@@ -83,7 +84,7 @@ function getQuickActions(role: string) {
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : 'ANGGOTA';
+  const role = useActiveRole() || 'ANGGOTA';
   const { totalPoints, showPoints } = useMyPoints();
   const quickActions = getQuickActions(role);
 

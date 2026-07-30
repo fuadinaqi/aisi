@@ -546,6 +546,24 @@ async function main() {
     ],
   });
 
+  const school1 = schoolByName['SMAN 1 Depok']!;
+  const multiRole = await prisma.user.create({
+    data: {
+      name: 'Multi Role Demo',
+      email: 'multi.role.sman1@gmail.com',
+      phone: seedPhone(phoneSeq++),
+      gender: Gender.IKHWAN,
+      password: hash(PASSWORD.pembina),
+      roles: {
+        create: [{ role: Role.PEMBINA }, { role: Role.ANGGOTA }],
+      },
+      schools: { create: { schoolId: school1.id } },
+    },
+  });
+  await prisma.groupMember.create({
+    data: { groupId: groups[0]!.id, userId: multiRole.id },
+  });
+
   await prisma.userInvitation.create({
     data: {
       email: 'calon.anggota@gmail.com',
@@ -559,6 +577,21 @@ async function main() {
     },
   });
 
+  // Undangan peran tambahan ke anggota existing (untuk alur accept-role)
+  await prisma.userInvitation.create({
+    data: {
+      email: 'ahmad.fauzi.sman1.g1@gmail.com',
+      name: 'Ahmad Fauzi',
+      role: Role.PEMBINA,
+      gender: Gender.IKHWAN,
+      schoolId: school1.id,
+      token: '00000000-0000-4000-8000-000000000002',
+      status: InvitationStatus.PENDING,
+      invitedById: admin.id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+
   console.log('\nSeed selesai!\n');
   console.log('=== Akun utama ===');
   console.log(`Superadmin : fuadinaqi@gmail.com / ${PASSWORD.superadmin}`);
@@ -567,6 +600,8 @@ async function main() {
   for (const pj of PJ_SEKOLAH) {
     console.log(`${pj.name.padEnd(8)} : ${pj.email} / ${PASSWORD.pj} (${pj.school})`);
   }
+  console.log('\n=== Multi-role ===');
+  console.log(`PEMBINA+ANGGOTA : multi.role.sman1@gmail.com / ${PASSWORD.pembina}`);
   console.log('\n=== Pembina & Anggota ===');
   console.log(`Password pembina : ${PASSWORD.pembina}`);
   console.log(`Password anggota : ${PASSWORD.anggota}`);

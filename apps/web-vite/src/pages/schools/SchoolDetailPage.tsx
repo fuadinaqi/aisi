@@ -5,8 +5,7 @@ import { Link } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, UserMinus, UserPlus, Users } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader, Section } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup, ListRow } from '@/components/layout/AppUI';
 import { EvaluationInfiniteList } from '@/components/evaluasi/EvaluationInfiniteList';
@@ -25,8 +24,7 @@ import type { SchoolDetail } from '@/lib/types';
 export default function SchoolDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const canManagePj = role === 'SUPERADMIN' || role === 'ADMIN';
   const canManageGroups = canManagePj || role === 'PJ_SEKOLAH';
 

@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, School } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup, ListRow } from '@/components/layout/AppUI';
 import { LoadingSkeleton } from '@/components/shared/Badges';
@@ -13,8 +12,7 @@ import { Button } from '@/components/ui/button';
 import type { SchoolItem } from '@/lib/types';
 
 export default function SchoolsPage() {
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const canCreate = role === 'SUPERADMIN' || role === 'ADMIN';
 
   const { data, isLoading } = useQuery<SchoolItem[]>({

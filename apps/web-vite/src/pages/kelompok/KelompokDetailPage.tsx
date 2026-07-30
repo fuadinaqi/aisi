@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Pencil, UserMinus, UserPlus } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
-import { cn, getPrimaryRole } from '@/lib/utils';
+import { useActiveRole } from '@/components/layout/RoleGuard';
+import { cn } from '@/lib/utils';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { EvaluationInfiniteList } from '@/components/evaluasi/EvaluationInfiniteList';
@@ -24,8 +24,7 @@ import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 export default function KelompokDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const canManageMembers =
     role === 'PEMBINA' || role === 'PJ_SEKOLAH' || role === 'ADMIN' || role === 'SUPERADMIN';
 

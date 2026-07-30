@@ -20,6 +20,7 @@ function SetPasswordForm() {
     name: string;
     email: string;
     role: string;
+    existingUser?: boolean;
   } | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -39,10 +40,19 @@ function SetPasswordForm() {
       return;
     }
     api
-      .get<ApiResponse<{ name: string; email: string; role: string }>>(`/auth/invitation/${token}`)
-      .then((res) => setInviteInfo(res.data.data))
+      .get<ApiResponse<{ name: string; email: string; role: string; existingUser?: boolean }>>(
+        `/auth/invitation/${token}`,
+      )
+      .then((res) => {
+        const info = res.data.data;
+        if (info.existingUser) {
+          navigate(`/accept-role?token=${encodeURIComponent(token)}`, { replace: true });
+          return;
+        }
+        setInviteInfo(info);
+      })
       .catch((err) => setError(err.response?.data?.message || 'Token tidak valid'));
-  }, [token]);
+  }, [token, navigate]);
 
   const onSubmit = async (data: SetPasswordInput) => {
     try {

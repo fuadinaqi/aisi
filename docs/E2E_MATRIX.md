@@ -20,6 +20,7 @@ pnpm --filter @dakwah/web-vite test:e2e:ui
 | `@p0` | `e2e/specs/global.setup.ts` | Health API |
 | `@p0` | `e2e/specs/auth.spec.ts` | Login/logout/set-password |
 | `@p0` | `e2e/specs/roles.p0.spec.ts` | Nav loop 5 role + nested sekolah/kelompok/anggota/evaluasi/config |
+| `@p0` | `e2e/specs/multirole.p0.spec.ts` | Switch role UI, assign role API, accept-role undangan existing |
 | `@p1` | `e2e/specs/flows.p1.spec.ts` | F01–F20 write flows |
 | `@p2` | `e2e/specs/acl.p2.spec.ts` | ACL negatif, `/leaderboard`, edge blank-page |
 
@@ -30,6 +31,7 @@ pnpm --filter @dakwah/web-vite test:e2e:ui
 | Auth | automated `@p0` — hijau |
 | Nav SUPERADMIN–ANGGOTA | automated `@p0` — hijau |
 | Nested school→group→member | automated `@p0` — hijau |
+| Multi-role switch / assign / accept-role | automated `@p0` — lokal |
 | Write flows F01–F20 | automated `@p1` — hijau |
 | ACL negatif + edge | automated `@p2` — hijau |
 | CI blocking | belum — jalankan manual / lokal dulu |

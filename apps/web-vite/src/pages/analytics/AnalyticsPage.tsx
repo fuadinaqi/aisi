@@ -2,8 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api, type ApiResponse } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { StatCard, LoadingSkeleton } from '@/components/shared/Badges';
 import { GenderBreakdownPanel } from '@/components/analytics/GenderBreakdownPanel';
 import { LevelBreakdownPanel } from '@/components/analytics/LevelBreakdownPanel';
@@ -29,8 +28,7 @@ interface AnalyticsOverview {
 }
 
 export default function AnalyticsPage() {
-  const user = useAuthStore((s) => s.user);
-  const role = user ? getPrimaryRole(user.roles) : '';
+  const role = useActiveRole() || '';
   const isPj = role === 'PJ_SEKOLAH';
 
   const { data, isLoading } = useQuery<AnalyticsOverview>({
