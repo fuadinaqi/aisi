@@ -25,7 +25,7 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 - **Sekolah & Kelompok** — CRUD sekolah, PJ Sekolah (multi-PJ), kelompok dengan level (`LEVEL_1` / `LEVEL_2`) dan jenis **Ikhwan / Akhwat**, undangan pembina & anggota; validasi gender pembina/anggota harus sesuai kelompok
 - **Evaluasi Mingguan** — Pembina mengisi kehadiran per pekan (satu evaluasi per kelompok per pekan); create-only (409 jika sudah ada), edit via PUT; tampilan mutabaah anggota per pekan evaluasi
 - **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina lihat di detail evaluasi & detail anggota
-- **Indikator Capaian (IC)** — Master kurikulum per level kelompok (5 kategori: Keagamaan, Kebangsaan, Kemasyarakatan, Keorganisarian, Kepemimpinan Kewirausahaan; masing-masing Primer & Sekunder); 78 IC Level Muda, 106 IC Level Pratama; pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
+- **Indikator Capaian (IC)** — Master kurikulum per level kelompok (Bidang Studi disimpan di field `materi`); **29 IC Level Muda** (Marhalah Muhib / M1), **38 IC Level Pratama** (Marhalah Muayyid / M2); pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
 - **Agenda & Check-in** — Event dengan target level (semua level jika kosong); anggota check-in berfoto; pembina menyetujui/menolak
 - **Materi** — Upload file, link eksternal, atau rich text
 - **Poin & Leaderboard** — Poin evaluasi tepat waktu, hadir pembinaan, kirim mutabaah (+2), dan check-in event yang disetujui
@@ -234,7 +234,7 @@ pnpm --filter @dakwah/web-vite dev
 #### Database
 - Migration `20260620145831_add_indikator_capaian` — model `IndikatorCapaian`, `MemberICProgress`, enum `ICCategory` & `ICType`
 - Migration `20260620150500_fix_ic_unique_constraint` — unique `(level, category, type, number)` agar nomor IC dapat sama antar Primer/Sekunder
-- Seed 184 item IC (`ic-seed-data.ts`) — 78 Level Muda, 106 Level Pratama
+- Seed 67 item IC (`ic-seed-data.ts`) — 29 Level Muda (Muhib/M1), 38 Level Pratama (Muayyid/M2)
 
 ### 2025-06-19 — Mutabaah yaumiyah, perbaikan evaluasi & poin
 

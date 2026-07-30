@@ -72,7 +72,7 @@ echo "  3. cd deploy && docker compose -f docker-compose.db.yml --env-file env/d
 echo "  4. cp deploy/env/api-go.env.example apps/api-go/.env && edit"
 echo "     ALLOWED_ORIGIN=https://binaisi.xyz  APP_URL=https://binaisi.xyz"
 echo "  5. echo 'VITE_API_URL=https://api.binaisi.xyz/api/v1' > apps/web-vite/.env"
-echo "  6. bash deploy/deploy.sh --seed"
+echo "  6. export SEED_SUPERADMIN_EMAIL=... SEED_PASSWORD_SUPERADMIN=... && bash deploy/deploy.sh --seed"
 echo "  7. sudo cp deploy/nginx.conf /etc/nginx/sites-available/aisi"
 echo "  8. sudo ln -sf /etc/nginx/sites-available/aisi /etc/nginx/sites-enabled/"
 echo "  9. sudo rm -f /etc/nginx/sites-enabled/default"

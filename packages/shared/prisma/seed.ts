@@ -1,3 +1,8 @@
+/**
+ * Seed DEMO (lokal/staging) — wipe DB lalu isi data dummy lengkap.
+ *
+ * Untuk production bootstrap pakai: pnpm db:seed:prod  (lihat seed-production.ts)
+ */
 import { config as loadEnv } from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +23,7 @@ if (!process.env.DATABASE_URL) {
 
 if (process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production') {
   throw new Error(
-    'Seed dilarang di production. Jangan jalankan db:seed / deploy --seed pada lingkungan produksi.',
+    'Seed DEMO dilarang di production. Pakai: pnpm db:seed:prod (atau deploy.sh --seed).',
   );
 }
 
@@ -32,16 +37,42 @@ const PASSWORD = {
   anggota: process.env.SEED_PASSWORD_ANGGOTA || '!Password123',
 } as const;
 
-const SCHOOLS = ['SMAN 1 Depok', 'SMAN 2 Depok', 'SMAN 3 Depok'] as const;
-
-const PJ_SEKOLAH = [
-  { name: 'Usamah', email: 'usamah_sman1@gmail.com', school: 'SMAN 1 Depok', phone: '081234560001' },
-  { name: 'Naufal', email: 'naufal_sman2@gmail.com', school: 'SMAN 2 Depok', phone: '081234560002' },
-  { name: 'Farid', email: 'farid_sman3@gmail.com', school: 'SMAN 3 Depok', phone: '081234560003' },
+const SCHOOLS = [
+  'SMAN 1',
+  'SMAN 2',
+  'SMAN 3',
+  'SMAN 4',
+  'SMAN 5',
+  'SMAN 6',
+  'SMAN 7',
+  'SMAN 8',
+  'SMAN 9',
+  'SMAN 10',
+  'SMAN 11',
+  'SMAN 12',
+  'SMAN 13',
+  'SMAN 14',
+  'SMAN 15',
+  'SMA Sejahtera 1',
+  'SMKN 4',
+  'SMK Bakti Karya',
+  'SMK Sari Farma',
+  'SMK Terbuka Madani',
 ] as const;
 
-/** Jumlah kelompok per sekolah (acak 2–3) */
-const GROUPS_PER_SCHOOL = [3, 2, 3] as const;
+/** PJ demo hanya untuk beberapa sekolah pertama; sisanya siap diisi undangan nyata */
+const PJ_SEKOLAH = [
+  { name: 'Usamah', email: 'usamah_sman1@gmail.com', school: 'SMAN 1', phone: '081234560001' },
+  { name: 'Naufal', email: 'naufal_sman2@gmail.com', school: 'SMAN 2', phone: '081234560002' },
+  { name: 'Farid', email: 'farid_sman3@gmail.com', school: 'SMAN 3', phone: '081234560003' },
+] as const;
+
+/** Jumlah kelompok demo per sekolah (0 = sekolah tanpa kelompok dummy) */
+const GROUPS_PER_SCHOOL: Record<string, number> = {
+  'SMAN 1': 3,
+  'SMAN 2': 2,
+  'SMAN 3': 3,
+};
 
 const PEMBINA_IKHWAN_NAMES = [
   'Budi Santoso',
@@ -386,8 +417,9 @@ async function main() {
   for (let sIdx = 0; sIdx < SCHOOLS.length; sIdx++) {
     const schoolName = SCHOOLS[sIdx]!;
     const school = schoolByName[schoolName]!;
-    const groupCount = GROUPS_PER_SCHOOL[sIdx]!;
-    const schoolShort = `sman${sIdx + 1}`;
+    const groupCount = GROUPS_PER_SCHOOL[schoolName] ?? 0;
+    if (groupCount === 0) continue;
+    const schoolShort = slugify(schoolName).replace(/\./g, '') || `sekolah${sIdx + 1}`;
 
     for (let gIdx = 0; gIdx < groupCount; gIdx++) {
       const level = gIdx % 2 === 0 ? GroupLevel.LEVEL_1 : GroupLevel.LEVEL_2;
@@ -506,7 +538,7 @@ async function main() {
       {
         title: 'Kajian Kelompok (Sedang Berlangsung)',
         description: 'Event contoh untuk uji check-in anggota',
-        location: 'Aula SMAN 1 Depok',
+        location: 'Aula SMAN 1',
         startAt: ongoingStart,
         endAt: ongoingEnd,
         pointValue: 5,
@@ -546,7 +578,7 @@ async function main() {
     ],
   });
 
-  const school1 = schoolByName['SMAN 1 Depok']!;
+  const school1 = schoolByName['SMAN 1']!;
   const multiRole = await prisma.user.create({
     data: {
       name: 'Multi Role Demo',

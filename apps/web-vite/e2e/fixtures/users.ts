@@ -48,7 +48,7 @@ export const USERS = {
 
 export const SEED_INVITE_TOKEN = '00000000-0000-4000-8000-000000000001';
 export const SEED_ACCEPT_ROLE_TOKEN = '00000000-0000-4000-8000-000000000002';
-export const SEED_SCHOOL_NAME = 'SMAN 1 Depok';
+export const SEED_SCHOOL_NAME = 'SMAN 1';
 
 export const NAV_BY_ROLE: Record<SeedUser['role'], { href: string; label: string }[]> = {
   SUPERADMIN: [

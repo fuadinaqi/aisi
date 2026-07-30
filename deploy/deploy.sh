@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # Deploy Vite SPA + Go API
-# Usage: bash deploy/deploy.sh [--seed]
+# Usage:
+#   bash deploy/deploy.sh
+#   bash deploy/deploy.sh --seed        # production bootstrap (superadmin + master data)
+#   bash deploy/deploy.sh --seed-demo   # full demo seed (JANGAN di production)
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-SEED=false
+SEED_PROD=false
+SEED_DEMO=false
 if [[ "${1:-}" == "--seed" ]]; then
-  SEED=true
+  SEED_PROD=true
+elif [[ "${1:-}" == "--seed-demo" ]]; then
+  SEED_DEMO=true
 fi
 
 echo "==> Install JS dependencies (web-vite + shared prisma tools)"
@@ -19,8 +25,11 @@ echo "==> DB migrate (Prisma history tetap dipakai sampai goose penuh di prod)"
 pnpm db:generate
 pnpm db:deploy
 
-if [[ "$SEED" == true ]]; then
-  echo "==> Seed database (first deploy only)"
+if [[ "$SEED_PROD" == true ]]; then
+  echo "==> Seed production (bootstrap — wajib SEED_SUPERADMIN_EMAIL + SEED_PASSWORD_SUPERADMIN)"
+  pnpm db:seed:prod
+elif [[ "$SEED_DEMO" == true ]]; then
+  echo "==> Seed DEMO (wipe + data dummy — jangan di production)"
   pnpm db:seed
 fi
 

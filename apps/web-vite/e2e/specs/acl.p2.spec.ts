@@ -69,7 +69,7 @@ test.describe('P2 orphan + edge @p2', () => {
     const done = attachPageErrorGuard(page);
     await loginAs(page, USERS.superadmin);
     await page.goto('/schools');
-    await page.getByText('SMAN 1 Depok', { exact: true }).first().click();
+    await page.getByText('SMAN 1', { exact: true }).first().click();
     await page.waitForURL(/\/schools\//);
     await expect(page.getByText(/0 kelompok · 0 anggota/)).toHaveCount(0);
     await expect(page.getByText(/Usamah|PJ terdaftar/i).first()).toBeVisible();
@@ -81,7 +81,7 @@ test.describe('P2 orphan + edge @p2', () => {
     const done = attachPageErrorGuard(page);
     await loginAs(page, USERS.superadmin);
     await page.goto('/schools');
-    await page.getByText('SMAN 1 Depok', { exact: true }).first().click();
+    await page.getByText('SMAN 1', { exact: true }).first().click();
     await page.locator('a[href^="/kelompok/"]').first().click();
     await page.locator('a[href*="/anggota/"]').first().click();
     await page.waitForURL(/\/anggota\//);

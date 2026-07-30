@@ -12,6 +12,7 @@
     "db:migrate": "pnpm --filter @dakwah/shared db:migrate",
     "db:deploy": "pnpm --filter @dakwah/shared db:deploy",
     "db:seed": "pnpm --filter @dakwah/shared db:seed",
+    "db:seed:prod": "pnpm --filter @dakwah/shared db:seed:prod",
     "db:studio": "pnpm --filter @dakwah/shared db:studio",
     "test:e2e": "pnpm --filter @dakwah/web-vite test:e2e",
     "test:e2e:p0": "pnpm --filter @dakwah/web-vite test:e2e:p0",
