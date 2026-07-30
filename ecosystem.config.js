@@ -1,20 +1,17 @@
+const path = require('path');
+
 module.exports = {
   apps: [
     {
-      name: 'dakwah-api',
-      script: 'apps/api/dist/server.js',
+      name: 'aisi-api',
+      script: path.join(__dirname, 'apps/api-go/bin/aisi-api'),
+      cwd: __dirname,
       instances: 1,
-      max_memory_restart: '512M',
-      env: { NODE_ENV: 'production', PORT: 4000 },
-    },
-    {
-      name: 'dakwah-web',
-      script: 'node_modules/next/dist/bin/next',
-      args: 'start',
-      cwd: 'apps/web',
-      instances: 1,
-      max_memory_restart: '512M',
-      env: { NODE_ENV: 'production', PORT: 3000 },
+      max_memory_restart: '256M',
+      env: {
+        APP_ENV: 'production',
+        PORT: 4000,
+      },
     },
   ],
 };

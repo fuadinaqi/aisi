@@ -1,5 +1,7 @@
 # PROJECT PLAN — Aplikasi AISI
 
+> **Catatan (2026-07):** Stack produksi sekarang **Vite + Go** (`apps/web-vite`, `apps/api-go`). Next.js/Express sudah dihapus. Dokumen di bawah adalah rencana awal (historis).
+
 > Dokumen perencanaan kerja (engineering plan) untuk membangun aplikasi web full-stack
 > pendataan & monitoring pembinaan dakwah di sekolah-sekolah Kota Depok.
 

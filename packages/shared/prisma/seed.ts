@@ -1,6 +1,20 @@
+import { config as loadEnv } from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PrismaClient, Role, GroupLevel, AttendanceStatus, InvitationStatus, Gender } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { IC_SEED_DATA } from './ic-seed-data.js';
+
+// Prisma CLI auto-loads .env; tsx/PrismaClient does not — load explicitly.
+const seedDir = path.dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: path.resolve(seedDir, '../.env') });
+loadEnv({ path: path.resolve(seedDir, '../../../apps/api-go/.env') });
+
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL tidak ditemukan. Isi packages/shared/.env atau apps/api-go/.env (lihat .env.example).',
+  );
+}
 
 const prisma = new PrismaClient();
 

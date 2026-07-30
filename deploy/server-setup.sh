@@ -44,6 +44,13 @@ corepack prepare pnpm@9.15.0 --activate
 echo "==> PM2"
 npm install -g pm2
 
+echo "==> Go (untuk build API di server; opsional jika binary di-upload dari CI)"
+if ! command -v go &>/dev/null; then
+  curl -fsSL https://go.dev/dl/go1.23.6.linux-amd64.tar.gz -o /tmp/go.tgz
+  rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tgz
+  ln -sf /usr/local/go/bin/go /usr/local/bin/go
+fi
+
 echo "==> Docker"
 if ! command -v docker &>/dev/null; then
   curl -fsSL https://get.docker.com | sh
@@ -61,10 +68,11 @@ echo "Setup selesai. Langkah berikutnya (sebagai user $DEPLOY_USER):"
 echo "  1. Clone repo ke $APP_DIR"
 echo "  2. cp deploy/env/db.env.example deploy/env/db.env && edit password"
 echo "  3. cd deploy && docker compose -f docker-compose.db.yml --env-file env/db.env up -d"
-echo "  4. cp deploy/env/api.env.example apps/api/.env && edit"
-echo "  5. cp deploy/env/web.env.example apps/web/.env.local && edit"
-echo "  6. bash deploy/deploy.sh"
+echo "  4. cp deploy/env/api-go.env.example apps/api-go/.env && edit"
+echo "  5. echo VITE_API_URL=https://app.namadomain.id/api/v1 > apps/web-vite/.env"
+echo "  6. bash deploy/deploy.sh --seed"
 echo "  7. sudo cp deploy/nginx.conf /etc/nginx/sites-available/aisi"
 echo "  8. sudo ln -sf /etc/nginx/sites-available/aisi /etc/nginx/sites-enabled/"
 echo "  9. sudo nginx -t && sudo systemctl reload nginx"
 echo " 10. sudo certbot --nginx -d app.namadomain.id"
+echo " Docs: docs/STAGING.md , docs/CUTOVER.md"

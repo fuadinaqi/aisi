@@ -25,7 +25,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx --env-file=./.env prisma/seed.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
@@ -33,11 +33,12 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
     "prisma": "^6.1.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2",
-    "bcryptjs": "^2.4.3",
-    "@types/bcryptjs": "^2.4.6"
+    "typescript": "^5.7.2"
   },
   "prisma": {
     "schema": "prisma/schema.prisma",

@@ -4,10 +4,10 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 
 ## Tech Stack
 
-- **Frontend:** Next.js 14, Tailwind CSS, shadcn/ui, TanStack Query, Zustand
-- **Backend:** Express.js, Prisma, JWT Auth
+- **Frontend:** Vite + React, Tailwind CSS, shadcn/ui, TanStack Query, Zustand
+- **Backend:** Go (Chi), Prisma schema (shared), JWT Auth
 - **Database:** PostgreSQL 16
-- **Monorepo:** pnpm + Turborepo
+- **Monorepo:** pnpm + Turborepo (+ Go module di `apps/api-go`)
 
 ## Fitur Utama
 
@@ -59,8 +59,9 @@ pnpm install
 docker compose up db -d
 
 # Copy env files
-cp .env.example apps/api/.env
-cp .env.example apps/web/.env.local
+cp .env.example apps/api-go/.env
+# Sesuaikan ALLOWED_ORIGIN / APP_URL ke http://localhost:5173
+echo 'VITE_API_URL=http://localhost:4000/api/v1' > apps/web-vite/.env
 
 # Generate Prisma client & run migrations
 pnpm db:generate
@@ -69,11 +70,14 @@ pnpm db:migrate
 # Seed database
 pnpm db:seed
 
-# Start dev servers
-pnpm dev
+# Start stack
+# terminal 1 — API Go
+cd apps/api-go && go run ./cmd/server
+# terminal 2 — Vite
+pnpm --filter @dakwah/web-vite dev
 ```
 
-- Frontend: http://localhost:3000
+- Frontend: http://localhost:5173
 - API: http://localhost:4000
 - Health: http://localhost:4000/health
 
@@ -101,8 +105,8 @@ Seed menyertakan undangan pending. Aktivasi di `/set-password?token=...`:
 ## Project Structure
 
 ```
-apps/web/          Next.js frontend (Bina AISI)
-apps/api/          Express backend
+apps/web-vite/     Vite + React frontend (Bina AISI)
+apps/api-go/       Go API
 packages/shared/   Zod schemas, constants, Prisma schema & migrations
 ```
 
@@ -110,33 +114,37 @@ packages/shared/   Zod schemas, constants, Prisma schema & migrations
 
 | Command | Description |
 | ------- | ----------- |
-| `pnpm dev` | Start all apps in dev mode |
-| `pnpm build` | Build all apps |
+| `pnpm --filter @dakwah/web-vite dev` | Start Vite frontend |
+| `pnpm build:web-vite` | Build SPA |
+| `pnpm build:api-go` | Build Go API binary |
 | `pnpm db:migrate` | Run Prisma migrations |
 | `pnpm db:seed` | Seed database |
 | `pnpm db:studio` | Open Prisma Studio |
+| `pnpm test:e2e:p0` | E2E smoke Playwright |
 
 ## Deployment
 
-Deploy produksi: **1 VPS + Nginx + PM2 + Postgres (Docker) + Cloudflare R2**.
+Deploy produksi: **1 VPS + Nginx (SPA static) + PM2 (Go binary) + Postgres (Docker) + Cloudflare R2**.
+
+Panduan: [docs/CUTOVER.md](docs/CUTOVER.md) · Staging: [docs/STAGING.md](docs/STAGING.md) · E2E: [docs/E2E_MATRIX.md](docs/E2E_MATRIX.md) · OpenAPI: [openapi/aisi.v1.yaml](openapi/aisi.v1.yaml).
 
 ### Arsitektur
 
-- Domain tunggal: web di `/`, API di `/api/v1` (same-origin, cookie refresh token aman)
+- Domain tunggal: Vite SPA di `/`, Go API di `/api/v1` (same-origin, cookie refresh)
 - Postgres hanya listen `127.0.0.1:5432`
-- Upload file ke Cloudflare R2 (fallback disk lokal di dev)
+- Upload file ke Cloudflare R2 (fallback disk lokal)
 
 ### File deploy
 
 | File | Fungsi |
 | ---- | ------ |
-| [deploy/server-setup.sh](deploy/server-setup.sh) | Setup awal VPS (Node, PM2, Docker, Nginx, ufw) |
-| [deploy/deploy.sh](deploy/deploy.sh) | Install, migrate, build, restart PM2 |
+| [deploy/server-setup.sh](deploy/server-setup.sh) | Setup VPS (Node, Go, PM2, Docker, Nginx, ufw) |
+| [deploy/deploy.sh](deploy/deploy.sh) | Migrate, build Vite+Go, restart PM2 |
 | [deploy/docker-compose.db.yml](deploy/docker-compose.db.yml) | Postgres produksi |
-| [deploy/nginx.conf](deploy/nginx.conf) | Reverse proxy + gzip |
+| [deploy/nginx.conf](deploy/nginx.conf) | SPA static + API proxy |
 | [deploy/backup-db.sh](deploy/backup-db.sh) | Backup harian pg_dump |
-| [deploy/env/*.example](deploy/env/) | Template env produksi |
-| [.github/workflows/deploy.yml](.github/workflows/deploy.yml) | CI/CD via SSH |
+| [deploy/env/*.example](deploy/env/) | Template env (`api-go`, `web` Vite, `db`) |
+| [.github/workflows/deploy.yml](.github/workflows/deploy.yml) | CI/CD Vite + Go via SSH |
 
 ### Langkah cepat (server baru)
 
@@ -146,12 +154,12 @@ sudo bash deploy/server-setup.sh
 
 # 2. Clone & env (sebagai user deploy)
 git clone <repo-url> /opt/aisi && cd /opt/aisi
-cp deploy/env/db.env.example deploy/env/db.env      # edit password
-cp deploy/env/api.env.example apps/api/.env         # edit JWT, R2, domain
-cp deploy/env/web.env.example apps/web/.env.local   # edit domain
+cp deploy/env/db.env.example deploy/env/db.env
+cp deploy/env/api-go.env.example apps/api-go/.env   # JWT, R2, domain
+echo 'VITE_API_URL=https://app.namadomain.id/api/v1' > apps/web-vite/.env
 
 # 3. Postgres
-cd deploy && docker compose -f docker-compose.db.yml up -d && cd ..
+cd deploy && docker compose -f docker-compose.db.yml --env-file env/db.env up -d && cd ..
 
 # 4. Deploy pertama (dengan seed)
 bash deploy/deploy.sh --seed
@@ -164,7 +172,16 @@ sudo certbot --nginx -d app.namadomain.id
 
 # 6. Backup harian (cron)
 chmod +x deploy/backup-db.sh
-# crontab -e → 0 2 * * * /opt/aisi/deploy/backup-db.sh
+```
+
+### Dev lokal (stack baru)
+
+```bash
+pnpm db:deploy && pnpm db:seed
+# terminal 1
+cd apps/api-go && go run ./cmd/server
+# terminal 2
+pnpm --filter @dakwah/web-vite dev
 ```
 
 ### GitHub Secrets (CI/CD)
@@ -175,7 +192,7 @@ chmod +x deploy/backup-db.sh
 
 ### Estimasi biaya
 
-~€4.5/bln VPS + domain + R2 free tier (cukup untuk <3000 user).
+~€4.5–$12/bln VPS + domain + R2 free tier (cukup untuk <3000 user).
 
 ## Changelog
 

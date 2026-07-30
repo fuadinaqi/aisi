@@ -1,0 +1,182 @@
+package invitations
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
+	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type Handler struct {
+	DB     *pgxpool.Pool
+	Config config.Config
+}
+type request struct {
+	Name, Email, Role         string
+	Gender, SchoolID, GroupID *string
+}
+
+func (h Handler) Routes() chi.Router {
+	r := chi.NewRouter()
+	r.Use(middleware.RequireAuth(h.Config))
+	r.Post("/", h.create)
+	r.Get("/", h.list)
+	r.Post("/{id}/resend", h.resend)
+	r.Delete("/{id}", h.cancel)
+	return r
+}
+
+func (h Handler) create(w http.ResponseWriter, r *http.Request) {
+	var in request
+	if json.NewDecoder(r.Body).Decode(&in) != nil || len(in.Name) < 2 || in.Email == "" || !validRole(in.Role) {
+		httpx.Error(w, 400, "Data undangan tidak valid")
+		return
+	}
+	claims, _ := middleware.Claims(r)
+	if !constants.CanInvite(claims.Roles, in.Role) {
+		httpx.Error(w, 403, "Anda tidak berhak mengundang role ini")
+		return
+	}
+	if in.Role == "PEMBINA" || in.Role == "ANGGOTA" || in.Role == "PJ_SEKOLAH" {
+		if in.Gender == nil || !validGender(*in.Gender) {
+			httpx.Error(w, 400, "Jenis kelamin wajib dipilih")
+			return
+		}
+	}
+	if in.GroupID != nil && in.Role == "ANGGOTA" {
+		var gender string
+		var active bool
+		if h.DB.QueryRow(r.Context(), `SELECT "gender"::text,"isActive" FROM "Group" WHERE "id"=$1`, *in.GroupID).Scan(&gender, &active) != nil || !active {
+			httpx.Error(w, 404, "Kelompok tidak ditemukan")
+			return
+		}
+		if in.Gender == nil {
+			in.Gender = &gender
+		}
+		if *in.Gender != gender {
+			httpx.Error(w, 400, "Jenis kelamin Anggota harus sesuai kelompok")
+			return
+		}
+	}
+	if h.activeUserOrInvitation(r, in.Email) {
+		httpx.Error(w, 400, "Email sudah terdaftar atau memiliki undangan aktif")
+		return
+	}
+	id, token := uuid.NewString(), uuid.NewString()
+	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
+	_, err := h.DB.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","gender","schoolId","groupId","token","invitedById","expiresAt") VALUES ($1,$2,$3,$4::"Role",$5::"Gender",$6,$7,$8,$9,$10)`, id, in.Name, in.Email, in.Role, in.Gender, in.SchoolID, in.GroupID, token, claims.UserID, expires)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal membuat undangan")
+		return
+	}
+	if err := email.New(h.Config).SendInvitation(r.Context(), in.Email, in.Name, h.Config.AppURL+"/set-password?token="+token); err != nil {
+		httpx.Error(w, 502, "Undangan dibuat, namun email gagal dikirim")
+		return
+	}
+	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "token": token, "status": "PENDING", "expiresAt": expires}, "Undangan berhasil dikirim")
+}
+
+func (h Handler) list(w http.ResponseWriter, r *http.Request) {
+	claims, _ := middleware.Claims(r)
+	page, limit := pagination(r)
+	var total int
+	if h.DB.QueryRow(r.Context(), `SELECT count(*) FROM "UserInvitation" WHERE "invitedById"=$1`, claims.UserID).Scan(&total) != nil {
+		httpx.Error(w, 500, "Gagal mengambil undangan")
+		return
+	}
+	rows, err := h.DB.Query(r.Context(), `SELECT "id","name","email","role"::text,"gender"::text,"schoolId","groupId","token","status"::text,"expiresAt","createdAt" FROM "UserInvitation" WHERE "invitedById"=$1 ORDER BY "createdAt" DESC OFFSET $2 LIMIT $3`, claims.UserID, (page-1)*limit, limit)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal mengambil undangan")
+		return
+	}
+	defer rows.Close()
+	items := []map[string]any{}
+	for rows.Next() {
+		var id, name, mail, role, token, status string
+		var gender, school, group *string
+		var expires, created time.Time
+		if rows.Scan(&id, &name, &mail, &role, &gender, &school, &group, &token, &status, &expires, &created) == nil {
+			items = append(items, map[string]any{"id": id, "name": name, "email": mail, "role": role, "gender": gender, "schoolId": school, "groupId": group, "token": token, "status": status, "expiresAt": expires, "createdAt": created})
+		}
+	}
+	httpx.Paginated(w, items, page, limit, total)
+}
+
+func (h Handler) resend(w http.ResponseWriter, r *http.Request) {
+	claims, _ := middleware.Claims(r)
+	id := chi.URLParam(r, "id")
+	var name, mail, token string
+	err := h.DB.QueryRow(r.Context(), `SELECT "name","email","token" FROM "UserInvitation" WHERE "id"=$1 AND "invitedById"=$2`, id, claims.UserID).Scan(&name, &mail, &token)
+	if err == pgx.ErrNoRows {
+		httpx.Error(w, 404, "Undangan tidak ditemukan")
+		return
+	}
+	if err != nil {
+		httpx.Error(w, 500, "Gagal mengirim ulang undangan")
+		return
+	}
+	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
+	if _, err = h.DB.Exec(r.Context(), `UPDATE "UserInvitation" SET "status"='PENDING',"expiresAt"=$1 WHERE "id"=$2`, expires, id); err != nil {
+		httpx.Error(w, 500, "Gagal mengirim ulang undangan")
+		return
+	}
+	if err = email.New(h.Config).SendInvitation(r.Context(), mail, name, h.Config.AppURL+"/set-password?token="+token); err != nil {
+		httpx.Error(w, 502, "Undangan diperbarui, namun email gagal dikirim")
+		return
+	}
+	httpx.Success(w, 200, map[string]any{"id": id, "expiresAt": expires}, "Undangan berhasil dikirim ulang")
+}
+func (h Handler) cancel(w http.ResponseWriter, r *http.Request) {
+	claims, _ := middleware.Claims(r)
+	tag, err := h.DB.Exec(r.Context(), `DELETE FROM "UserInvitation" WHERE "id"=$1 AND "invitedById"=$2 AND "status"='PENDING'`, chi.URLParam(r, "id"), claims.UserID)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal membatalkan undangan")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httpx.Error(w, 404, "Undangan tidak ditemukan")
+		return
+	}
+	httpx.Success(w, 200, nil, "Undangan dibatalkan")
+}
+func (h Handler) activeUserOrInvitation(r *http.Request, email string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE "email"=$1 AND "isActive") OR EXISTS(SELECT 1 FROM "UserInvitation" WHERE "email"=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, email).Scan(&exists)
+	return exists
+}
+func validRole(v string) bool {
+	for _, x := range constants.Roles {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+func validGender(v string) bool { return v == "IKHWAN" || v == "AKHWAT" }
+func pagination(r *http.Request) (int, int) {
+	p, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	l, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if p < 1 {
+		p = 1
+	}
+	if l < 1 || l > 100 {
+		l = 20
+	}
+	return p, l
+}
+func pages(total, limit int) int {
+	if total == 0 {
+		return 0
+	}
+	return (total + limit - 1) / limit
+}

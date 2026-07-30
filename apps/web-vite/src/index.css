@@ -1,0 +1,71 @@
+@import '@fontsource/inter';
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --surface: 210 20% 96%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 158 64% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 18% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 18% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 158 64% 32%;
+    --radius: 0.875rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-[hsl(var(--surface))] text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .materi-content h2 {
+    @apply mb-2 mt-4 text-lg font-semibold first:mt-0;
+  }
+
+  .materi-content p {
+    @apply mb-3 last:mb-0;
+  }
+
+  .materi-content ul {
+    @apply mb-3 list-disc space-y-1 pl-5;
+  }
+
+  .materi-content ol {
+    @apply mb-3 list-decimal space-y-1 pl-5;
+  }
+
+  .materi-content a {
+    @apply text-primary underline;
+  }
+
+  .materi-content strong {
+    @apply font-semibold;
+  }
+}

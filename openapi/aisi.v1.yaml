@@ -1,0 +1,965 @@
+openapi: 3.0.3
+info:
+  title: AISI / Dakwah Depok API
+  version: 1.0.0
+  description: |
+    Kontrak SSOT API AISI (Go).
+    Envelope sukses: `{ success: true, data, message?, pagination? }`
+    Envelope error: `{ success: false, message }`
+servers:
+  - url: /api/v1
+paths:
+  /health:
+    servers:
+      - url: /
+    get:
+      operationId: health
+      responses:
+        '200':
+          description: OK
+  /auth/login:
+    post:
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login OK
+  /auth/logout:
+    post:
+      operationId: authLogout
+      responses:
+        '200':
+          description: OK
+  /auth/refresh:
+    post:
+      operationId: authRefresh
+      responses:
+        '200':
+          description: New access token
+  /auth/change-password:
+    post:
+      operationId: authChangePassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: OK
+  /auth/invitation/{token}:
+    get:
+      operationId: authGetInvitation
+      parameters:
+        - $ref: '#/components/parameters/token'
+      responses:
+        '200':
+          description: Invitation detail
+  /auth/set-password:
+    post:
+      operationId: authSetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPasswordRequest'
+      responses:
+        '200':
+          description: OK
+  /invitations:
+    get:
+      operationId: listInvitations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createInvitation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+      responses:
+        '201':
+          description: Created
+  /invitations/{id}/resend:
+    post:
+      operationId: resendInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /invitations/{id}:
+    delete:
+      operationId: deleteInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /users/leaderboard:
+    get:
+      operationId: usersLeaderboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /users/me:
+    get:
+      operationId: getMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /users:
+    get:
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /users/{id}:
+    get:
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    delete:
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /schools:
+    get:
+      operationId: listSchools
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createSchool
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+  /schools/{id}:
+    get:
+      operationId: getSchool
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateSchool
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    delete:
+      operationId: deleteSchool
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /schools/{id}/pj:
+    post:
+      operationId: addSchoolPj
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /schools/{id}/pj/{userId}:
+    delete:
+      operationId: removeSchoolPj
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /schools/{id}/pembina:
+    get:
+      operationId: listSchoolPembina
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /schools/{id}/groups:
+    post:
+      operationId: createSchoolGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '201':
+          description: Created
+  /schools/{id}/stats:
+    get:
+      operationId: schoolStats
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /groups:
+    get:
+      operationId: listGroups
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createGroup
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+  /groups/{id}:
+    get:
+      operationId: getGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    delete:
+      operationId: deleteGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /groups/{id}/members:
+    get:
+      operationId: listGroupMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: addGroupMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '201':
+          description: Created
+  /groups/{id}/members/{userId}:
+    get:
+      operationId: getGroupMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateGroupMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    delete:
+      operationId: removeGroupMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /evaluations:
+    get:
+      operationId: listEvaluations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createEvaluation
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+  /evaluations/{id}:
+    get:
+      operationId: getEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /evaluations/{id}/submit:
+    post:
+      operationId: submitEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /evaluations/{id}/photos:
+    post:
+      operationId: uploadEvaluationPhotos
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photos:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '200':
+          description: OK
+  /events:
+    get:
+      operationId: listEvents
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createEvent
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+  /events/check-ins/pending:
+    get:
+      operationId: pendingCheckIns
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /events/check-ins/{attendanceId}/approve:
+    post:
+      operationId: approveCheckIn
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: attendanceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /events/check-ins/{attendanceId}/reject:
+    post:
+      operationId: rejectCheckIn
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: attendanceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /events/{id}:
+    get:
+      operationId: getEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    delete:
+      operationId: deleteEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /events/{id}/check-in:
+    post:
+      operationId: eventCheckIn
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: OK
+  /materi:
+    get:
+      operationId: listMateri
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createMateri
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+  /materi/{id}:
+    get:
+      operationId: getMateri
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateMateri
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    delete:
+      operationId: deleteMateri
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /points/me:
+    get:
+      operationId: myPoints
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /points/leaderboard:
+    get:
+      operationId: pointsLeaderboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /points/manual:
+    post:
+      operationId: manualPoints
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /notifications:
+    get:
+      operationId: listNotifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /notifications/{id}/read:
+    put:
+      operationId: readNotification
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /notifications/read-all:
+    put:
+      operationId: readAllNotifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /analytics/overview:
+    get:
+      operationId: analyticsOverview
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /analytics/school/{id}:
+    get:
+      operationId: analyticsSchool
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /analytics/group/{id}:
+    get:
+      operationId: analyticsGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /mutabaah/items:
+    get:
+      operationId: listMutabaahItems
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createMutabaahItem
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+  /mutabaah/items/{id}:
+    put:
+      operationId: updateMutabaahItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    delete:
+      operationId: deleteMutabaahItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /mutabaah/my:
+    get:
+      operationId: getMyMutabaah
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: upsertMyMutabaah
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /mutabaah/my/submit:
+    post:
+      operationId: submitMyMutabaah
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /mutabaah/member/{userId}:
+    get:
+      operationId: getMemberMutabaah
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /mutabaah/group/{groupId}:
+    get:
+      operationId: getGroupMutabaah
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /ic/items:
+    get:
+      operationId: listICItems
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createICItem
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+  /ic/items/{id}:
+    put:
+      operationId: updateICItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    delete:
+      operationId: deleteICItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /ic/member/{userId}:
+    get:
+      operationId: getMemberIC
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /ic/member/{userId}/progress:
+    put:
+      operationId: updateMemberICProgress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /kks:
+    get:
+      operationId: listKks
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      operationId: createKks
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+  /kks/{id}:
+    get:
+      operationId: getKks
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: updateKks
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: OK
+  /config/group-levels:
+    get:
+      operationId: getGroupLevels
+      responses:
+        '200':
+          description: OK
+    put:
+      operationId: putGroupLevels
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    token:
+      name: token
+      in: path
+      required: true
+      schema:
+        type: string
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    SetPasswordRequest:
+      type: object
+      required: [token, password, confirmPassword]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        confirmPassword:
+          type: string
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword, confirmPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+        confirmPassword:
+          type: string
+    InvitationRequest:
+      type: object
+      required: [name, email, role]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, PJ_SEKOLAH, PEMBINA, ANGGOTA]
+        gender:
+          type: string
+          enum: [IKHWAN, AKHWAT]
+        schoolId:
+          type: string
+        groupId:
+          type: string
+    ApiEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data: {}
+        message:
+          type: string
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
