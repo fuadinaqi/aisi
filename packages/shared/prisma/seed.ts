@@ -16,14 +16,20 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+if (process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'Seed dilarang di production. Jangan jalankan db:seed / deploy --seed pada lingkungan produksi.',
+  );
+}
+
 const prisma = new PrismaClient();
 
 const PASSWORD = {
-  superadmin: '!Superadmin123',
-  admin: '!Admin123',
-  pj: '!Password123',
-  pembina: '!Password123',
-  anggota: '!Password123',
+  superadmin: process.env.SEED_PASSWORD_SUPERADMIN || '!Superadmin123',
+  admin: process.env.SEED_PASSWORD_ADMIN || '!Admin123',
+  pj: process.env.SEED_PASSWORD_PJ || '!Password123',
+  pembina: process.env.SEED_PASSWORD_PEMBINA || '!Password123',
+  anggota: process.env.SEED_PASSWORD_ANGGOTA || '!Password123',
 } as const;
 
 const SCHOOLS = ['SMAN 1 Depok', 'SMAN 2 Depok', 'SMAN 3 Depok'] as const;
@@ -339,7 +345,7 @@ async function main() {
   const superadmin = await prisma.user.create({
     data: {
       name: 'Fuad Inaqi',
-      email: 'fuadinaqi@gmail.com',
+      email: process.env.SEED_SUPERADMIN_EMAIL || 'fuadinaqi@gmail.com',
       gender: Gender.IKHWAN,
       password: hash(PASSWORD.superadmin),
       roles: { create: { role: Role.SUPERADMIN } },
@@ -349,7 +355,7 @@ async function main() {
   const admin = await prisma.user.create({
     data: {
       name: 'Fuad Project',
-      email: 'fuadiproject@gmail.com',
+      email: process.env.SEED_ADMIN_EMAIL || 'fuadiproject@gmail.com',
       gender: Gender.IKHWAN,
       password: hash(PASSWORD.admin),
       roles: { create: { role: Role.ADMIN } },

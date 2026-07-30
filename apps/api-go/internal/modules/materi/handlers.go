@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 type input struct {
@@ -80,6 +81,13 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+var htmlPolicy = bluemonday.UGCPolicy()
+
+func sanitizeHTML(s string) string {
+	return htmlPolicy.Sanitize(s)
+}
+
 func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
@@ -99,6 +107,10 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 		if e != nil || len(in.Title) < 2 {
 			httpx.Error(w, 400, "Data materi tidak valid")
 			return
+		}
+		if in.ContentHTML != nil {
+			cleaned := sanitizeHTML(*in.ContentHTML)
+			in.ContentHTML = &cleaned
 		}
 		wd, e := monday(in.WeekDate)
 		if e != nil || (in.ContentType != "FILE" && in.ContentType != "LINK" && in.ContentType != "RICH_TEXT") {
@@ -121,7 +133,13 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 				httpx.Error(w, 400, "File tidak valid")
 				return
 			}
-			u, e := s.Put(r.Context(), f.Filename, h)
+			validated, detectedType, ve := storage.ValidateMateriFile(h, f.Filename, f.Size)
+			if ve != nil {
+				h.Close()
+				httpx.Error(w, 400, ve.Error())
+				return
+			}
+			u, e := s.Put(r.Context(), f.Filename, validated, detectedType)
 			h.Close()
 			if e != nil {
 				httpx.Error(w, 500, "Gagal upload file")

@@ -36,6 +36,42 @@ func (h Handler) Routes() chi.Router {
 	return r
 }
 
+func admin(roles []string) bool {
+	for _, r := range roles {
+		if r == "ADMIN" || r == "SUPERADMIN" {
+			return true
+		}
+	}
+	return false
+}
+
+func (h Handler) assertSchoolAccess(r *http.Request, schoolID string) bool {
+	claims, _ := middleware.Claims(r)
+	if admin(claims.Roles) {
+		return true
+	}
+	var ok bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, claims.UserID, schoolID).Scan(&ok)
+	return ok
+}
+
+func (h Handler) assertGroupAccess(r *http.Request, groupID string) bool {
+	claims, _ := middleware.Claims(r)
+	if admin(claims.Roles) {
+		return true
+	}
+	var owner, school string
+	if h.DB.QueryRow(r.Context(), `SELECT "pembinaId","schoolId" FROM "Group" WHERE "id"=$1`, groupID).Scan(&owner, &school) != nil {
+		return false
+	}
+	if owner == claims.UserID {
+		return true
+	}
+	var ok bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, claims.UserID, school).Scan(&ok)
+	return ok
+}
+
 func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	var in request
 	if json.NewDecoder(r.Body).Decode(&in) != nil || len(in.Name) < 2 || in.Email == "" || !validRole(in.Role) {
@@ -53,7 +89,15 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if in.SchoolID != nil && *in.SchoolID != "" && !h.assertSchoolAccess(r, *in.SchoolID) {
+		httpx.Error(w, 403, "Akses sekolah ditolak")
+		return
+	}
 	if in.GroupID != nil && in.Role == "ANGGOTA" {
+		if !h.assertGroupAccess(r, *in.GroupID) {
+			httpx.Error(w, 403, "Akses kelompok ditolak")
+			return
+		}
 		var gender string
 		var active bool
 		if h.DB.QueryRow(r.Context(), `SELECT "gender"::text,"isActive" FROM "Group" WHERE "id"=$1`, *in.GroupID).Scan(&gender, &active) != nil || !active {
@@ -83,7 +127,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 502, "Undangan dibuat, namun email gagal dikirim")
 		return
 	}
-	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "token": token, "status": "PENDING", "expiresAt": expires}, "Undangan berhasil dikirim")
+	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "status": "PENDING", "expiresAt": expires}, "Undangan berhasil dikirim")
 }
 
 func (h Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +138,7 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, "Gagal mengambil undangan")
 		return
 	}
-	rows, err := h.DB.Query(r.Context(), `SELECT "id","name","email","role"::text,"gender"::text,"schoolId","groupId","token","status"::text,"expiresAt","createdAt" FROM "UserInvitation" WHERE "invitedById"=$1 ORDER BY "createdAt" DESC OFFSET $2 LIMIT $3`, claims.UserID, (page-1)*limit, limit)
+	rows, err := h.DB.Query(r.Context(), `SELECT "id","name","email","role"::text,"gender"::text,"schoolId","groupId","status"::text,"expiresAt","createdAt" FROM "UserInvitation" WHERE "invitedById"=$1 ORDER BY "createdAt" DESC OFFSET $2 LIMIT $3`, claims.UserID, (page-1)*limit, limit)
 	if err != nil {
 		httpx.Error(w, 500, "Gagal mengambil undangan")
 		return
@@ -102,11 +146,11 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	items := []map[string]any{}
 	for rows.Next() {
-		var id, name, mail, role, token, status string
+		var id, name, mail, role, status string
 		var gender, school, group *string
 		var expires, created time.Time
-		if rows.Scan(&id, &name, &mail, &role, &gender, &school, &group, &token, &status, &expires, &created) == nil {
-			items = append(items, map[string]any{"id": id, "name": name, "email": mail, "role": role, "gender": gender, "schoolId": school, "groupId": group, "token": token, "status": status, "expiresAt": expires, "createdAt": created})
+		if rows.Scan(&id, &name, &mail, &role, &gender, &school, &group, &status, &expires, &created) == nil {
+			items = append(items, map[string]any{"id": id, "name": name, "email": mail, "role": role, "gender": gender, "schoolId": school, "groupId": group, "status": status, "expiresAt": expires, "createdAt": created})
 		}
 	}
 	httpx.Paginated(w, items, page, limit, total)
@@ -173,10 +217,4 @@ func pagination(r *http.Request) (int, int) {
 		l = 20
 	}
 	return p, l
-}
-func pages(total, limit int) int {
-	if total == 0 {
-		return 0
-	}
-	return (total + limit - 1) / limit
 }

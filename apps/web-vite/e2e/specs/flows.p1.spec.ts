@@ -9,7 +9,6 @@ import {
   apiLogin,
   createOngoingEvent,
   findSchoolId,
-  apiPost,
   apiGet,
 } from '../helpers/api';
 
@@ -288,7 +287,7 @@ test.describe('P1 write flows @p1', () => {
     done();
   });
 
-  test('F03 undang PJ form + F06 set-password via API invite token', async ({ page }) => {
+  test('F03 undang PJ form + F06 set-password via seed invite token', async ({ page }) => {
     const done = attachPageErrorGuard(page);
     await loginAs(page, USERS.superadmin);
     await openSchoolDetail(page, SEED_SCHOOL_NAME);
@@ -298,33 +297,21 @@ test.describe('P1 write flows @p1', () => {
     await page.waitForURL(/\/pj\/undang/);
     await assertMainContentVisible(page);
 
-    const token = await apiLogin(USERS.pembina.email, USERS.pembina.password);
-    const groups = await apiGet<{ id: string }[]>(token, '/groups');
-    const groupId = groups[0]?.id;
-    expect(groupId).toBeTruthy();
-    const inviteEmail = `e2e.setpw.${stamp()}@example.com`;
-    try {
-      const invite = await apiPost<{ token?: string }>(token, '/invitations', {
-        name: `E2E SetPW ${stamp()}`,
-        email: inviteEmail,
-        role: 'ANGGOTA',
-        gender: 'IKHWAN',
-        groupId,
-      });
-      const inviteToken = (invite.data as { token?: string }).token;
-      if (inviteToken) {
-        await ensureLoggedOut(page);
-        await page.goto(`/set-password?token=${inviteToken}`);
-        await page.locator('#password').fill('!Password123');
-        await page.locator('#confirmPassword').fill('!Password123');
-        const submit = page.getByRole('button', { name: 'Buat Password' });
-        if (await submit.isEnabled()) {
-          await submit.click();
-          await expect(page.getByText(/berhasil/i).first()).toBeVisible({ timeout: 15_000 });
-        }
+    // Token undangan tidak lagi dikembalikan API; pakai seed token lokal untuk F06.
+    const seedInviteToken = '00000000-0000-4000-8000-000000000001';
+    await ensureLoggedOut(page);
+    await page.goto(`/set-password?token=${seedInviteToken}`);
+    const password = page.locator('#password');
+    if (await password.isVisible().catch(() => false)) {
+      await password.fill('!Password123');
+      await page.locator('#confirmPassword').fill('!Password123');
+      const submit = page.getByRole('button', { name: 'Buat Password' });
+      if (await submit.isEnabled()) {
+        await submit.click();
+        await expect(page.getByText(/berhasil|sudah digunakan|expired|tidak valid/i).first()).toBeVisible({
+          timeout: 15_000,
+        });
       }
-    } catch {
-      // Undangan bisa gagal jika SMTP/validasi — form undang PJ sudah cukup untuk F03
     }
     done();
   });

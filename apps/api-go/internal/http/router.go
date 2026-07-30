@@ -22,6 +22,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/modules/points"
 	schoolsmodule "github.com/dakwah-depok/aisi/apps/api-go/internal/modules/schools"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/modules/users"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/storage"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,7 +40,7 @@ func Router(db *pgxpool.Pool, c config.Config) http.Handler {
 		Success(w, 200, map[string]string{"status": "ok"}, "")
 	})
 	if _, err := os.Stat("uploads"); err == nil {
-		r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
+		r.Handle("/uploads/*", http.StripPrefix("/uploads/", storage.UploadFileServer("uploads")))
 	}
 	r.Route("/api/v1", func(api chi.Router) {
 		api.Use(middleware.NewRateLimit(100, time.Minute).Middleware)

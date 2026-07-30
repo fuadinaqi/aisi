@@ -125,9 +125,17 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	mode := "invite"
 	data := map[string]any{"school": map[string]any{"id": sid, "name": in.Name, "city": city}}
-	if in.PJ.Password != nil && len(*in.PJ.Password) >= 8 {
+	if in.PJ.Password != nil {
+		if err := auth.ValidatePassword(*in.PJ.Password); err != nil {
+			httpx.Error(w, 400, err.Error())
+			return
+		}
 		uid := uuid.NewString()
-		hash, _ := auth.HashPassword(*in.PJ.Password)
+		hash, he := auth.HashPassword(*in.PJ.Password)
+		if he != nil {
+			httpx.Error(w, 500, "Gagal membuat sekolah")
+			return
+		}
 		_, e = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","phone","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::"Gender",NOW())`, uid, in.PJ.Name, in.PJ.Email, in.PJ.Phone, hash, in.PJ.Gender)
 		if e == nil {
 			_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'PJ_SEKOLAH')`, uuid.NewString(), uid)
@@ -142,19 +150,20 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		iid := uuid.NewString()
 		expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
 		_, e = tx.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","gender","schoolId","token","invitedById","expiresAt") VALUES ($1,$2,$3,'PJ_SEKOLAH',$4::"Gender",$5,$6,$7,$8)`, iid, in.PJ.Name, in.PJ.Email, in.PJ.Gender, sid, token, c.UserID, expires)
-		data["invitation"] = map[string]any{"id": iid, "email": in.PJ.Email, "status": "PENDING", "token": token}
+		data["invitation"] = map[string]any{"id": iid, "email": in.PJ.Email, "status": "PENDING"}
+		data["_inviteToken"] = token
 	}
 	if e != nil || tx.Commit(r.Context()) != nil {
 		httpx.Error(w, 500, "Gagal membuat sekolah")
 		return
 	}
 	if mode == "invite" {
-		inv := data["invitation"].(map[string]any)
-		if e = email.New(h.Config).SendInvitation(r.Context(), in.PJ.Email, in.PJ.Name, h.Config.AppURL+"/set-password?token="+inv["token"].(string)); e != nil {
+		tok := data["_inviteToken"].(string)
+		delete(data, "_inviteToken")
+		if e = email.New(h.Config).SendInvitation(r.Context(), in.PJ.Email, in.PJ.Name, h.Config.AppURL+"/set-password?token="+tok); e != nil {
 			httpx.Error(w, 502, "Sekolah dibuat, namun email gagal dikirim")
 			return
 		}
-		delete(inv, "token")
 	}
 	data["mode"] = mode
 	msg := "Sekolah berhasil dibuat. Undangan PJ Sekolah telah dikirim."
@@ -227,9 +236,17 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 	c, _ := middleware.Claims(r)
 	mode := "invite"
 	data := map[string]any{}
-	if in.Password != nil && len(*in.Password) >= 8 {
+	if in.Password != nil {
+		if err := auth.ValidatePassword(*in.Password); err != nil {
+			httpx.Error(w, 400, err.Error())
+			return
+		}
 		uid := uuid.NewString()
-		hash, _ := auth.HashPassword(*in.Password)
+		hash, he := auth.HashPassword(*in.Password)
+		if he != nil {
+			httpx.Error(w, 500, "Gagal membuat PJ")
+			return
+		}
 		_, e = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","phone","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::"Gender",NOW())`, uid, in.Name, in.Email, in.Phone, hash, in.Gender)
 		if e == nil {
 			_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'PJ_SEKOLAH')`, uuid.NewString(), uid)
@@ -243,19 +260,20 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 		token, iid := uuid.NewString(), uuid.NewString()
 		expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
 		_, e = tx.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","gender","schoolId","token","invitedById","expiresAt") VALUES ($1,$2,$3,'PJ_SEKOLAH',$4::"Gender",$5,$6,$7,$8)`, iid, in.Name, in.Email, in.Gender, sid, token, c.UserID, expires)
-		data["invitation"] = map[string]string{"id": iid, "email": in.Email, "token": token}
+		data["invitation"] = map[string]string{"id": iid, "email": in.Email}
+		data["_inviteToken"] = token
 	}
 	if e != nil || tx.Commit(r.Context()) != nil {
 		httpx.Error(w, 500, "Gagal membuat PJ")
 		return
 	}
 	if mode == "invite" {
-		x := data["invitation"].(map[string]string)
-		if e = email.New(h.Config).SendInvitation(r.Context(), in.Email, in.Name, h.Config.AppURL+"/set-password?token="+x["token"]); e != nil {
+		tok := data["_inviteToken"].(string)
+		delete(data, "_inviteToken")
+		if e = email.New(h.Config).SendInvitation(r.Context(), in.Email, in.Name, h.Config.AppURL+"/set-password?token="+tok); e != nil {
 			httpx.Error(w, 502, "Undangan dibuat, namun email gagal dikirim")
 			return
 		}
-		delete(x, "token")
 	}
 	data["mode"] = mode
 	httpx.Success(w, 201, data, "PJ Sekolah berhasil ditambahkan")
@@ -355,7 +373,7 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		  AND ur."role" = 'PJ_SEKOLAH'::"Role"
 		ORDER BY u."name"`, sid)
 	if err != nil {
-		httpx.Error(w, 500, "Gagal memuat PJ sekolah: "+err.Error())
+		httpx.Error(w, 500, "Gagal memuat PJ sekolah")
 		return
 	}
 	for pjRows.Next() {
@@ -363,14 +381,14 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		var phone *string
 		if err := pjRows.Scan(&uid, &name, &email, &phone); err != nil {
 			pjRows.Close()
-			httpx.Error(w, 500, "Gagal membaca PJ: "+err.Error())
+			httpx.Error(w, 500, "Gagal membaca PJ")
 			return
 		}
 		pjUsers = append(pjUsers, map[string]any{"id": uid, "name": name, "email": email, "phone": phone})
 	}
 	pjRows.Close()
 	if err := pjRows.Err(); err != nil {
-		httpx.Error(w, 500, "Gagal memuat PJ: "+err.Error())
+		httpx.Error(w, 500, "Gagal memuat PJ")
 		return
 	}
 
@@ -389,21 +407,21 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		WHERE g."schoolId" = $1 AND g."isActive" = true
 		ORDER BY g."name"`, sid)
 	if err != nil {
-		httpx.Error(w, 500, "Gagal memuat kelompok: "+err.Error())
+		httpx.Error(w, 500, "Gagal memuat kelompok")
 		return
 	}
 	for gRows.Next() {
 		var gr gRow
 		if err := gRows.Scan(&gr.id, &gr.name, &gr.level, &gr.gender, &gr.createdAt, &gr.pembinaID, &gr.pembinaName, &gr.pembinaEmail, &gr.memberCount); err != nil {
 			gRows.Close()
-			httpx.Error(w, 500, "Gagal membaca kelompok: "+err.Error())
+			httpx.Error(w, 500, "Gagal membaca kelompok")
 			return
 		}
 		groupsRaw = append(groupsRaw, gr)
 	}
 	gRows.Close()
 	if err := gRows.Err(); err != nil {
-		httpx.Error(w, 500, "Gagal memuat kelompok: "+err.Error())
+		httpx.Error(w, 500, "Gagal memuat kelompok")
 		return
 	}
 
@@ -417,7 +435,7 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		INNER JOIN "Group" g ON g."id"=gm."groupId"
 		WHERE g."schoolId"=$1 AND g."isActive"=true AND gm."isActive"=true`, sid)
 	if err != nil {
-		httpx.Error(w, 500, "Gagal memuat anggota kelompok: "+err.Error())
+		httpx.Error(w, 500, "Gagal memuat anggota kelompok")
 		return
 	}
 	for mRows.Next() {
@@ -425,7 +443,7 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		var joined time.Time
 		if err := mRows.Scan(&gid, &uid, &joined); err != nil {
 			mRows.Close()
-			httpx.Error(w, 500, "Gagal membaca anggota: "+err.Error())
+			httpx.Error(w, 500, "Gagal membaca anggota")
 			return
 		}
 		membersByGroup[gid] = append(membersByGroup[gid], struct {
@@ -449,7 +467,7 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		INNER JOIN "Group" g ON g."id"=e."groupId"
 		WHERE g."schoolId"=$1 AND g."isActive"=true AND e."isSubmitted"=true`, sid)
 	if err != nil {
-		httpx.Error(w, 500, "Gagal memuat evaluasi: "+err.Error())
+		httpx.Error(w, 500, "Gagal memuat evaluasi")
 		return
 	}
 	type evMeta struct {
@@ -461,7 +479,7 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		var em evMeta
 		if err := eRows.Scan(&em.id, &em.groupID, &em.weekDate); err != nil {
 			eRows.Close()
-			httpx.Error(w, 500, "Gagal membaca evaluasi: "+err.Error())
+			httpx.Error(w, 500, "Gagal membaca evaluasi")
 			return
 		}
 		evs = append(evs, em)

@@ -2,7 +2,6 @@ package evaluations
 
 import (
 	"encoding/json"
-	"errors"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -440,15 +439,17 @@ func photos(db *pgxpool.Pool, c config.Config) http.HandlerFunc {
 	}
 }
 func putImage(r *http.Request, s *storage.Storage, f *multipart.FileHeader, max int64) (string, error) {
-	if f.Size > max || !strings.HasPrefix(f.Header.Get("Content-Type"), "image/") {
-		return "", errors.New("File harus berupa gambar maksimal 5MB")
-	}
+	_ = max
 	in, e := f.Open()
 	if e != nil {
 		return "", e
 	}
 	defer in.Close()
-	return s.Put(r.Context(), f.Filename, in)
+	validated, ct, e := storage.ValidateImage(in, f.Size)
+	if e != nil {
+		return "", e
+	}
+	return s.Put(r.Context(), f.Filename, validated, ct)
 }
 func mondayNow() time.Time {
 	n := time.Now().In(time.FixedZone("WIB", 7*3600))

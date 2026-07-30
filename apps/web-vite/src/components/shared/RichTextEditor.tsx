@@ -4,6 +4,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import DOMPurify from 'dompurify';
 import {
   Bold,
   Heading2,
@@ -142,10 +143,13 @@ export function RichTextEditor({ value, onChange, className }: RichTextEditorPro
 }
 
 export function RichTextContent({ html, className }: { html: string; className?: string }) {
+  const clean = DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+  });
   return (
     <div
       className={cn('materi-content text-sm leading-relaxed text-foreground', className)}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: clean }}
     />
   );
 }

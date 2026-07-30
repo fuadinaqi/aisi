@@ -39,7 +39,14 @@ func ParseAccess(c config.Config, raw string) (*Claims, error) {
 }
 func ParseRefresh(c config.Config, raw string) (*RefreshClaims, error) {
 	claims := new(RefreshClaims)
-	t, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (any, error) { return []byte(c.JWTRefreshSecret), nil })
-	if err != nil || !t.Valid || claims.Token == "" { return nil, fmt.Errorf("refresh token tidak valid") }
+	t, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("metode JWT tidak valid")
+		}
+		return []byte(c.JWTRefreshSecret), nil
+	})
+	if err != nil || !t.Valid || claims.Token == "" {
+		return nil, fmt.Errorf("refresh token tidak valid")
+	}
 	return claims, nil
 }

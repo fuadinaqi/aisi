@@ -3,6 +3,7 @@ import { USERS } from '../fixtures/users';
 import { loginAs } from '../helpers/auth';
 import { attachPageErrorGuard } from '../helpers/console';
 import { assertMainContentVisible } from '../helpers/nav';
+import { apiGet, apiLogin, API_URL } from '../helpers/api';
 
 /** Hanya URL yang dilindungi RoleGuard di page component. */
 const denied: { as: keyof typeof USERS; url: string }[] = [
@@ -97,5 +98,29 @@ test.describe('P2 orphan + edge @p2', () => {
     await expect(page).not.toHaveURL(/\/login/);
     await assertMainContentVisible(page);
     done();
+  });
+
+  test('ANGGOTA list groups hanya kelompok sendiri + tidak bisa add member', async () => {
+    const anggotaToken = await apiLogin(USERS.anggota.email, USERS.anggota.password);
+    const saToken = await apiLogin(USERS.superadmin.email, USERS.superadmin.password);
+    const allGroups = await apiGet<{ id: string }[]>(saToken, '/groups');
+    expect(allGroups.length).toBeGreaterThan(1);
+
+    const mine = await apiGet<{ id: string }[]>(anggotaToken, '/groups');
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.length).toBeLessThan(allGroups.length);
+
+    const foreign = allGroups.find((g) => !mine.some((m) => m.id === g.id));
+    expect(foreign).toBeTruthy();
+
+    const res = await fetch(`${API_URL}/api/v1/groups/${foreign!.id}/members`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${anggotaToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId: '00000000-0000-4000-8000-000000000099' }),
+    });
+    expect(res.status).toBe(403);
   });
 });

@@ -13,4 +13,6 @@ playwright-report
 test-results
 blob-report
 .playwright
+apps/api-go/bin/
+*.exe
 

@@ -24,7 +24,7 @@ func (h Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireAuth(h.Config))
 	r.Get("/", h.list)
-	r.With(middleware.RequireRole("PEMBINA", "PJ_SEKOLAH", "ADMIN", "SUPERADMIN")).Post("/", h.create)
+	r.With(middleware.RequireRole("PJ_SEKOLAH", "ADMIN", "SUPERADMIN")).Post("/", h.create)
 	r.Get("/{id}", h.detail)
 	r.Put("/{id}", h.update)
 	r.With(middleware.RequireRole("PJ_SEKOLAH", "ADMIN", "SUPERADMIN")).Delete("/{id}", h.remove)
@@ -57,9 +57,20 @@ func (h Handler) groupAccess(r *http.Request, id string, write bool) bool {
 	if owner == c.UserID {
 		return true
 	}
-	var ok bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, c.UserID, school).Scan(&ok)
-	return ok
+	if has(c.Roles, "PJ_SEKOLAH") {
+		var ok bool
+		_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, c.UserID, school).Scan(&ok)
+		return ok
+	}
+	if write {
+		return false
+	}
+	if has(c.Roles, "ANGGOTA") {
+		var ok bool
+		_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "GroupMember" WHERE "groupId"=$1 AND "userId"=$2 AND "isActive")`, id, c.UserID).Scan(&ok)
+		return ok
+	}
+	return false
 }
 func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 	c, _ := middleware.Claims(r)
@@ -68,9 +79,11 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 	if !admin(c.Roles) {
 		hasPembina := false
 		hasPJ := false
+		hasAnggota := false
 		for _, x := range c.Roles {
 			hasPembina = hasPembina || x == "PEMBINA"
 			hasPJ = hasPJ || x == "PJ_SEKOLAH"
+			hasAnggota = hasAnggota || x == "ANGGOTA"
 		}
 		if hasPembina {
 			q += ` AND g."pembinaId"=$1`
@@ -78,6 +91,12 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 		} else if hasPJ {
 			q += ` AND EXISTS(SELECT 1 FROM "UserSchool" us WHERE us."userId"=$1 AND us."schoolId"=g."schoolId")`
 			args = append(args, c.UserID)
+		} else if hasAnggota {
+			q += ` AND EXISTS(SELECT 1 FROM "GroupMember" gm2 WHERE gm2."groupId"=g."id" AND gm2."userId"=$1 AND gm2."isActive")`
+			args = append(args, c.UserID)
+		} else {
+			httpx.Success(w, 200, []map[string]any{}, "")
+			return
 		}
 	}
 	q += ` GROUP BY g."id",s."id",u."id" ORDER BY g."name"`
@@ -112,6 +131,21 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	var in input
 	if !decode(r, &in) || len(in.Name) < 2 || !level(in.Level) || !gender(in.Gender) || in.SchoolID == "" || in.PembinaID == "" {
 		httpx.Error(w, 400, "Data kelompok tidak valid")
+		return
+	}
+	c, _ := middleware.Claims(r)
+	if !admin(c.Roles) {
+		var ok bool
+		_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, c.UserID, in.SchoolID).Scan(&ok)
+		if !ok {
+			httpx.Error(w, 403, "Akses ditolak")
+			return
+		}
+	}
+	var pembinaOK bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."id"=$1 AND u."isActive" AND u."gender"=$2::"Gender" AND ur."role"='PEMBINA')`, in.PembinaID, in.Gender).Scan(&pembinaOK)
+	if !pembinaOK {
+		httpx.Error(w, 400, "Pembina tidak ditemukan atau jenis kelamin tidak sesuai kelompok")
 		return
 	}
 	id := uuid.NewString()
@@ -207,7 +241,12 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, map[string]string{"id": id}, "Kelompok berhasil diperbarui")
 }
 func (h Handler) remove(w http.ResponseWriter, r *http.Request) {
-	tag, e := h.DB.Exec(r.Context(), `UPDATE "Group" SET "isActive"=false,"updatedAt"=NOW() WHERE "id"=$1`, chi.URLParam(r, "id"))
+	id := chi.URLParam(r, "id")
+	if !h.groupAccess(r, id, true) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
+	tag, e := h.DB.Exec(r.Context(), `UPDATE "Group" SET "isActive"=false,"updatedAt"=NOW() WHERE "id"=$1`, id)
 	if e != nil || tag.RowsAffected() == 0 {
 		httpx.Error(w, 404, "Kelompok tidak ditemukan")
 		return

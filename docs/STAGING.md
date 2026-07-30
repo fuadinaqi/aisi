@@ -46,6 +46,15 @@ pnpm --filter @dakwah/web-vite preview
 
 Atau serve `apps/web-vite/dist` dengan Nginx memakai [`deploy/nginx.conf`](../deploy/nginx.conf).
 
+## Keamanan staging / produksi
+
+- **Jangan** jalankan `pnpm db:seed` atau `deploy.sh --seed` di production (seed akan abort jika `APP_ENV`/`NODE_ENV=production`).
+- Pastikan `JWT_SECRET` dan `JWT_REFRESH_SECRET` kuat (≥32 karakter, bukan nilai default); API Go gagal boot di production jika misconfig.
+- `ALLOWED_ORIGIN` harus origin frontend yang tepat (bukan `*`).
+- Bind API Go ke localhost di belakang Nginx; jangan expose `:4000` ke publik.
+- Jika staging pernah di-seed, **rotasi password** akun seed sebelum dibuka ke lebih banyak orang.
+- Override opsional: `SEED_SUPERADMIN_EMAIL`, `SEED_ADMIN_EMAIL`, `SEED_PASSWORD_*`.
+
 ## Regression
 
 1. Isi status di [`docs/PARITY_MATRIX.md`](PARITY_MATRIX.md) saat tiap endpoint/page lolos.
