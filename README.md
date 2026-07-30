@@ -130,9 +130,9 @@ Panduan: [docs/CUTOVER.md](docs/CUTOVER.md) · Staging: [docs/STAGING.md](docs/S
 
 ### Arsitektur
 
-- Domain tunggal: Vite SPA di `/`, Go API di `/api/v1` (same-origin, cookie refresh)
+- **Opsi B (default deploy):** SPA di `https://binaisi.xyz`, API di `https://api.binaisi.xyz` (CORS + cookie refresh same-site)
 - Postgres hanya listen `127.0.0.1:5432`
-- Upload file ke Cloudflare R2 (fallback disk lokal)
+- Upload file ke Cloudflare R2 (fallback disk lokal di API)
 
 ### File deploy
 
@@ -141,7 +141,7 @@ Panduan: [docs/CUTOVER.md](docs/CUTOVER.md) · Staging: [docs/STAGING.md](docs/S
 | [deploy/server-setup.sh](deploy/server-setup.sh) | Setup VPS (Node, Go, PM2, Docker, Nginx, ufw) |
 | [deploy/deploy.sh](deploy/deploy.sh) | Migrate, build Vite+Go, restart PM2 |
 | [deploy/docker-compose.db.yml](deploy/docker-compose.db.yml) | Postgres produksi |
-| [deploy/nginx.conf](deploy/nginx.conf) | SPA static + API proxy |
+| [deploy/nginx.conf](deploy/nginx.conf) | SPA `binaisi.xyz` + proxy API `api.binaisi.xyz` |
 | [deploy/backup-db.sh](deploy/backup-db.sh) | Backup harian pg_dump |
 | [deploy/env/*.example](deploy/env/) | Template env (`api-go`, `web` Vite, `db`) |
 | [.github/workflows/deploy.yml](.github/workflows/deploy.yml) | CI/CD Vite + Go via SSH |
@@ -149,14 +149,16 @@ Panduan: [docs/CUTOVER.md](docs/CUTOVER.md) · Staging: [docs/STAGING.md](docs/S
 ### Langkah cepat (server baru)
 
 ```bash
+# 0. DNS Hostinger: A @ dan A api → IP droplet
+
 # 1. Setup VPS (sebagai root)
 sudo bash deploy/server-setup.sh
 
 # 2. Clone & env (sebagai user deploy)
 git clone <repo-url> /opt/aisi && cd /opt/aisi
 cp deploy/env/db.env.example deploy/env/db.env
-cp deploy/env/api-go.env.example apps/api-go/.env   # JWT, R2, domain
-echo 'VITE_API_URL=https://app.namadomain.id/api/v1' > apps/web-vite/.env
+cp deploy/env/api-go.env.example apps/api-go/.env   # JWT, R2, ALLOWED_ORIGIN=https://binaisi.xyz
+echo 'VITE_API_URL=https://api.binaisi.xyz/api/v1' > apps/web-vite/.env
 
 # 3. Postgres
 cd deploy && docker compose -f docker-compose.db.yml --env-file env/db.env up -d && cd ..
@@ -167,8 +169,9 @@ bash deploy/deploy.sh --seed
 # 5. Nginx + SSL
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/aisi
 sudo ln -sf /etc/nginx/sites-available/aisi /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d app.namadomain.id
+sudo certbot --nginx -d binaisi.xyz -d www.binaisi.xyz -d api.binaisi.xyz
 
 # 6. Backup harian (cron)
 chmod +x deploy/backup-db.sh

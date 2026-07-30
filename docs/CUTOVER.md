@@ -14,15 +14,17 @@ Stack aktif: **Vite SPA** (`apps/web-vite`) + **Go API** (`apps/api-go`). Next.j
 cd /opt/aisi
 git pull origin main
 
-# Env
-cp deploy/env/api-go.env.example apps/api-go/.env   # isi kredensial
-echo 'VITE_API_URL=https://app.domainanda.id/api/v1' > apps/web-vite/.env
+# Env (Opsi B: SPA di root, API di subdomain)
+cp deploy/env/api-go.env.example apps/api-go/.env   # ALLOWED_ORIGIN=https://binaisi.xyz
+echo 'VITE_API_URL=https://api.binaisi.xyz/api/v1' > apps/web-vite/.env
 
 bash deploy/deploy.sh
 
-# Nginx SPA
+# Nginx: SPA binaisi.xyz + API api.binaisi.xyz
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/aisi
+sudo ln -sf /etc/nginx/sites-available/aisi /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d binaisi.xyz -d www.binaisi.xyz -d api.binaisi.xyz
 ```
 
 PM2 hanya menjalankan `aisi-api` (Go).

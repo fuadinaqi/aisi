@@ -35,7 +35,8 @@ jobs:
       - name: Build Vite SPA
         run: pnpm --filter @dakwah/web-vite build
         env:
-          VITE_API_URL: /api/v1
+          # CI compile-only; nilai produksi di-set di apps/web-vite/.env di VPS
+          VITE_API_URL: https://api.binaisi.xyz/api/v1
 
       - name: Build Go API
         working-directory: apps/api-go

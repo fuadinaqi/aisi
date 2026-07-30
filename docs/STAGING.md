@@ -50,7 +50,8 @@ Atau serve `apps/web-vite/dist` dengan Nginx memakai [`deploy/nginx.conf`](../de
 
 - **Jangan** jalankan `pnpm db:seed` atau `deploy.sh --seed` di production (seed akan abort jika `APP_ENV`/`NODE_ENV=production`).
 - Pastikan `JWT_SECRET` dan `JWT_REFRESH_SECRET` kuat (≥32 karakter, bukan nilai default); API Go gagal boot di production jika misconfig.
-- `ALLOWED_ORIGIN` harus origin frontend yang tepat (bukan `*`).
+- `ALLOWED_ORIGIN` harus origin frontend yang tepat (bukan `*`), mis. `https://binaisi.xyz` (bukan URL API).
+- Produksi Opsi B: SPA `binaisi.xyz`, API `api.binaisi.xyz` — lihat `deploy/nginx.conf` + `VITE_API_URL=https://api.binaisi.xyz/api/v1`.
 - Bind API Go ke localhost di belakang Nginx; jangan expose `:4000` ke publik.
 - Jika staging pernah di-seed, **rotasi password** akun seed sebelum dibuka ke lebih banyak orang.
 - Override opsional: `SEED_SUPERADMIN_EMAIL`, `SEED_ADMIN_EMAIL`, `SEED_PASSWORD_*`.

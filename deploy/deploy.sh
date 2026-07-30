@@ -52,4 +52,5 @@ fi
 pm2 save
 
 echo "Deploy selesai. Cek: curl -s http://127.0.0.1:4000/health"
-echo "SPA: pastikan nginx root = $ROOT_DIR/apps/web-vite/dist"
+echo "SPA: nginx root = $ROOT_DIR/apps/web-vite/dist (server_name binaisi.xyz)"
+echo "API publik: https://api.binaisi.xyz (proxy ke :4000) — pastikan VITE_API_URL & ALLOWED_ORIGIN sudah benar"
