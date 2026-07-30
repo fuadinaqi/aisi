@@ -61,12 +61,15 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/aisi
-            # Pastikan /opt/aisi milik user deploy (hindari clone sebagai root)
-            if [[ ! -w .git/objects ]]; then
-              echo "ERROR: .git tidak writable oleh $(whoami). Jalankan di VPS:"
-              echo "  sudo chown -R deploy:deploy /opt/aisi"
+            # Pastikan .git writable (clone sebagai root sering sisakan file milik root)
+            if ! touch .git/objects/.ci_write_test 2>/dev/null; then
+              echo "ERROR: $(whoami) tidak bisa menulis .git/objects"
+              echo "Di VPS (sebagai root) jalankan:"
+              echo "  chown -R deploy:deploy /opt/aisi"
+              ls -la .git .git/objects | head -20 || true
               exit 1
             fi
+            rm -f .git/objects/.ci_write_test
             git fetch origin main
             git reset --hard origin/main
             set -a
