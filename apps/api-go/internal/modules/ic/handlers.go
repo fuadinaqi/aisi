@@ -62,7 +62,10 @@ type itemInput struct {
 }
 
 func validItem(v itemInput) bool {
-	return (v.Level == "LEVEL_1" || v.Level == "LEVEL_2") && v.Title != "" && v.Number > 0 && contains(constants.ICCategories, v.Category) && contains(constants.ICTypes, v.Type)
+	if !(v.Level == "LEVEL_1" || v.Level == "LEVEL_2") || v.Title == "" || v.Number <= 0 || !contains(constants.ICTypes, v.Type) {
+		return false
+	}
+	return contains(constants.ICCategoriesForLevel(v.Level), v.Category)
 }
 func contains(a []string, v string) bool {
 	for _, x := range a {
@@ -207,7 +210,7 @@ func member(db *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 		out := []map[string]any{}
-		for _, cat := range constants.ICCategories {
+		for _, cat := range constants.ICCategoriesForLevel(level) {
 			types := []map[string]any{}
 			for _, typ := range constants.ICTypes {
 				if xs := cats[cat][typ]; len(xs) > 0 {
@@ -215,7 +218,7 @@ func member(db *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 			if len(types) > 0 {
-				out = append(out, map[string]any{"category": cat, "label": constants.ICCategoryLabels[cat], "types": types})
+				out = append(out, map[string]any{"category": cat, "label": constants.ICCategoryLabel(cat, level), "types": types})
 			}
 		}
 		httpx.Success(w, 200, map[string]any{"user": map[string]string{"id": uid, "name": uname}, "group": map[string]string{"id": gid, "name": gn, "level": level}, "summary": map[string]int{"total": total, "achieved": achieved, "primerTotal": pt, "primerAchieved": pa, "sekunderTotal": st, "sekunderAchieved": sa}, "categories": out}, "")

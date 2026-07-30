@@ -32,6 +32,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
 
+      - name: Build shared
+        run: pnpm --filter @dakwah/shared build
+
       - name: Build Vite SPA
         run: pnpm --filter @dakwah/web-vite build
         env:
@@ -46,7 +49,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to VPS
@@ -55,7 +58,16 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          command_timeout: 30m
           script: |
+            set -euo pipefail
             cd /opt/aisi
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
+            set -a
+            # shellcheck disable=SC1091
+            source apps/api-go/.env
+            set +a
             bash deploy/deploy.sh
+            curl -sf http://127.0.0.1:4000/health

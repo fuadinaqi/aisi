@@ -105,20 +105,101 @@ var GenderLabels = map[string]string{
 }
 
 var ICCategories = []string{
-	"KEAGAMAAN", "KEBANGSAAN", "KEMASYARAKATAN", "KEORGANISASIAN", "KEPEMIMPINAN_KEWIRAUSAHAAN",
+	"MANA_ASY_SYAHADAH",
+	"MARIFATULLAH",
+	"MARIFATUR_RASUL",
+	"MARIFATUL_ISLAM",
+	"MARIFATUL_INSAN",
+	"MARIFATUL_QURAN",
+	"FIQIH_USHUL_FIQIH",
+	"KETATANEGARAAN",
+	"LIFESKILLS",
+	"ALQURAN_ULUMUL_QURAN",
+	"HADITS_ULUMUL_HADITS",
+	"AQIDAH_AKHLAK",
+	"AL_HAQ_WAL_BATHIL",
+	"QADHAYA_TAKWINUL_UMMAH",
+	"DAKWAH_FIKRAH",
+}
+
+// ICCategoriesByLevel — Bidang Studi per level kelompok.
+var ICCategoriesByLevel = map[string][]string{
+	"LEVEL_1": {
+		"MANA_ASY_SYAHADAH", "MARIFATULLAH", "MARIFATUR_RASUL", "MARIFATUL_ISLAM",
+		"MARIFATUL_INSAN", "MARIFATUL_QURAN", "FIQIH_USHUL_FIQIH", "KETATANEGARAAN", "LIFESKILLS",
+	},
+	"LEVEL_2": {
+		"ALQURAN_ULUMUL_QURAN", "HADITS_ULUMUL_HADITS", "AQIDAH_AKHLAK", "FIQIH_USHUL_FIQIH",
+		"AL_HAQ_WAL_BATHIL", "QADHAYA_TAKWINUL_UMMAH", "DAKWAH_FIKRAH", "KETATANEGARAAN", "LIFESKILLS",
+	},
 }
 
 var ICTypes = []string{"PRIMER", "SEKUNDER"}
 
 var ICCategoryLabels = map[string]string{
-	"KEAGAMAAN":                  "A. Keagamaan",
-	"KEBANGSAAN":                 "B. Kebangsaan",
-	"KEMASYARAKATAN":             "C. Kemasyarakatan",
-	"KEORGANISASIAN":             "D. Keorganisasian",
-	"KEPEMIMPINAN_KEWIRAUSAHAAN": "E. Kepemimpinan Kewirausahaan",
+	"MANA_ASY_SYAHADAH":      "A. Ma'na Asy-Syahadah",
+	"MARIFATULLAH":           "B. Ma'rifatullah",
+	"MARIFATUR_RASUL":        "C. Ma'rifatur Rasul",
+	"MARIFATUL_ISLAM":        "D. Ma'rifatul Islam",
+	"MARIFATUL_INSAN":        "E. Ma'rifatul Insan",
+	"MARIFATUL_QURAN":        "F. Ma'rifatul Qur'an",
+	"FIQIH_USHUL_FIQIH":      "G. Fiqih dan Ushul Fiqih",
+	"KETATANEGARAAN":         "H. Ketatanegaraan",
+	"LIFESKILLS":             "I. Lifeskills",
+	"ALQURAN_ULUMUL_QURAN":   "A. Al-Qur'an dan Ulumul Qur'an",
+	"HADITS_ULUMUL_HADITS":   "B. Hadits dan Ulumul Hadits",
+	"AQIDAH_AKHLAK":          "C. Aqidah dan Akhlak",
+	"AL_HAQ_WAL_BATHIL":      "E. Al-Haq wal-Bathil",
+	"QADHAYA_TAKWINUL_UMMAH": "F. Qadhaya dan Takwinul Ummah",
+	"DAKWAH_FIKRAH":          "G. Dakwah dan Fikrah",
+}
+
+// ICCategoryLabelsByLevel — huruf/urutan sesuai kurikulum per level.
+var ICCategoryLabelsByLevel = map[string]map[string]string{
+	"LEVEL_1": {
+		"MANA_ASY_SYAHADAH": "A. Ma'na Asy-Syahadah",
+		"MARIFATULLAH":      "B. Ma'rifatullah",
+		"MARIFATUR_RASUL":   "C. Ma'rifatur Rasul",
+		"MARIFATUL_ISLAM":   "D. Ma'rifatul Islam",
+		"MARIFATUL_INSAN":   "E. Ma'rifatul Insan",
+		"MARIFATUL_QURAN":   "F. Ma'rifatul Qur'an",
+		"FIQIH_USHUL_FIQIH": "G. Fiqih dan Ushul Fiqih",
+		"KETATANEGARAAN":    "H. Ketatanegaraan",
+		"LIFESKILLS":        "I. Lifeskills",
+	},
+	"LEVEL_2": {
+		"ALQURAN_ULUMUL_QURAN":   "A. Al-Qur'an dan Ulumul Qur'an",
+		"HADITS_ULUMUL_HADITS":   "B. Hadits dan Ulumul Hadits",
+		"AQIDAH_AKHLAK":          "C. Aqidah dan Akhlak",
+		"FIQIH_USHUL_FIQIH":      "D. Fiqih dan Ushul Fiqih",
+		"AL_HAQ_WAL_BATHIL":      "E. Al-Haq wal-Bathil",
+		"QADHAYA_TAKWINUL_UMMAH": "F. Qadhaya dan Takwinul Ummah",
+		"DAKWAH_FIKRAH":          "G. Dakwah dan Fikrah",
+		"KETATANEGARAAN":         "H. Ketatanegaraan",
+		"LIFESKILLS":             "I. Lifeskills",
+	},
 }
 
 var ICTypeLabels = map[string]string{
 	"PRIMER":   "IC Primer",
 	"SEKUNDER": "IC Sekunder",
+}
+
+func ICCategoryLabel(category, level string) string {
+	if byLevel, ok := ICCategoryLabelsByLevel[level]; ok {
+		if label, ok := byLevel[category]; ok {
+			return label
+		}
+	}
+	if label, ok := ICCategoryLabels[category]; ok {
+		return label
+	}
+	return category
+}
+
+func ICCategoriesForLevel(level string) []string {
+	if cats, ok := ICCategoriesByLevel[level]; ok {
+		return cats
+	}
+	return ICCategories
 }

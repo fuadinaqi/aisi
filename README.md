@@ -25,7 +25,7 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 - **Sekolah & Kelompok** — CRUD sekolah, PJ Sekolah (multi-PJ), kelompok dengan level (`LEVEL_1` / `LEVEL_2`) dan jenis **Ikhwan / Akhwat**, undangan pembina & anggota; validasi gender pembina/anggota harus sesuai kelompok
 - **Evaluasi Mingguan** — Pembina mengisi kehadiran per pekan (satu evaluasi per kelompok per pekan); create-only (409 jika sudah ada), edit via PUT; tampilan mutabaah anggota per pekan evaluasi
 - **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina lihat di detail evaluasi & detail anggota
-- **Indikator Capaian (IC)** — Master kurikulum per level kelompok (Bidang Studi disimpan di field `materi`); **29 IC Level Muda** (Marhalah Muhib / M1), **38 IC Level Pratama** (Marhalah Muayyid / M2); pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
+- **Indikator Capaian (IC)** — Master kurikulum per level kelompok dikelompokkan per **Bidang Studi** (mis. Ma'na Asy-Syahadah, Ma'rifatullah, …); **29 IC Level Muda** (Marhalah Muhib / M1), **38 IC Level Pratama** (Marhalah Muayyid / M2); pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
 - **Agenda & Check-in** — Event dengan target level (semua level jika kosong); anggota check-in berfoto; pembina menyetujui/menolak
 - **Materi** — Upload file, link eksternal, atau rich text
 - **Poin & Leaderboard** — Poin evaluasi tepat waktu, hadir pembinaan, kirim mutabaah (+2), dan check-in event yang disetujui
@@ -187,11 +187,40 @@ cd apps/api-go && go run ./cmd/server
 pnpm --filter @dakwah/web-vite dev
 ```
 
-### GitHub Secrets (CI/CD)
+### CI/CD otomatis (push ke `main`)
 
-- `VPS_HOST` — IP/domain VPS
-- `VPS_USER` — user deploy (mis. `deploy`)
-- `VPS_SSH_KEY` — private key SSH
+Workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): CI build → SSH ke VPS → `git reset --hard origin/main` → `deploy/deploy.sh` (tanpa seed).
+
+**1. SSH key khusus CI (di VPS, sebagai root):**
+
+```bash
+# buat key khusus GitHub Actions (tanpa passphrase)
+ssh-keygen -t ed25519 -C "github-actions-aisi" -f /tmp/aisi_deploy -N ""
+
+# izinkan login sebagai user deploy
+mkdir -p /home/deploy/.ssh
+cat /tmp/aisi_deploy.pub >> /home/deploy/.ssh/authorized_keys
+chown -R deploy:deploy /home/deploy/.ssh
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/authorized_keys
+
+# tampilkan private key → salin ke GitHub Secret VPS_SSH_KEY
+cat /tmp/aisi_deploy
+# lalu hapus dari server
+rm -f /tmp/aisi_deploy /tmp/aisi_deploy.pub
+```
+
+**2. Akses git pull di VPS** (repo private): tambahkan **Deploy key** (read-only) di GitHub repo → Settings → Deploy keys, public key dari `ssh-keygen` di user `deploy`, atau pastikan remote HTTPS + credential.
+
+**3. GitHub → repo → Settings → Secrets and variables → Actions:**
+
+| Secret | Isi |
+|--------|-----|
+| `VPS_HOST` | IP Droplet |
+| `VPS_USER` | `deploy` |
+| `VPS_SSH_KEY` | isi penuh private key (`-----BEGIN ... PRIVATE KEY-----`) |
+
+**4. Push ke `main`** → tab Actions: job `build` lalu `deploy`. Env di VPS (`apps/api-go/.env`, `apps/web-vite/.env`) tetap dikelola di server, tidak dari GitHub.
 
 ### Estimasi biaya
 

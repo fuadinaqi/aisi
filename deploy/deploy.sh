@@ -18,6 +18,14 @@ elif [[ "${1:-}" == "--seed-demo" ]]; then
   SEED_DEMO=true
 fi
 
+# Load env early (DATABASE_URL untuk Prisma + vars untuk PM2)
+if [[ -f apps/api-go/.env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source apps/api-go/.env
+  set +a
+fi
+
 echo "==> Install JS dependencies (web-vite + shared prisma tools)"
 pnpm install --frozen-lockfile || pnpm install
 
@@ -33,25 +41,16 @@ elif [[ "$SEED_DEMO" == true ]]; then
   pnpm db:seed
 fi
 
-echo "==> Build Go API"
+echo "==> Build shared + Go API + Vite SPA"
+pnpm --filter @dakwah/shared build
 mkdir -p apps/api-go/bin
 (cd apps/api-go && go build -o bin/aisi-api ./cmd/server)
-
-echo "==> Build Vite SPA"
 pnpm --filter @dakwah/web-vite build
 
 echo "==> Restart PM2 (Go API only)"
 # Bersihkan proses legacy jika masih ada di server lama
 pm2 delete dakwah-web 2>/dev/null || true
 pm2 delete dakwah-api 2>/dev/null || true
-
-# Load Go env into the shell for PM2 inheritance
-if [[ -f apps/api-go/.env ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source apps/api-go/.env
-  set +a
-fi
 
 if pm2 describe aisi-api &>/dev/null; then
   pm2 restart ecosystem.config.js --update-env

@@ -5,9 +5,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import {
-  IC_CATEGORIES,
-  IC_CATEGORY_LABELS,
   IC_TYPE_LABELS,
+  getICCategoriesForLevel,
+  getICCategoryLabel,
   type ICCategory,
   type IndikatorCapaianMaster,
 } from '@/lib/ic';
@@ -32,14 +32,16 @@ type FormState = {
   sortOrder: string;
 };
 
-const emptyForm: FormState = {
-  category: 'KEAGAMAAN',
-  type: 'PRIMER',
-  number: '',
-  title: '',
-  materi: '',
-  sortOrder: '0',
-};
+function emptyFormForLevel(level: 'LEVEL_1' | 'LEVEL_2'): FormState {
+  return {
+    category: getICCategoriesForLevel(level)[0]!,
+    type: 'PRIMER',
+    number: '',
+    title: '',
+    materi: '',
+    sortOrder: '0',
+  };
+}
 
 export default function ICConfigPage() {
   const queryClient = useQueryClient();
@@ -49,10 +51,11 @@ export default function ICConfigPage() {
   const [level, setLevel] = useState<'LEVEL_1' | 'LEVEL_2'>('LEVEL_1');
   const [filterCategory, setFilterCategory] = useState<ICCategory | 'ALL'>('ALL');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<FormState>(() => emptyFormForLevel('LEVEL_1'));
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { configs: levelConfigs } = useGroupLevelLabels();
+  const levelCategories = useMemo(() => getICCategoriesForLevel(level), [level]);
 
   const { data: items = [], isLoading } = useQuery<IndikatorCapaianMaster[]>({
     queryKey: ['ic-items', level],
@@ -67,7 +70,7 @@ export default function ICConfigPage() {
   }, [items, filterCategory]);
 
   const groupedItems = useMemo(() => {
-    return IC_CATEGORIES.map((category) => {
+    return levelCategories.map((category) => {
       const categoryItems = filteredItems.filter((i) => i.category === category);
       if (!categoryItems.length) return null;
 
@@ -84,11 +87,11 @@ export default function ICConfigPage() {
       primer: IndikatorCapaianMaster[];
       sekunder: IndikatorCapaianMaster[];
     }[];
-  }, [filteredItems]);
+  }, [filteredItems, levelCategories]);
 
   const resetForm = () => {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm(emptyFormForLevel(level));
     setError('');
   };
 
@@ -211,8 +214,12 @@ export default function ICConfigPage() {
               variant={level === cfg.level ? 'default' : 'outline'}
               className="rounded-xl"
               onClick={() => {
-                setLevel(cfg.level as 'LEVEL_1' | 'LEVEL_2');
-                resetForm();
+                const next = cfg.level as 'LEVEL_1' | 'LEVEL_2';
+                setLevel(next);
+                setFilterCategory('ALL');
+                setEditingId(null);
+                setForm(emptyFormForLevel(next));
+                setError('');
               }}
             >
               {cfg.label}
@@ -229,7 +236,7 @@ export default function ICConfigPage() {
           >
             Semua
           </Button>
-          {IC_CATEGORIES.map((cat) => (
+          {levelCategories.map((cat) => (
             <Button
               key={cat}
               size="sm"
@@ -237,7 +244,7 @@ export default function ICConfigPage() {
               className="rounded-xl"
               onClick={() => setFilterCategory(cat)}
             >
-              {IC_CATEGORY_LABELS[cat].replace(/^[A-Z]\.\s/, '')}
+              {getICCategoryLabel(cat, level).replace(/^[A-Z]\.\s/, '')}
             </Button>
           ))}
         </div>
@@ -253,9 +260,9 @@ export default function ICConfigPage() {
                   onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ICCategory }))}
                   className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
                 >
-                  {IC_CATEGORIES.map((cat) => (
+                  {levelCategories.map((cat) => (
                     <option key={cat} value={cat}>
-                      {IC_CATEGORY_LABELS[cat]}
+                      {getICCategoryLabel(cat, level)}
                     </option>
                   ))}
                 </select>
@@ -321,7 +328,7 @@ export default function ICConfigPage() {
             {groupedItems.map(({ category, primer, sekunder }) => (
               <ListGroup key={category} className="overflow-hidden">
                 <div className="border-b border-border/60 px-4 py-3 md:px-5">
-                  <p className="font-semibold">{IC_CATEGORY_LABELS[category]}</p>
+                  <p className="font-semibold">{getICCategoryLabel(category, level)}</p>
                 </div>
                 {primer.length > 0 && (
                   <>
