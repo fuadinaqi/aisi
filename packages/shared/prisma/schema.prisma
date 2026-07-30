@@ -142,6 +142,7 @@ model User {
   pointLogs          PointLog[]
   notifications      Notification[]
   refreshTokens      RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
   eventAttendances   EventAttendance[]
   eventApprovals     EventAttendance[]      @relation("EventApprover")
   invitationsSent    UserInvitation[]       @relation("InvitationCreator")
@@ -348,6 +349,20 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique @default(uuid())
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
 }
 
 model UserInvitation {

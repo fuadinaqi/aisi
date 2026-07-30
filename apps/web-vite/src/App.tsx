@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import HomeRedirect from '@/pages/HomeRedirect';
 import LoginPage from '@/pages/LoginPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import SetPasswordPage from '@/pages/SetPasswordPage';
 import AcceptRolePage from '@/pages/AcceptRolePage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
@@ -48,6 +50,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/set-password" element={<SetPasswordPage />} />
         <Route path="/accept-role" element={<AcceptRolePage />} />
 

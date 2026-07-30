@@ -55,6 +55,30 @@ paths:
       responses:
         '200':
           description: OK
+  /auth/forgot-password:
+    post:
+      operationId: authForgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Always OK (does not reveal whether email exists)
+  /auth/reset-password:
+    post:
+      operationId: authResetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset OK
   /auth/invitation/{token}:
     get:
       operationId: authGetInvitation
@@ -924,6 +948,25 @@ components:
           type: string
         newPassword:
           type: string
+        confirmPassword:
+          type: string
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    ResetPasswordRequest:
+      type: object
+      required: [token, password, confirmPassword]
+      properties:
+        token:
+          type: string
+          format: uuid
+        password:
+          type: string
+          minLength: 8
         confirmPassword:
           type: string
     InvitationRequest:

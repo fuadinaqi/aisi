@@ -8,6 +8,7 @@ import (
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/auth"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/go-chi/chi/v5"
@@ -28,12 +29,18 @@ func (h Handler) Routes() chi.Router {
 	r.Post("/refresh", h.refresh)
 	r.With(middleware.RequireAuth(h.Config)).Post("/change-password", h.changePassword)
 	r.With(middleware.RequireAuth(h.Config)).Post("/accept-role", h.acceptRole)
+	r.With(forgotLimit.Middleware).Post("/forgot-password", h.forgotPassword)
+	r.With(forgotLimit.Middleware).Post("/reset-password", h.resetPassword)
 	r.Get("/invitation/{token}", h.invitation)
 	r.Post("/set-password", h.setPassword)
 	return r
 }
 
 var loginLimit = middleware.NewRateLimit(5, 15*time.Minute)
+var forgotLimit = middleware.NewRateLimit(5, 15*time.Minute)
+
+const passwordResetTTL = time.Hour
+const forgotPasswordMsg = "Jika email terdaftar, tautan reset password telah dikirim"
 
 type loginRequest struct {
 	Email    string `json:"email"`
@@ -183,6 +190,92 @@ func (h Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM "RefreshToken" WHERE "userId"=$1`, c.UserID)
 	http.SetCookie(w, &http.Cookie{Name: "refreshToken", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: h.Config.Production()})
 	httpx.Success(w, 200, nil, "Password berhasil diubah")
+}
+
+func (h Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email string `json:"email"`
+	}
+	if decode(r, &in) != nil || in.Email == "" {
+		httpx.Error(w, 400, "Email wajib diisi")
+		return
+	}
+	var userID, name string
+	err := h.DB.QueryRow(r.Context(), `SELECT "id","name" FROM "User" WHERE "email"=$1 AND "isActive"`, in.Email).Scan(&userID, &name)
+	if err != nil {
+		// Jangan bocorkan apakah email terdaftar.
+		httpx.Success(w, 200, nil, forgotPasswordMsg)
+		return
+	}
+	token := uuid.NewString()
+	expires := time.Now().Add(passwordResetTTL)
+	_, _ = h.DB.Exec(r.Context(), `DELETE FROM "PasswordResetToken" WHERE "userId"=$1 AND "usedAt" IS NULL`, userID)
+	_, err = h.DB.Exec(r.Context(), `INSERT INTO "PasswordResetToken" ("id","userId","token","expiresAt") VALUES ($1,$2,$3,$4)`, uuid.NewString(), userID, token, expires)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal memproses permintaan reset password")
+		return
+	}
+	link := h.Config.AppURL + "/reset-password?token=" + token
+	if err := email.New(h.Config).SendPasswordReset(r.Context(), in.Email, name, link); err != nil {
+		httpx.Error(w, 500, "Gagal mengirim email reset password")
+		return
+	}
+	httpx.Success(w, 200, nil, forgotPasswordMsg)
+}
+
+func (h Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if decode(r, &in) != nil || in.Token == "" {
+		httpx.Error(w, 400, "Token dan password wajib diisi")
+		return
+	}
+	if err := auth.ValidatePassword(in.Password); err != nil {
+		httpx.Error(w, 400, err.Error())
+		return
+	}
+	tx, err := h.DB.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, 500, "Gagal mereset password")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	var id, userID string
+	var expires time.Time
+	var usedAt *time.Time
+	err = tx.QueryRow(r.Context(), `SELECT "id","userId","expiresAt","usedAt" FROM "PasswordResetToken" WHERE "token"=$1 FOR UPDATE`, in.Token).Scan(&id, &userID, &expires, &usedAt)
+	if err != nil || usedAt != nil || expires.Before(time.Now()) {
+		httpx.Error(w, 400, "Token reset tidak valid atau sudah kedaluwarsa")
+		return
+	}
+	var active bool
+	if tx.QueryRow(r.Context(), `SELECT "isActive" FROM "User" WHERE "id"=$1`, userID).Scan(&active) != nil || !active {
+		httpx.Error(w, 400, "Token reset tidak valid atau sudah kedaluwarsa")
+		return
+	}
+	hashed, err := auth.HashPassword(in.Password)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal mereset password")
+		return
+	}
+	if _, err = tx.Exec(r.Context(), `UPDATE "User" SET "password"=$1,"updatedAt"=NOW() WHERE "id"=$2`, hashed, userID); err != nil {
+		httpx.Error(w, 500, "Gagal mereset password")
+		return
+	}
+	if _, err = tx.Exec(r.Context(), `UPDATE "PasswordResetToken" SET "usedAt"=NOW() WHERE "id"=$1`, id); err != nil {
+		httpx.Error(w, 500, "Gagal mereset password")
+		return
+	}
+	_, _ = tx.Exec(r.Context(), `DELETE FROM "PasswordResetToken" WHERE "userId"=$1 AND "id"<>$2 AND "usedAt" IS NULL`, userID, id)
+	_, _ = tx.Exec(r.Context(), `DELETE FROM "RefreshToken" WHERE "userId"=$1`, userID)
+	if tx.Commit(r.Context()) != nil {
+		httpx.Error(w, 500, "Gagal mereset password")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "refreshToken", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: h.Config.Production()})
+	httpx.Success(w, 200, nil, "Password berhasil direset, silakan login")
 }
 
 func (h Handler) invitation(w http.ResponseWriter, r *http.Request) {

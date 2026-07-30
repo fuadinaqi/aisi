@@ -30,8 +30,23 @@ func (s Sender) SendInvitationWithKind(ctx context.Context, to, name, url string
 		subject = "Undangan peran tambahan AISI"
 		bodyHTML = "<p>Assalamu'alaikum " + safeName + ",</p><p>Anda diundang untuk menambahkan peran pada akun AISI yang sudah ada.</p><p><a href=\"" + safeURL + "\">Terima undangan peran</a></p>"
 	}
+	return s.send(ctx, to, subject, bodyHTML, fmt.Sprintf("[email console] to=%s name=%s existing=%v invitation=%s\n", to, name, existingUser, url))
+}
+
+func (s Sender) SendPasswordReset(ctx context.Context, to, name, url string) error {
+	safeName := html.EscapeString(name)
+	safeURL := html.EscapeString(url)
+	subject := "Reset password AISI"
+	bodyHTML := "<p>Assalamu'alaikum " + safeName + ",</p>" +
+		"<p>Kami menerima permintaan untuk mereset password akun AISI Anda.</p>" +
+		"<p><a href=\"" + safeURL + "\">Reset password</a></p>" +
+		"<p>Tautan ini berlaku selama 1 jam. Jika Anda tidak meminta reset, abaikan email ini.</p>"
+	return s.send(ctx, to, subject, bodyHTML, fmt.Sprintf("[email console] to=%s name=%s password-reset=%s\n", to, name, url))
+}
+
+func (s Sender) send(ctx context.Context, to, subject, bodyHTML, consoleLog string) error {
 	if s.apiKey == "" {
-		fmt.Printf("[email console] to=%s name=%s existing=%v invitation=%s\n", to, name, existingUser, url)
+		fmt.Print(consoleLog)
 		return nil
 	}
 	body, _ := json.Marshal(map[string]string{

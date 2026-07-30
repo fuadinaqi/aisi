@@ -28,11 +28,26 @@ export const setPasswordSchema = z
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1),
+    currentPassword: z.string().min(1, 'Password saat ini wajib diisi'),
     newPassword: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Konfirmasi password tidak cocok',
+    path: ['confirmPassword'],
+  });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Email tidak valid'),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().uuid('Token tidak valid'),
+    password: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
     message: 'Konfirmasi password tidak cocok',
     path: ['confirmPassword'],
   });
@@ -347,6 +362,9 @@ export const kksListQuerySchema = paginationSchema.extend({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type InvitationInput = z.infer<typeof invitationSchema>;
 export type EvaluationInput = z.infer<typeof evaluationSchema>;
 export type CreateSchoolWithPjInput = z.infer<typeof createSchoolWithPjSchema>;
