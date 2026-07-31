@@ -16,6 +16,7 @@ interface AuthState {
   activeRole: string | null;
   setAuth: (user: AuthUser, token: string) => void;
   setActiveRole: (role: string) => void;
+  updateUser: (patch: Partial<Pick<AuthUser, 'name' | 'email' | 'totalPoints'>>) => void;
   updateRoles: (roles: string[]) => void;
   updateTotalPoints: (totalPoints: number) => void;
   logout: () => void;
@@ -43,6 +44,8 @@ export const useAuthStore = create<AuthState>()(
         if (!user || !user.roles.includes(role)) return;
         set({ activeRole: role });
       },
+      updateUser: (patch) =>
+        set((state) => (state.user ? { user: { ...state.user, ...patch } } : {})),
       updateRoles: (roles) => {
         set((state) => {
           if (!state.user) return {};

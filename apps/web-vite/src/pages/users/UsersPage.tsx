@@ -131,7 +131,9 @@ export default function UsersPage() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 space-y-1.5">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{user.name}</p>
+                          <Link to={`/users/${user.id}`} className="font-medium hover:underline">
+                            {user.name}
+                          </Link>
                           {!user.isActive && (
                             <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                               Nonaktif

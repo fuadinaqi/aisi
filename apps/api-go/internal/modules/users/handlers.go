@@ -71,18 +71,48 @@ func schools(db *pgxpool.Pool, r *http.Request, id string) []map[string]any {
 	}
 	return out
 }
+func dateStr(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.Format("2006-01-02")
+}
+
 func user(db *pgxpool.Pool, r *http.Request, id string) (map[string]any, error) {
-	var name, email string
+	var name, email, gender string
 	var phone, avatar *string
+	var birthPlace, address, tiktok, instagram, facebook, socialX *string
+	var fatherName, fatherPhone, motherName, motherPhone, hobby *string
+	var birthDate *time.Time
 	var points int
 	var active bool
 	var created time.Time
 	var login *time.Time
-	e := db.QueryRow(r.Context(), `SELECT "name","email","phone","avatarUrl","totalPoints","isActive","createdAt","lastLoginAt" FROM "User" WHERE "id"=$1`, id).Scan(&name, &email, &phone, &avatar, &points, &active, &created, &login)
+	e := db.QueryRow(r.Context(), `
+		SELECT "name","email","phone","avatarUrl","gender"::text,
+			"birthPlace","birthDate","address",
+			"tiktok","instagram","facebook","socialX",
+			"fatherName","fatherPhone","motherName","motherPhone","hobby",
+			"totalPoints","isActive","createdAt","lastLoginAt"
+		FROM "User" WHERE "id"=$1`, id).Scan(
+		&name, &email, &phone, &avatar, &gender,
+		&birthPlace, &birthDate, &address,
+		&tiktok, &instagram, &facebook, &socialX,
+		&fatherName, &fatherPhone, &motherName, &motherPhone, &hobby,
+		&points, &active, &created, &login,
+	)
 	if e != nil {
 		return nil, e
 	}
-	return map[string]any{"id": id, "name": name, "email": email, "phone": phone, "avatarUrl": avatar, "totalPoints": points, "isActive": active, "createdAt": created, "lastLoginAt": login, "roles": roles(db, r, id), "schools": schools(db, r, id)}, nil
+	return map[string]any{
+		"id": id, "name": name, "email": email, "phone": phone, "avatarUrl": avatar, "gender": gender,
+		"birthPlace": birthPlace, "birthDate": dateStr(birthDate), "address": address,
+		"tiktok": tiktok, "instagram": instagram, "facebook": facebook, "socialX": socialX,
+		"fatherName": fatherName, "fatherPhone": fatherPhone,
+		"motherName": motherName, "motherPhone": motherPhone, "hobby": hobby,
+		"totalPoints": points, "isActive": active, "createdAt": created, "lastLoginAt": login,
+		"roles": roles(db, r, id), "schools": schools(db, r, id),
+	}, nil
 }
 func me(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -99,15 +129,61 @@ func updateMe(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c, _ := middleware.Claims(r)
 		var in struct {
-			Name   *string `json:"name"`
-			Phone  *string `json:"phone"`
-			Avatar *string `json:"avatarUrl"`
+			Name        *string `json:"name"`
+			Phone       *string `json:"phone"`
+			Avatar      *string `json:"avatarUrl"`
+			BirthPlace  *string `json:"birthPlace"`
+			BirthDate   *string `json:"birthDate"`
+			Address     *string `json:"address"`
+			Tiktok      *string `json:"tiktok"`
+			Instagram   *string `json:"instagram"`
+			Facebook    *string `json:"facebook"`
+			SocialX     *string `json:"socialX"`
+			FatherName  *string `json:"fatherName"`
+			FatherPhone *string `json:"fatherPhone"`
+			MotherName  *string `json:"motherName"`
+			MotherPhone *string `json:"motherPhone"`
+			Hobby       *string `json:"hobby"`
 		}
 		if json.NewDecoder(r.Body).Decode(&in) != nil {
 			httpx.Error(w, 400, "Body tidak valid")
 			return
 		}
-		_, e := db.Exec(r.Context(), `UPDATE "User" SET "name"=COALESCE($1,"name"),"phone"=COALESCE($2,"phone"),"avatarUrl"=COALESCE($3,"avatarUrl"),"updatedAt"=NOW() WHERE "id"=$4`, in.Name, in.Phone, in.Avatar, c.UserID)
+		if in.BirthDate != nil && *in.BirthDate != "" {
+			if _, err := time.Parse("2006-01-02", *in.BirthDate); err != nil {
+				httpx.Error(w, 400, "Format tanggal lahir tidak valid (YYYY-MM-DD)")
+				return
+			}
+		}
+		_, e := db.Exec(r.Context(), `
+			UPDATE "User" SET
+				"name"=COALESCE(NULLIF($1,''),"name"),
+				"phone"=CASE WHEN $2::text IS NULL THEN "phone" WHEN $2='' THEN NULL ELSE $2 END,
+				"avatarUrl"=CASE WHEN $3::text IS NULL THEN "avatarUrl" WHEN $3='' THEN NULL ELSE $3 END,
+				"birthPlace"=CASE WHEN $4::text IS NULL THEN "birthPlace" WHEN $4='' THEN NULL ELSE $4 END,
+				"birthDate"=CASE
+					WHEN $5::text IS NULL THEN "birthDate"
+					WHEN $5='' THEN NULL
+					ELSE $5::date
+				END,
+				"address"=CASE WHEN $6::text IS NULL THEN "address" WHEN $6='' THEN NULL ELSE $6 END,
+				"tiktok"=CASE WHEN $7::text IS NULL THEN "tiktok" WHEN $7='' THEN NULL ELSE $7 END,
+				"instagram"=CASE WHEN $8::text IS NULL THEN "instagram" WHEN $8='' THEN NULL ELSE $8 END,
+				"facebook"=CASE WHEN $9::text IS NULL THEN "facebook" WHEN $9='' THEN NULL ELSE $9 END,
+				"socialX"=CASE WHEN $10::text IS NULL THEN "socialX" WHEN $10='' THEN NULL ELSE $10 END,
+				"fatherName"=CASE WHEN $11::text IS NULL THEN "fatherName" WHEN $11='' THEN NULL ELSE $11 END,
+				"fatherPhone"=CASE WHEN $12::text IS NULL THEN "fatherPhone" WHEN $12='' THEN NULL ELSE $12 END,
+				"motherName"=CASE WHEN $13::text IS NULL THEN "motherName" WHEN $13='' THEN NULL ELSE $13 END,
+				"motherPhone"=CASE WHEN $14::text IS NULL THEN "motherPhone" WHEN $14='' THEN NULL ELSE $14 END,
+				"hobby"=CASE WHEN $15::text IS NULL THEN "hobby" WHEN $15='' THEN NULL ELSE $15 END,
+				"updatedAt"=NOW()
+			WHERE "id"=$16`,
+			in.Name, in.Phone, in.Avatar,
+			in.BirthPlace, in.BirthDate, in.Address,
+			in.Tiktok, in.Instagram, in.Facebook, in.SocialX,
+			in.FatherName, in.FatherPhone, in.MotherName, in.MotherPhone, in.Hobby,
+			c.UserID,
+		)
 		if e != nil {
 			httpx.Error(w, 500, "Gagal memperbarui profil")
 			return
@@ -174,18 +250,73 @@ func get(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 404, "User tidak ditemukan")
 			return
 		}
-		if !has(c.Roles, "SUPERADMIN") && !has(c.Roles, "ADMIN") {
-			if !has(c.Roles, "PJ_SEKOLAH") || !sharedSchool(db, r, c.UserID, id) {
-				httpx.Error(w, 403, "Akses ditolak")
-				return
-			}
+		if id != c.UserID && !canAccessUserProfile(db, r, c.UserID, c.Roles, id, u) {
+			httpx.Error(w, 403, "Akses ditolak")
+			return
 		}
 		httpx.Success(w, 200, u, "")
 	}
 }
+
+func targetRoleList(u map[string]any) []string {
+	raw, _ := u["roles"].([]map[string]string)
+	out := make([]string, 0, len(raw))
+	for _, row := range raw {
+		if role := row["role"]; role != "" {
+			out = append(out, role)
+		}
+	}
+	return out
+}
+
+func canAccessUserProfile(db *pgxpool.Pool, r *http.Request, viewerID string, viewerRoles []string, targetID string, target map[string]any) bool {
+	targetRoles := targetRoleList(target)
+	if !constants.CanViewUserProfile(viewerRoles, targetRoles) {
+		return false
+	}
+	if has(viewerRoles, "SUPERADMIN") || has(viewerRoles, "ADMIN") {
+		return true
+	}
+	if has(viewerRoles, "PJ_SEKOLAH") && (sharedSchool(db, r, viewerID, targetID) || schoolScopedTarget(db, r, viewerID, targetID)) {
+		return true
+	}
+	if has(viewerRoles, "PEMBINA") && pembinaOfMember(db, r, viewerID, targetID) {
+		return true
+	}
+	return false
+}
+
 func sharedSchool(db *pgxpool.Pool, r *http.Request, a, b string) bool {
 	var ok bool
 	_ = db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" a JOIN "UserSchool" b ON a."schoolId"=b."schoolId" WHERE a."userId"=$1 AND b."userId"=$2)`, a, b).Scan(&ok)
+	return ok
+}
+
+func schoolScopedTarget(db *pgxpool.Pool, r *http.Request, viewerID, targetID string) bool {
+	var ok bool
+	_ = db.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM "UserSchool" us
+			JOIN "Group" g ON g."schoolId"=us."schoolId" AND g."isActive"
+			WHERE us."userId"=$1 AND (
+				g."pembinaId"=$2
+				OR EXISTS(
+					SELECT 1 FROM "GroupMember" gm
+					WHERE gm."groupId"=g."id" AND gm."userId"=$2 AND gm."isActive"
+				)
+			)
+		)`, viewerID, targetID).Scan(&ok)
+	return ok
+}
+
+func pembinaOfMember(db *pgxpool.Pool, r *http.Request, pembinaID, memberID string) bool {
+	var ok bool
+	_ = db.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM "Group" g
+			JOIN "GroupMember" gm ON gm."groupId"=g."id" AND gm."userId"=$2 AND gm."isActive"
+			WHERE g."pembinaId"=$1 AND g."isActive"
+		)`, pembinaID, memberID).Scan(&ok)
 	return ok
 }
 func update(db *pgxpool.Pool) http.HandlerFunc {

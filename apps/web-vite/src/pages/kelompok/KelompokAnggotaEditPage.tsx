@@ -1,9 +1,8 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { ArrowLeft } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
@@ -40,18 +39,27 @@ export default function EditAnggotaPage() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
-  } = useForm<FormData>();
+    formState: { isSubmitting, errors },
+  } = useForm<FormData>({
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      gender: 'IKHWAN',
+    },
+  });
 
   useEffect(() => {
     if (!member) return;
+    const g = member.user.gender === 'AKHWAT' ? 'AKHWAT' : 'IKHWAN';
     reset({
       name: member.user.name,
       email: member.user.email,
       phone: member.user.phone || '',
-      gender: (member.user.gender as 'IKHWAN' | 'AKHWAT') || 'IKHWAN',
+      gender: g,
     });
   }, [member, reset]);
 
@@ -122,7 +130,30 @@ export default function EditAnggotaPage() {
 
             <div className="space-y-2">
               <Label htmlFor="gender">Jenis kelamin</Label>
-              <GenderSelect id="gender" {...register('gender', { required: true })} />
+              <Controller
+                name="gender"
+                control={control}
+                rules={{ required: 'Jenis kelamin wajib dipilih' }}
+                render={({ field }) => (
+                  <GenderSelect
+                    id="gender"
+                    name={field.name}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    onChange={(e) => field.onChange(e.target.value as 'IKHWAN' | 'AKHWAT')}
+                  />
+                )}
+              />
+              {member.group.gender && (
+                <p className="text-xs text-muted-foreground">
+                  Harus sama dengan jenis kelompok (
+                  {member.group.gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}).
+                </p>
+              )}
+              {errors.gender && (
+                <p className="text-sm text-destructive">{errors.gender.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">

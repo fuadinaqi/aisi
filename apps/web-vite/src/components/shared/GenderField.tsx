@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { cn, getGenderLabel } from '@/lib/utils';
 
 const GENDER_OPTIONS = [
@@ -22,12 +23,13 @@ export function GenderBadge({ gender, className }: { gender: string; className?:
   );
 }
 
-export function GenderSelect({
-  className,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+export const GenderSelect = forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement>
+>(function GenderSelect({ className, ...props }, ref) {
   return (
     <select
+      ref={ref}
       className={cn(
         'flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm',
         className,
@@ -41,7 +43,7 @@ export function GenderSelect({
       ))}
     </select>
   );
-}
+});
 
 export function getGroupGenderTheme(gender: string) {
   if (gender === 'AKHWAT') {

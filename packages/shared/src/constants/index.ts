@@ -57,6 +57,22 @@ export const INVITATION_RULES: Record<string, string[]> = {
   PEMBINA: ['ANGGOTA'],
 };
 
+/** Role penonton → role target yang boleh dilihat detail profilnya */
+export const PROFILE_VIEW_RULES: Record<string, string[]> = {
+  SUPERADMIN: ['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA'],
+  ADMIN: ['PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA'],
+  PJ_SEKOLAH: ['PEMBINA', 'ANGGOTA'],
+  PEMBINA: ['ANGGOTA'],
+};
+
+export function canViewUserProfile(viewerRoles: string[], targetRoles: string[]): boolean {
+  return viewerRoles.some((vr) => {
+    const allowed = PROFILE_VIEW_RULES[vr];
+    if (!allowed) return false;
+    return targetRoles.some((tr) => allowed.includes(tr));
+  });
+}
+
 export const KKS_TYPE_LABELS: Record<string, string> = {
   KELUHAN: 'Keluhan',
   KRITIK: 'Kritik',

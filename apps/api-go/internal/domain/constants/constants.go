@@ -72,6 +72,14 @@ var InvitationRules = map[string][]string{
 	"PEMBINA":    {"ANGGOTA"},
 }
 
+// ProfileViewRules: role penonton → role target yang boleh dilihat detail profilnya.
+var ProfileViewRules = map[string][]string{
+	"SUPERADMIN": {"SUPERADMIN", "ADMIN", "PJ_SEKOLAH", "PEMBINA", "ANGGOTA"},
+	"ADMIN":      {"PJ_SEKOLAH", "PEMBINA", "ANGGOTA"},
+	"PJ_SEKOLAH": {"PEMBINA", "ANGGOTA"},
+	"PEMBINA":    {"ANGGOTA"},
+}
+
 func CanInvite(inviterRoles []string, targetRole string) bool {
 	for _, r := range inviterRoles {
 		allowed, ok := InvitationRules[r]
@@ -81,6 +89,23 @@ func CanInvite(inviterRoles []string, targetRole string) bool {
 		for _, a := range allowed {
 			if a == targetRole {
 				return true
+			}
+		}
+	}
+	return false
+}
+
+func CanViewUserProfile(viewerRoles, targetRoles []string) bool {
+	for _, vr := range viewerRoles {
+		allowed, ok := ProfileViewRules[vr]
+		if !ok {
+			continue
+		}
+		for _, tr := range targetRoles {
+			for _, a := range allowed {
+				if a == tr {
+					return true
+				}
 			}
 		}
 	}

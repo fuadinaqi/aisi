@@ -24,6 +24,7 @@ import KelompokAnggotaDetailPage from '@/pages/kelompok/KelompokAnggotaDetailPag
 import KelompokAnggotaEditPage from '@/pages/kelompok/KelompokAnggotaEditPage';
 import UsersPage from '@/pages/users/UsersPage';
 import UsersInvitePage from '@/pages/users/UsersInvitePage';
+import UsersDetailPage from '@/pages/users/UsersDetailPage';
 import InvitationsPage from '@/pages/invitations/InvitationsPage';
 import EventsPage from '@/pages/events/EventsPage';
 import EventNewPage from '@/pages/events/EventNewPage';
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/kelompok/:id/anggota/:userId/edit" element={<KelompokAnggotaEditPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/users/invite" element={<UsersInvitePage />} />
+          <Route path="/users/:userId" element={<UsersDetailPage />} />
           <Route path="/invitations" element={<InvitationsPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/new" element={<EventNewPage />} />

@@ -12,6 +12,7 @@ import { ListGroup, ProfileHeader } from '@/components/layout/AppUI';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
 import { LoadingSkeleton, PointBadge, RoleBadge } from '@/components/shared/Badges';
 import { getGroupGenderTheme } from '@/components/shared/GenderField';
+import { ProfileDetailsCard } from '@/components/shared/ProfileDetailsCard';
 import { Button } from '@/components/ui/button';
 import { formatDate, formatWeekRange, toDateInputValue } from '@/lib/utils';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
@@ -154,6 +155,12 @@ export default function AnggotaDetailPage() {
           </div>
         </div>
       </ListGroup>
+
+      {canEdit && (
+        <div className="mt-4">
+          <ProfileDetailsCard profile={memberUser} className={theme.card} />
+        </div>
+      )}
 
       <ListGroup className={cn('mt-4 p-4', theme.card)}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">

@@ -320,6 +320,9 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 	var joined time.Time
 	var name, email, gender string
 	var phone *string
+	var birthPlace, address, tiktok, instagram, facebook, socialX *string
+	var fatherName, fatherPhone, motherName, motherPhone, hobby *string
+	var birthDate *time.Time
 	var points int
 	var lastLogin *time.Time
 	var createdAt time.Time
@@ -327,6 +330,9 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 	e := h.DB.QueryRow(r.Context(), `
 		SELECT gm."id", gm."joinedAt",
 		       u."name", u."email", u."phone", u."gender"::text, u."totalPoints", u."lastLoginAt", u."createdAt",
+		       u."birthPlace", u."birthDate", u."address",
+		       u."tiktok", u."instagram", u."facebook", u."socialX",
+		       u."fatherName", u."fatherPhone", u."motherName", u."motherPhone", u."hobby",
 		       g."name", g."level"::text, g."gender"::text,
 		       s."id", s."name"
 		FROM "GroupMember" gm
@@ -334,10 +340,18 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 		JOIN "Group" g ON g."id"=gm."groupId"
 		JOIN "School" s ON s."id"=g."schoolId"
 		WHERE gm."groupId"=$1 AND gm."userId"=$2 AND gm."isActive"=true`, id, uid).
-		Scan(&mid, &joined, &name, &email, &phone, &gender, &points, &lastLogin, &createdAt, &gName, &gLevel, &gGender, &schoolID, &schoolName)
+		Scan(&mid, &joined, &name, &email, &phone, &gender, &points, &lastLogin, &createdAt,
+			&birthPlace, &birthDate, &address,
+			&tiktok, &instagram, &facebook, &socialX,
+			&fatherName, &fatherPhone, &motherName, &motherPhone, &hobby,
+			&gName, &gLevel, &gGender, &schoolID, &schoolName)
 	if e != nil {
 		httpx.Error(w, 404, "Anggota tidak ditemukan di kelompok ini")
 		return
+	}
+	var birthDateStr any
+	if birthDate != nil {
+		birthDateStr = birthDate.Format("2006-01-02")
 	}
 
 	// Monday of join week (WIB), same rule as Express getMonday
@@ -382,6 +396,10 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 		"user": map[string]any{
 			"id": uid, "name": name, "email": email, "phone": phone,
 			"gender": gender, "totalPoints": points, "lastLoginAt": lastLogin, "createdAt": createdAt,
+			"birthPlace": birthPlace, "birthDate": birthDateStr, "address": address,
+			"tiktok": tiktok, "instagram": instagram, "facebook": facebook, "socialX": socialX,
+			"fatherName": fatherName, "fatherPhone": fatherPhone,
+			"motherName": motherName, "motherPhone": motherPhone, "hobby": hobby,
 		},
 		"group":  map[string]any{"id": id, "name": gName, "level": gLevel, "gender": gGender},
 		"school": map[string]any{"id": schoolID, "name": schoolName},

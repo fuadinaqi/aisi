@@ -12,6 +12,18 @@ export interface GroupMemberDetail {
     totalPoints: number;
     lastLoginAt: string | null;
     createdAt: string;
+    birthPlace?: string | null;
+    birthDate?: string | null;
+    address?: string | null;
+    hobby?: string | null;
+    tiktok?: string | null;
+    instagram?: string | null;
+    facebook?: string | null;
+    socialX?: string | null;
+    fatherName?: string | null;
+    fatherPhone?: string | null;
+    motherName?: string | null;
+    motherPhone?: string | null;
   };
   group: { id: string; name: string; level: string; gender?: string };
   school: { id: string; name: string };

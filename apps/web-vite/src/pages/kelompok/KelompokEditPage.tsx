@@ -59,15 +59,22 @@ export default function EditKelompokPage() {
     register,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
-  } = useForm<FormData>();
+    formState: { isSubmitting, errors },
+  } = useForm<FormData>({
+    defaultValues: {
+      name: '',
+      level: 'LEVEL_1',
+      gender: 'IKHWAN',
+      pembinaId: '',
+    },
+  });
 
   useEffect(() => {
     if (!group) return;
     reset({
       name: group.name,
       level: (group.level as 'LEVEL_1' | 'LEVEL_2') || 'LEVEL_1',
-      gender: (group.gender as 'IKHWAN' | 'AKHWAT') || 'IKHWAN',
+      gender: group.gender === 'AKHWAT' ? 'AKHWAT' : 'IKHWAN',
       pembinaId: group.pembina.id,
     });
   }, [group, reset]);
@@ -129,8 +136,9 @@ export default function EditKelompokPage() {
                 id="name"
                 className="rounded-xl"
                 placeholder="Kelompok Alpha"
-                {...register('name', { required: true })}
+                {...register('name', { required: 'Nama kelompok wajib diisi' })}
               />
+              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
 
             <div className="space-y-2">
@@ -153,13 +161,14 @@ export default function EditKelompokPage() {
               <GenderSelect
                 id="gender"
                 disabled={(group.members?.length ?? 0) > 0}
-                {...register('gender')}
+                {...register('gender', { required: 'Jenis kelompok wajib dipilih' })}
               />
               {(group.members?.length ?? 0) > 0 && (
                 <p className="text-xs text-muted-foreground">
                   Jenis kelompok tidak dapat diubah selama masih ada anggota.
                 </p>
               )}
+              {errors.gender && <p className="text-sm text-destructive">{errors.gender.message}</p>}
             </div>
 
             {canChangePembina && (
@@ -171,7 +180,7 @@ export default function EditKelompokPage() {
                   <select
                     id="pembinaId"
                     className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                    {...register('pembinaId', { required: true })}
+                    {...register('pembinaId', { required: 'Pembina wajib dipilih' })}
                   >
                     {pembinaList.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -179,6 +188,9 @@ export default function EditKelompokPage() {
                       </option>
                     ))}
                   </select>
+                )}
+                {errors.pembinaId && (
+                  <p className="text-sm text-destructive">{errors.pembinaId.message}</p>
                 )}
               </div>
             )}

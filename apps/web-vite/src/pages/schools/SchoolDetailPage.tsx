@@ -110,7 +110,9 @@ export default function SchoolDetailPage() {
                   {i > 0 && <ListDivider />}
                   <div className="flex items-center gap-3 px-4 py-4 md:px-5">
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium">{pj.name}</p>
+                      <Link to={`/users/${pj.id}`} className="font-medium hover:underline">
+                        {pj.name}
+                      </Link>
                       <p className="truncate text-sm text-muted-foreground">
                         {[pj.email, pj.phone].filter(Boolean).join(' · ')}
                       </p>

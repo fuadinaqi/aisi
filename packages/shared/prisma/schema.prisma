@@ -127,6 +127,18 @@ model User {
   password    String
   avatarUrl   String?
   gender      Gender    @default(IKHWAN)
+  birthPlace  String?
+  birthDate   DateTime? @db.Date
+  address     String?
+  tiktok      String?
+  instagram   String?
+  facebook    String?
+  socialX     String?
+  fatherName  String?
+  fatherPhone String?
+  motherName  String?
+  motherPhone String?
+  hobby       String?
   totalPoints Int       @default(0)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())

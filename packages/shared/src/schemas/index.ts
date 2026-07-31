@@ -37,6 +37,29 @@ export const changePasswordSchema = z
     path: ['confirmPassword'],
   });
 
+const optionalText = z.string().trim().optional();
+
+export const updateProfileSchema = z.object({
+  name: z.string().trim().min(2, 'Nama minimal 2 karakter'),
+  phone: optionalText,
+  birthPlace: optionalText,
+  birthDate: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Format tanggal tidak valid'),
+  address: optionalText,
+  tiktok: optionalText,
+  instagram: optionalText,
+  facebook: optionalText,
+  socialX: optionalText,
+  fatherName: optionalText,
+  fatherPhone: optionalText,
+  motherName: optionalText,
+  motherPhone: optionalText,
+  hobby: optionalText,
+});
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email('Email tidak valid'),
 });
@@ -366,6 +389,7 @@ export const kksListQuerySchema = paginationSchema.extend({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type InvitationInput = z.infer<typeof invitationSchema>;

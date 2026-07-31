@@ -39,7 +39,7 @@ export default function NewSchoolPage() {
     register,
     handleSubmit,
     watch,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<FormData>({
     defaultValues: {
       city: 'Depok',
@@ -161,7 +161,13 @@ export default function NewSchoolPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="pjGender">Jenis kelamin</Label>
-                  <GenderSelect id="pjGender" {...register('pjGender', { required: true })} />
+                  <GenderSelect
+                    id="pjGender"
+                    {...register('pjGender', { required: 'Jenis kelamin wajib dipilih' })}
+                  />
+                  {errors.pjGender && (
+                    <p className="text-sm text-destructive">{errors.pjGender.message}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
