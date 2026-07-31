@@ -27,7 +27,12 @@ if [[ -f apps/api-go/.env ]]; then
 fi
 
 echo "==> Install JS dependencies (web-vite + shared prisma tools)"
-pnpm install --frozen-lockfile || pnpm install
+# CI=true: non-interactive (hindari prompt purge node_modules di SSH/deploy)
+export CI=true
+if ! pnpm install --frozen-lockfile; then
+  echo "WARN: frozen-lockfile gagal, install ulang tanpa freeze"
+  pnpm install --force
+fi
 
 echo "==> DB migrate (Prisma history tetap dipakai sampai goose penuh di prod)"
 pnpm db:generate
