@@ -32,7 +32,7 @@ export default function UndangAnggotaPage() {
 
       <ListGroup className="p-5">
         <InviteForm
-          description="Anggota akan menerima undangan email dan otomatis masuk ke kelompok ini setelah aktivasi."
+          description="Anggota akan menerima undangan email dan otomatis masuk ke kelompok ini setelah aktivasi. Jenis kelamin mengikuti jenis kelompok."
           submitLabel="Kirim undangan anggota"
           onCancel={() => navigate(-1)}
           onSubmit={async (data) => {

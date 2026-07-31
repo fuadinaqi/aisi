@@ -91,16 +91,11 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 403, "Anda tidak berhak mengundang role ini")
 		return
 	}
-	if in.Role == "PEMBINA" || in.Role == "ANGGOTA" || in.Role == "PJ_SEKOLAH" {
-		if in.Gender == nil || !validGender(*in.Gender) {
-			httpx.Error(w, 400, "Jenis kelamin wajib dipilih")
-			return
-		}
-	}
 	if in.SchoolID != nil && *in.SchoolID != "" && !h.assertSchoolAccess(r, *in.SchoolID) {
 		httpx.Error(w, 403, "Akses sekolah ditolak")
 		return
 	}
+	// Undangan anggota ke kelompok: gender diisi otomatis dari jenis kelompok.
 	if in.GroupID != nil && in.Role == "ANGGOTA" {
 		if !h.assertGroupAccess(r, *in.GroupID) {
 			httpx.Error(w, 403, "Akses kelompok ditolak")
@@ -112,11 +107,17 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, 404, "Kelompok tidak ditemukan")
 			return
 		}
-		if in.Gender == nil {
+		if in.Gender == nil || *in.Gender == "" {
 			in.Gender = &gender
 		}
 		if *in.Gender != gender {
 			httpx.Error(w, 400, "Jenis kelamin Anggota harus sesuai kelompok")
+			return
+		}
+	}
+	if in.Role == "PEMBINA" || in.Role == "ANGGOTA" || in.Role == "PJ_SEKOLAH" {
+		if in.Gender == nil || !validGender(*in.Gender) {
+			httpx.Error(w, 400, "Jenis kelamin wajib dipilih")
 			return
 		}
 	}
