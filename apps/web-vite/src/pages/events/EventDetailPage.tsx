@@ -14,6 +14,7 @@ import { formatDate, formatEventTargetLevels, getMediaUrl } from '@/lib/utils';
 import { invalidateEventQueries } from '@/lib/queryInvalidation';
 import type { EventItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
+import { compressImage } from '@/lib/compressImage';
 import { toastError, toastSuccess } from '@/lib/toast';
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -56,8 +57,9 @@ export default function EventDetailPage() {
     try {
       setLoading(true);
       setError('');
+      const optimized = await compressImage(photo);
       const formData = new FormData();
-      formData.append('photo', photo);
+      formData.append('photo', optimized);
       await api.post(`/events/${id}/check-in`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -67,10 +69,12 @@ export default function EventDetailPage() {
       if (fileRef.current) fileRef.current.value = '';
       toastSuccess('Check-in berhasil dikirim');
     } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          'Gagal check-in',
-      );
+      const msg =
+        err instanceof Error && !('response' in err)
+          ? err.message
+          : (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            'Gagal check-in';
+      setError(msg);
       toastError(err, 'Gagal check-in');
     } finally {
       setLoading(false);
@@ -211,7 +215,7 @@ export default function EventDetailPage() {
               </Button>
             )}
             <Button type="button" className="flex-1 rounded-xl" disabled={loading || !photo} onClick={handleCheckIn}>
-              {loading ? 'Mengirim...' : 'Kirim check-in'}
+              {loading ? 'Mengoptimalkan foto...' : 'Kirim check-in'}
             </Button>
           </div>
 

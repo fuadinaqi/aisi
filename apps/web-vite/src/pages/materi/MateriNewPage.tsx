@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn, toDateInputValue } from '@/lib/utils';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
+import { compressImagesInList } from '@/lib/compressImage';
 import { toastError, toastSuccess } from '@/lib/toast';
 
 type ContentType = 'FILE' | 'LINK' | 'RICH_TEXT';
@@ -78,7 +79,8 @@ export default function NewMateriPage() {
         formData.append('contentHtml', contentHtml);
       }
       if (contentType === 'FILE') {
-        files.forEach((file) => formData.append('files', file));
+        const optimized = await compressImagesInList(files);
+        optimized.forEach((file) => formData.append('files', file));
       }
 
       await api.post('/materi', formData, {
@@ -89,10 +91,12 @@ export default function NewMateriPage() {
       toastSuccess('Materi berhasil dibuat');
       navigate('/materi');
     } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          'Gagal membuat materi',
-      );
+      const msg =
+        err instanceof Error && !('response' in err)
+          ? err.message
+          : (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            'Gagal membuat materi';
+      setError(msg);
       toastError(err, 'Gagal membuat materi');
     } finally {
       setLoading(false);
@@ -273,7 +277,11 @@ export default function NewMateriPage() {
             )}
 
             <Button type="submit" disabled={loading} className="w-full rounded-xl">
-              {loading ? 'Menyimpan...' : 'Publikasikan materi'}
+              {loading
+                ? contentType === 'FILE' && files.some((f) => f.type.startsWith('image/'))
+                  ? 'Mengoptimalkan foto...'
+                  : 'Menyimpan...'
+                : 'Publikasikan materi'}
             </Button>
           </form>
         </ListGroup>

@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	MaxImageBytes  = 5 << 20
+	MaxImageBytes  = 5 << 20  // max raw upload before optimize
 	MaxMateriBytes = 10 << 20
 )
 

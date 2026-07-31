@@ -37,12 +37,12 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 	r.Get("/{id}", detail(db))
 	r.With(middleware.RequireRole("ADMIN", "SUPERADMIN")).Post("/", save(db, c, false))
 	r.With(middleware.RequireRole("ADMIN", "SUPERADMIN")).Put("/{id}", save(db, c, true))
-	r.With(middleware.RequireRole("ADMIN", "SUPERADMIN")).Delete("/{id}", remove(db))
+	r.With(middleware.RequireRole("ADMIN", "SUPERADMIN")).Delete("/{id}", remove(db, c))
 	return r
 }
-func parse(r *http.Request, existing []string) (input, []*multipart.FileHeader, error) {
+func parse(r *http.Request, existing []string) (input, []*multipart.FileHeader, []string, error) {
 	if e := r.ParseMultipartForm(52 << 20); e != nil {
-		return input{}, nil, e
+		return input{}, nil, nil, e
 	}
 	in := input{Title: r.FormValue("title"), WeekDate: r.FormValue("weekDate"), ContentType: r.FormValue("contentType"), IsPublished: r.FormValue("isPublished") != "false"}
 	if x := r.FormValue("description"); x != "" {
@@ -61,12 +61,15 @@ func parse(r *http.Request, existing []string) (input, []*multipart.FileHeader, 
 			in.TargetLevels = []string{raw}
 		}
 	}
-	keep := existing
+	keep := append([]string{}, existing...)
 	if x := r.FormValue("keepFileUrls"); x != "" {
-		_ = json.Unmarshal([]byte(x), &keep)
+		var parsed []string
+		if err := json.Unmarshal([]byte(x), &parsed); err != nil {
+			return input{}, nil, nil, err
+		}
+		keep = parsed
 	}
-	_ = keep
-	return in, r.MultipartForm.File["files"], nil
+	return in, r.MultipartForm.File["files"], keep, nil
 }
 func monday(s string) (time.Time, error) {
 	t, e := time.ParseInLocation("2006-01-02", s[:min(len(s), 10)], time.FixedZone("WIB", 7*3600))
@@ -103,7 +106,7 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 				return
 			}
 		}
-		in, files, e := parse(r, existing)
+		in, files, keep, e := parse(r, existing)
 		if e != nil || len(in.Title) < 2 {
 			httpx.Error(w, 400, "Data materi tidak valid")
 			return
@@ -117,37 +120,12 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 			httpx.Error(w, 400, "Data materi tidak valid")
 			return
 		}
-		s, e := storage.New(cfg)
-		if e != nil {
-			httpx.Error(w, 500, "Storage tidak tersedia")
-			return
+		urls := keep
+		if !update {
+			urls = []string{}
 		}
-		urls := existing
-		for _, f := range files {
-			if f.Size > 10<<20 {
-				httpx.Error(w, 400, "Ukuran file maksimal 10MB")
-				return
-			}
-			h, e := f.Open()
-			if e != nil {
-				httpx.Error(w, 400, "File tidak valid")
-				return
-			}
-			validated, detectedType, ve := storage.ValidateMateriFile(h, f.Filename, f.Size)
-			if ve != nil {
-				h.Close()
-				httpx.Error(w, 400, ve.Error())
-				return
-			}
-			u, e := s.Put(r.Context(), f.Filename, validated, detectedType)
-			h.Close()
-			if e != nil {
-				httpx.Error(w, 500, "Gagal upload file")
-				return
-			}
-			urls = append(urls, u)
-		}
-		if in.ContentType == "FILE" && len(urls) == 0 {
+		// Validate business rules before any storage mutation.
+		if in.ContentType == "FILE" && len(urls)+len(files) == 0 {
 			httpx.Error(w, 400, "File wajib diunggah")
 			return
 		}
@@ -159,6 +137,59 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 			httpx.Error(w, 400, "Konten wajib diisi")
 			return
 		}
+		s, e := storage.New(cfg)
+		if e != nil {
+			httpx.Error(w, 500, "Storage tidak tersedia")
+			return
+		}
+		uploaded := []string{}
+		rollbackUploads := func() {
+			for _, ou := range uploaded {
+				s.DeleteBestEffort(r.Context(), ou)
+			}
+		}
+		for _, f := range files {
+			if f.Size > 10<<20 {
+				rollbackUploads()
+				httpx.Error(w, 400, "Ukuran file maksimal 10MB")
+				return
+			}
+			h, e := f.Open()
+			if e != nil {
+				rollbackUploads()
+				httpx.Error(w, 400, "File tidak valid")
+				return
+			}
+			validated, detectedType, ve := storage.ValidateMateriFile(h, f.Filename, f.Size)
+			if ve != nil {
+				h.Close()
+				rollbackUploads()
+				httpx.Error(w, 400, ve.Error())
+				return
+			}
+			body := validated
+			ct := detectedType
+			name := f.Filename
+			if storage.IsImageType(detectedType) {
+				optimized, oct, oe := storage.OptimizeImage(validated)
+				if oe != nil {
+					h.Close()
+					rollbackUploads()
+					httpx.Error(w, 400, oe.Error())
+					return
+				}
+				body, ct, name = optimized, oct, "image.jpg"
+			}
+			u, e := s.Put(r.Context(), storage.PrefixMateri, name, body, ct)
+			h.Close()
+			if e != nil {
+				rollbackUploads()
+				httpx.Error(w, 500, "Gagal upload file")
+				return
+			}
+			uploaded = append(uploaded, u)
+			urls = append(urls, u)
+		}
 		if !update {
 			c, _ := middleware.Claims(r)
 			id = uuid.NewString()
@@ -167,8 +198,20 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 			_, e = db.Exec(r.Context(), `UPDATE "WeeklyMateri" SET "title"=$1,"description"=$2,"weekDate"=$3,"contentType"=$4::"MateriContentType","linkUrl"=$5,"contentHtml"=$6,"fileUrls"=$7,"targetLevels"=$8::"GroupLevel"[],"isPublished"=$9,"updatedAt"=NOW() WHERE "id"=$10`, in.Title, in.Description, wd, in.ContentType, in.LinkURL, in.ContentHTML, urls, in.TargetLevels, in.IsPublished, id)
 		}
 		if e != nil {
+			rollbackUploads()
 			httpx.Error(w, 500, "Gagal menyimpan materi")
 			return
+		}
+		if update {
+			keepSet := map[string]struct{}{}
+			for _, u := range keep {
+				keepSet[u] = struct{}{}
+			}
+			for _, u := range existing {
+				if _, ok := keepSet[u]; !ok {
+					s.DeleteBestEffort(r.Context(), u)
+				}
+			}
 		}
 		byID(w, r, db, id, map[bool]int{true: 200, false: 201}[update], map[bool]string{true: "Materi berhasil diperbarui", false: "Materi berhasil dibuat"}[update])
 	}
@@ -240,9 +283,19 @@ func byID(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, id string, s
 	}
 	httpx.Success(w, status, raw, msg)
 }
-func remove(db *pgxpool.Pool) http.HandlerFunc {
+func remove(db *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
+		var fileURLs []string
+		e := db.QueryRow(r.Context(), `SELECT "fileUrls" FROM "WeeklyMateri" WHERE "id"=$1`, id).Scan(&fileURLs)
+		if e == pgx.ErrNoRows {
+			httpx.Error(w, 404, "Materi tidak ditemukan")
+			return
+		}
+		if e != nil {
+			httpx.Error(w, 500, "Gagal menghapus materi")
+			return
+		}
 		tag, e := db.Exec(r.Context(), `DELETE FROM "WeeklyMateri" WHERE "id"=$1`, id)
 		if e != nil {
 			httpx.Error(w, 500, "Gagal menghapus materi")
@@ -251,6 +304,11 @@ func remove(db *pgxpool.Pool) http.HandlerFunc {
 		if tag.RowsAffected() == 0 {
 			httpx.Error(w, 404, "Materi tidak ditemukan")
 			return
+		}
+		if s, se := storage.New(cfg); se == nil {
+			for _, u := range fileURLs {
+				s.DeleteBestEffort(r.Context(), u)
+			}
 		}
 		httpx.Success(w, 200, nil, "Materi berhasil dihapus")
 	}

@@ -449,9 +449,15 @@ func photos(db *pgxpool.Pool, c config.Config) http.HandlerFunc {
 			return
 		}
 		urls := []string{}
+		rollback := func() {
+			for _, u := range urls {
+				s.DeleteBestEffort(r.Context(), u)
+			}
+		}
 		for _, f := range files {
-			u, e := putImage(r, s, f, 5<<20)
+			u, e := putImage(r, s, f, storage.PrefixEvaluations)
 			if e != nil {
+				rollback()
 				httpx.Error(w, 400, e.Error())
 				return
 			}
@@ -459,24 +465,28 @@ func photos(db *pgxpool.Pool, c config.Config) http.HandlerFunc {
 		}
 		_, err = db.Exec(r.Context(), `UPDATE "WeeklyEvaluation" SET "photoUrls"=COALESCE("photoUrls",'{}') || $1::text[],"updatedAt"=NOW() WHERE "id"=$2`, urls, id)
 		if err != nil {
+			rollback()
 			httpx.Error(w, 500, "Gagal upload foto")
 			return
 		}
 		detailByID(w, r, db, id, 200, "Foto berhasil diupload")
 	}
 }
-func putImage(r *http.Request, s *storage.Storage, f *multipart.FileHeader, max int64) (string, error) {
-	_ = max
+func putImage(r *http.Request, s *storage.Storage, f *multipart.FileHeader, prefix string) (string, error) {
 	in, e := f.Open()
 	if e != nil {
 		return "", e
 	}
 	defer in.Close()
-	validated, ct, e := storage.ValidateImage(in, f.Size)
+	validated, _, e := storage.ValidateImage(in, f.Size)
 	if e != nil {
 		return "", e
 	}
-	return s.Put(r.Context(), f.Filename, validated, ct)
+	optimized, ct, e := storage.OptimizeImage(validated)
+	if e != nil {
+		return "", e
+	}
+	return s.Put(r.Context(), prefix, "photo.jpg", optimized, ct)
 }
 func mondayNow() time.Time {
 	n := time.Now().In(time.FixedZone("WIB", 7*3600))

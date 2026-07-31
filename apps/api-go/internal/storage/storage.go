@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,13 +19,20 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	PrefixEvents      = "events/"
+	PrefixCheckins    = "checkins/"
+	PrefixEvaluations = "evaluations/"
+	PrefixMateri      = "materi/"
+)
+
 type Storage struct {
-	client                    *s3.Client
+	client                      *s3.Client
 	bucket, publicURL, localDir string
 }
 
 func New(c config.Config) (*Storage, error) {
-	s := &Storage{bucket: c.R2Bucket, publicURL: c.R2PublicURL, localDir: "uploads"}
+	s := &Storage{bucket: c.R2Bucket, publicURL: strings.TrimRight(c.R2PublicURL, "/"), localDir: "uploads"}
 	if c.R2AccountID == "" || c.R2Bucket == "" {
 		return s, os.MkdirAll(s.localDir, 0755)
 	}
@@ -37,9 +46,18 @@ func New(c config.Config) (*Storage, error) {
 	return s, nil
 }
 
-// Put stores content. contentType should be detected server-side; empty falls back to application/octet-stream.
-func (s *Storage) Put(ctx context.Context, filename string, content io.Reader, contentType string) (string, error) {
-	ext := filepath.Ext(filename)
+func normalizePrefix(prefix string) string {
+	prefix = strings.Trim(prefix, "/")
+	if prefix == "" {
+		return ""
+	}
+	return prefix + "/"
+}
+
+// Put stores content under {prefix}{uuid}{ext}. contentType should be detected server-side.
+// filename is used for extension when content type does not imply one (e.g. OOXML zip).
+func (s *Storage) Put(ctx context.Context, prefix, filename string, content io.Reader, contentType string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(filename))
 	if contentType != "" {
 		switch contentType {
 		case "image/jpeg":
@@ -53,13 +71,18 @@ func (s *Storage) Put(ctx context.Context, filename string, content io.Reader, c
 		case "application/pdf":
 			ext = ".pdf"
 		}
-	}
-	key := uuid.NewString() + ext
-	if contentType == "" {
+	} else {
 		contentType = "application/octet-stream"
 	}
+	if ext == "" {
+		ext = ".bin"
+	}
+	key := normalizePrefix(prefix) + uuid.NewString() + ext
 	if s.client == nil {
-		path := filepath.Join(s.localDir, key)
+		path := filepath.Join(s.localDir, filepath.FromSlash(key))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			return "", err
+		}
 		f, err := os.Create(path)
 		if err != nil {
 			return "", err
@@ -86,6 +109,75 @@ func (s *Storage) Put(ctx context.Context, filename string, content io.Reader, c
 		return key, nil
 	}
 	return fmt.Sprintf("%s/%s", s.publicURL, key), nil
+}
+
+// Delete removes an object by URL returned from Put, /uploads/… path, or raw key. Missing object is nil.
+func (s *Storage) Delete(ctx context.Context, urlOrKey string) error {
+	key, ok := resolveKey(urlOrKey, s.publicURL)
+	if !ok {
+		return nil
+	}
+	if s.client == nil {
+		path := filepath.Join(s.localDir, filepath.FromSlash(key))
+		err := os.Remove(path)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return nil
+	}
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: &s.bucket,
+		Key:    &key,
+	})
+	return err
+}
+
+// DeleteBestEffort deletes and logs failures without returning them.
+func (s *Storage) DeleteBestEffort(ctx context.Context, urlOrKey string) {
+	if urlOrKey == "" {
+		return
+	}
+	if err := s.Delete(ctx, urlOrKey); err != nil {
+		log.Printf("storage: gagal hapus %s: %v", urlOrKey, err)
+	}
+}
+
+func resolveKey(urlOrKey, publicURL string) (string, bool) {
+	raw := strings.TrimSpace(urlOrKey)
+	if raw == "" {
+		return "", false
+	}
+	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return "", false
+		}
+		raw = strings.TrimPrefix(u.Path, "/")
+		if publicURL != "" {
+			if pu, err := url.Parse(publicURL); err == nil {
+				prefix := strings.Trim(pu.Path, "/")
+				if prefix != "" && strings.HasPrefix(raw, prefix+"/") {
+					raw = strings.TrimPrefix(raw, prefix+"/")
+				}
+			}
+		}
+	} else {
+		raw = strings.TrimPrefix(raw, "/uploads/")
+		raw = strings.TrimPrefix(raw, "uploads/")
+		raw = strings.TrimPrefix(raw, "/")
+	}
+	raw = strings.TrimPrefix(raw, "/")
+	if raw == "" || strings.Contains(raw, "..") || strings.HasPrefix(raw, `\`) {
+		return "", false
+	}
+	// Allow only safe key chars: alnum, dash, underscore, slash, dot
+	for _, r := range raw {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '/' || r == '.' {
+			continue
+		}
+		return "", false
+	}
+	return raw, true
 }
 
 // UploadFileServer serves local uploads with nosniff and attachment for non-images.

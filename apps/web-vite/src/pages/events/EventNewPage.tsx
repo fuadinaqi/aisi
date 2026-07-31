@@ -16,6 +16,7 @@ import { invalidateEventQueries } from '@/lib/queryInvalidation';
 import { toDateTimeLocalValue } from '@/lib/utils';
 import type { SchoolItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
+import { compressImage } from '@/lib/compressImage';
 import { toastError, toastSuccess } from '@/lib/toast';
 
 export default function NewEventPage() {
@@ -80,7 +81,10 @@ export default function NewEventPage() {
         'targetLevels',
         levelMode === 'specific' ? JSON.stringify(selectedLevels) : '[]',
       );
-      if (image) formData.append('image', image);
+      if (image) {
+        const optimized = await compressImage(image);
+        formData.append('image', optimized);
+      }
 
       await api.post('/events', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -90,10 +94,12 @@ export default function NewEventPage() {
       toastSuccess('Event berhasil dibuat');
       navigate('/events');
     } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          'Gagal membuat event',
-      );
+      const msg =
+        err instanceof Error && !('response' in err)
+          ? err.message
+          : (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            'Gagal membuat event';
+      setError(msg);
       toastError(err, 'Gagal membuat event');
     } finally {
       setLoading(false);
@@ -263,7 +269,7 @@ export default function NewEventPage() {
             )}
 
             <Button type="submit" disabled={loading} className="w-full rounded-xl">
-              {loading ? 'Menyimpan...' : 'Buat event'}
+              {loading ? (image ? 'Mengoptimalkan foto...' : 'Menyimpan...') : 'Buat event'}
             </Button>
           </form>
         </ListGroup>

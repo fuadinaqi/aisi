@@ -41,7 +41,7 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 	r.Post("/check-ins/{attendanceId}/reject", reject(db))
 	r.Get("/{id}", detail(db))
 	r.Put("/{id}", save(db, c, true))
-	r.Delete("/{id}", remove(db))
+	r.Delete("/{id}", remove(db, c))
 	r.Post("/{id}/check-in", checkin(db, c))
 	return r
 }
@@ -193,17 +193,20 @@ func save(db *pgxpool.Pool, cfg config.Config, isUpdate bool) http.HandlerFunc {
 				}
 			}
 		}
+		var store *storage.Storage
+		var newImageURL string
 		if file != nil {
-			s, e := storage.New(cfg)
+			store, e = storage.New(cfg)
 			if e != nil {
 				httpx.Error(w, 500, "Storage tidak tersedia")
 				return
 			}
-			u, e := putImage(r, s, file, 5<<20)
+			u, e := putImage(r, store, file, storage.PrefixEvents)
 			if e != nil {
 				httpx.Error(w, 400, e.Error())
 				return
 			}
+			newImageURL = u
 			in.ImageURL = &u
 		} else if isUpdate && in.ImageURL == nil {
 			in.ImageURL = existingImage
@@ -219,8 +222,14 @@ func save(db *pgxpool.Pool, cfg config.Config, isUpdate bool) http.HandlerFunc {
 			_, e = db.Exec(r.Context(), `UPDATE "Event" SET "title"=$1,"description"=$2,"location"=$3,"startAt"=$4,"endAt"=$5,"pointValue"=$6,"imageUrl"=$7,"targetLevels"=$8::"GroupLevel"[],"isPublished"=$9,"updatedAt"=NOW() WHERE "id"=$10`, in.Title, in.Description, in.Location, start, end, in.PointValue, in.ImageURL, in.TargetLevels, published, id)
 		}
 		if e != nil {
+			if store != nil && newImageURL != "" {
+				store.DeleteBestEffort(r.Context(), newImageURL)
+			}
 			httpx.Error(w, 500, "Gagal menyimpan event")
 			return
+		}
+		if store != nil && newImageURL != "" && existingImage != nil && *existingImage != "" && *existingImage != newImageURL {
+			store.DeleteBestEffort(r.Context(), *existingImage)
 		}
 		eventByID(w, r, db, id, map[bool]int{true: 200, false: 201}[isUpdate], map[bool]string{true: "Event berhasil diperbarui", false: "Event berhasil dibuat"}[isUpdate])
 	}
@@ -451,16 +460,37 @@ func reject(db *pgxpool.Pool) http.HandlerFunc {
 		httpx.Success(w, 200, map[string]any{"id": id, "status": "REJECTED"}, "Check-in ditolak")
 	}
 }
-func remove(db *pgxpool.Pool) http.HandlerFunc {
+func remove(db *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !authorize(w, r, "ADMIN", "SUPERADMIN", "PJ_SEKOLAH") {
 			return
 		}
 		id := chi.URLParam(r, "id")
+		var imageURL *string
+		_ = db.QueryRow(r.Context(), `SELECT "imageUrl" FROM "Event" WHERE "id"=$1`, id).Scan(&imageURL)
+		rows, qe := db.Query(r.Context(), `SELECT "photoUrl" FROM "EventAttendance" WHERE "eventId"=$1`, id)
+		photoURLs := []string{}
+		if qe == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var u string
+				if rows.Scan(&u) == nil && u != "" {
+					photoURLs = append(photoURLs, u)
+				}
+			}
+		}
 		_, e := db.Exec(r.Context(), `DELETE FROM "Event" WHERE "id"=$1`, id)
 		if e != nil {
 			httpx.Error(w, 500, "Gagal menghapus event")
 			return
+		}
+		if s, se := storage.New(cfg); se == nil {
+			if imageURL != nil {
+				s.DeleteBestEffort(r.Context(), *imageURL)
+			}
+			for _, u := range photoURLs {
+				s.DeleteBestEffort(r.Context(), u)
+			}
 		}
 		httpx.Success(w, 200, nil, "Event berhasil dihapus")
 	}
@@ -487,36 +517,45 @@ func checkin(db *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 			httpx.Error(w, 400, "Kelompok tidak ditemukan")
 			return
 		}
+		var oldPhoto *string
+		_ = db.QueryRow(r.Context(), `SELECT "photoUrl" FROM "EventAttendance" WHERE "eventId"=$1 AND "userId"=$2 AND "status"='REJECTED'`, id, c.UserID).Scan(&oldPhoto)
 		s, e := storage.New(cfg)
 		if e != nil {
 			httpx.Error(w, 500, "Storage tidak tersedia")
 			return
 		}
-		url, e := putImage(r, s, fs[0], 5<<20)
+		url, e := putImage(r, s, fs[0], storage.PrefixCheckins)
 		if e != nil {
 			httpx.Error(w, 400, e.Error())
 			return
 		}
 		_, e = db.Exec(r.Context(), `INSERT INTO "EventAttendance" ("id","eventId","userId","groupId","photoUrl","status") VALUES($1,$2,$3,$4,$5,'PENDING') ON CONFLICT ("eventId","userId") DO UPDATE SET "groupId"=EXCLUDED."groupId","photoUrl"=EXCLUDED."photoUrl","status"='PENDING',"checkedAt"=NOW(),"approvedById"=NULL,"approvedAt"=NULL,"rejectionNote"=NULL WHERE "EventAttendance"."status"='REJECTED'`, uuid.NewString(), id, c.UserID, gid, url)
 		if e != nil {
+			s.DeleteBestEffort(r.Context(), url)
 			httpx.Error(w, 400, "Anda sudah check-in event ini")
 			return
+		}
+		if oldPhoto != nil && *oldPhoto != "" && *oldPhoto != url {
+			s.DeleteBestEffort(r.Context(), *oldPhoto)
 		}
 		httpx.Success(w, 201, map[string]any{"eventId": id, "status": "PENDING", "photoUrl": url}, "Check-in terkirim, menunggu persetujuan pembina")
 	}
 }
-func putImage(r *http.Request, s *storage.Storage, f *multipart.FileHeader, max int64) (string, error) {
-	_ = max
+func putImage(r *http.Request, s *storage.Storage, f *multipart.FileHeader, prefix string) (string, error) {
 	in, e := f.Open()
 	if e != nil {
 		return "", e
 	}
 	defer in.Close()
-	validated, ct, e := storage.ValidateImage(in, f.Size)
+	validated, _, e := storage.ValidateImage(in, f.Size)
 	if e != nil {
 		return "", e
 	}
-	return s.Put(r.Context(), f.Filename, validated, ct)
+	optimized, ct, e := storage.OptimizeImage(validated)
+	if e != nil {
+		return "", e
+	}
+	return s.Put(r.Context(), prefix, "photo.jpg", optimized, ct)
 }
 func page(p, l string) (int, int) {
 	a, b := 1, 20
