@@ -38,12 +38,20 @@ func (h Handler) Routes() chi.Router {
 }
 
 type pjInput struct {
-	Name, Email   string
-	Phone         *string
-	Gender        string
-	Password      *string
-	Replace       bool
-	ReplaceUserID *string `json:"replaceUserId"`
+	Name, Email     string
+	Phone           *string
+	Gender          string
+	Password        *string
+	AlsoAsPembina   *bool   `json:"alsoAsPembina"`
+	Replace         bool
+	ReplaceUserID   *string `json:"replaceUserId"`
+}
+
+func alsoAsPembina(v *bool) bool {
+	if v == nil {
+		return true
+	}
+	return *v
 }
 type schoolInput struct {
 	Name     string
@@ -140,6 +148,9 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		if e == nil {
 			_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'PJ_SEKOLAH')`, uuid.NewString(), uid)
 		}
+		if e == nil && alsoAsPembina(in.PJ.AlsoAsPembina) {
+			_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'PEMBINA')`, uuid.NewString(), uid)
+		}
 		if e == nil {
 			_, e = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") VALUES ($1,$2,$3)`, uuid.NewString(), uid, sid)
 		}
@@ -149,7 +160,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		token := uuid.NewString()
 		iid := uuid.NewString()
 		expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
-		_, e = tx.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","gender","schoolId","token","invitedById","expiresAt") VALUES ($1,$2,$3,'PJ_SEKOLAH',$4::"Gender",$5,$6,$7,$8)`, iid, in.PJ.Name, in.PJ.Email, in.PJ.Gender, sid, token, c.UserID, expires)
+		_, e = tx.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","alsoAsPembina","gender","schoolId","token","invitedById","expiresAt") VALUES ($1,$2,$3,'PJ_SEKOLAH',$4,$5::"Gender",$6,$7,$8,$9)`, iid, in.PJ.Name, in.PJ.Email, alsoAsPembina(in.PJ.AlsoAsPembina), in.PJ.Gender, sid, token, c.UserID, expires)
 		data["invitation"] = map[string]any{"id": iid, "email": in.PJ.Email, "status": "PENDING"}
 		data["_inviteToken"] = token
 	}
@@ -251,6 +262,9 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 		if e == nil {
 			_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'PJ_SEKOLAH')`, uuid.NewString(), uid)
 		}
+		if e == nil && alsoAsPembina(in.AlsoAsPembina) {
+			_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'PEMBINA')`, uuid.NewString(), uid)
+		}
 		if e == nil {
 			_, e = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") VALUES ($1,$2,$3)`, uuid.NewString(), uid, sid)
 		}
@@ -259,7 +273,7 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 	} else {
 		token, iid := uuid.NewString(), uuid.NewString()
 		expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
-		_, e = tx.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","gender","schoolId","token","invitedById","expiresAt") VALUES ($1,$2,$3,'PJ_SEKOLAH',$4::"Gender",$5,$6,$7,$8)`, iid, in.Name, in.Email, in.Gender, sid, token, c.UserID, expires)
+		_, e = tx.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","alsoAsPembina","gender","schoolId","token","invitedById","expiresAt") VALUES ($1,$2,$3,'PJ_SEKOLAH',$4,$5::"Gender",$6,$7,$8,$9)`, iid, in.Name, in.Email, alsoAsPembina(in.AlsoAsPembina), in.Gender, sid, token, c.UserID, expires)
 		data["invitation"] = map[string]string{"id": iid, "email": in.Email}
 		data["_inviteToken"] = token
 	}

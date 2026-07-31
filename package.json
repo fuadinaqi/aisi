@@ -6,6 +6,11 @@
     "build": "pnpm build:web-vite && pnpm build:api-go",
     "lint": "turbo lint",
     "dev:web-vite": "pnpm --filter @dakwah/web-vite dev",
+    "dev:api": "cd apps/api-go && go run ./cmd/server",
+    "dev:db": "node scripts/dev-db.mjs",
+    "dev:stop": "kill-port 4000 5173",
+    "dev:stack": "pnpm dev:db && concurrently -k -n api,web -c blue,green \"pnpm dev:api\" \"pnpm dev:web-vite\"",
+    "dev:restart": "pnpm dev:stop && pnpm dev:stack",
     "build:web-vite": "pnpm --filter @dakwah/web-vite build",
     "build:api-go": "cd apps/api-go && go build -o bin/aisi-api ./cmd/server",
     "db:generate": "pnpm --filter @dakwah/shared db:generate",
@@ -20,6 +25,8 @@
     "test:e2e:p2": "pnpm --filter @dakwah/web-vite test:e2e:p2"
   },
   "devDependencies": {
+    "concurrently": "^10.0.4",
+    "kill-port": "^2.0.1",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
   },

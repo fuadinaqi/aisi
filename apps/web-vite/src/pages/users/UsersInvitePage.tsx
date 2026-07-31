@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,20 +11,34 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toastError, toastSuccess } from '@/lib/toast';
 
+type FormData = {
+  name: string;
+  email: string;
+  alsoAsPembina: boolean;
+};
+
 export default function InviteAdminPage() {
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm<{
-    name: string;
-    email: string;
-  }>();
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<FormData>({
+    defaultValues: { alsoAsPembina: true },
+  });
 
-  const onSubmit = async (data: { name: string; email: string }) => {
+  const onSubmit = async (data: FormData) => {
     try {
       setError('');
       setSuccess('');
-      await api.post('/invitations', { ...data, role: 'ADMIN' });
+      await api.post('/invitations', {
+        name: data.name.trim(),
+        email: data.email.trim(),
+        role: 'ADMIN',
+        alsoAsPembina: data.alsoAsPembina,
+      });
       await invalidateInvitationQueries(queryClient);
       setSuccess('Undangan admin berhasil dikirim. Cek log API untuk link aktivasi.');
       toastSuccess('Undangan berhasil dikirim');
@@ -61,6 +74,15 @@ export default function InviteAdminPage() {
                 placeholder="admin@email.com"
               />
             </div>
+            <label className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
+              <input type="checkbox" className="mt-1" {...register('alsoAsPembina')} />
+              <span className="text-sm">
+                <span className="font-medium">Juga jadikan Pembina</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Default tercentang; bisa di-uncheck jika tidak diperlukan.
+                </span>
+              </span>
+            </label>
             {error && (
               <div className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
             )}

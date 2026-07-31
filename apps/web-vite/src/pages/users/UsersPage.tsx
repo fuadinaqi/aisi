@@ -34,6 +34,7 @@ export default function UsersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [newRole, setNewRole] = useState<string>('PEMBINA');
   const [schoolId, setSchoolId] = useState('');
+  const [alsoAsPembina, setAlsoAsPembina] = useState(true);
 
   const { data, isLoading } = useQuery<UserItem[]>({
     queryKey: ['users'],
@@ -52,9 +53,20 @@ export default function UsersPage() {
   });
 
   const addRole = useMutation({
-    mutationFn: async ({ userId, role, schoolId }: { userId: string; role: string; schoolId?: string }) => {
-      const body: { role: string; schoolId?: string } = { role };
+    mutationFn: async ({
+      userId,
+      role,
+      schoolId,
+      alsoAsPembina,
+    }: {
+      userId: string;
+      role: string;
+      schoolId?: string;
+      alsoAsPembina?: boolean;
+    }) => {
+      const body: { role: string; schoolId?: string; alsoAsPembina?: boolean } = { role };
       if (schoolId) body.schoolId = schoolId;
+      if (role === 'ADMIN' || role === 'PJ_SEKOLAH') body.alsoAsPembina = alsoAsPembina;
       await api.post(`/users/${userId}/roles`, body);
     },
     onSuccess: () => {
@@ -62,6 +74,7 @@ export default function UsersPage() {
       qc.invalidateQueries({ queryKey: ['users'] });
       setExpandedId(null);
       setSchoolId('');
+      setAlsoAsPembina(true);
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
       toast.error(err.response?.data?.message || 'Gagal menambahkan role');
@@ -82,6 +95,7 @@ export default function UsersPage() {
   });
 
   const needsSchool = newRole === 'PJ_SEKOLAH' || newRole === 'PEMBINA' || newRole === 'ANGGOTA';
+  const canAlsoPembina = newRole === 'ADMIN' || newRole === 'PJ_SEKOLAH';
 
   return (
     <RoleGuard allowedRoles={['SUPERADMIN']}>
@@ -173,6 +187,7 @@ export default function UsersPage() {
                             setExpandedId(user.id);
                             setNewRole(next);
                             setSchoolId('');
+                            setAlsoAsPembina(true);
                           }}
                         >
                           <Plus className="mr-1 h-3.5 w-3.5" />
@@ -182,56 +197,75 @@ export default function UsersPage() {
                     </div>
 
                     {isExpanded && (
-                      <div className="mt-3 flex flex-col gap-2 rounded-xl bg-muted/40 p-3 sm:flex-row sm:items-end">
-                        <label className="block flex-1 text-xs">
-                          <span className="mb-1 block text-muted-foreground">Peran</span>
-                          <select
-                            value={newRole}
-                            onChange={(e) => setNewRole(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background px-2 py-2 text-sm"
-                          >
-                            {ASSIGNABLE_ROLES.filter((r) => !roleList.includes(r)).map((r) => (
-                              <option key={r} value={r}>
-                                {getRoleLabel(r)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        {needsSchool && (
+                      <div className="mt-3 flex flex-col gap-2 rounded-xl bg-muted/40 p-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                           <label className="block flex-1 text-xs">
-                            <span className="mb-1 block text-muted-foreground">Sekolah (opsional)</span>
+                            <span className="mb-1 block text-muted-foreground">Peran</span>
                             <select
-                              value={schoolId}
-                              onChange={(e) => setSchoolId(e.target.value)}
+                              value={newRole}
+                              onChange={(e) => setNewRole(e.target.value)}
                               className="w-full rounded-lg border border-border bg-background px-2 py-2 text-sm"
                             >
-                              <option value="">—</option>
-                              {(schools || []).map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.name}
+                              {ASSIGNABLE_ROLES.filter((r) => !roleList.includes(r)).map((r) => (
+                                <option key={r} value={r}>
+                                  {getRoleLabel(r)}
                                 </option>
                               ))}
                             </select>
                           </label>
+                          {needsSchool && (
+                            <label className="block flex-1 text-xs">
+                              <span className="mb-1 block text-muted-foreground">Sekolah (opsional)</span>
+                              <select
+                                value={schoolId}
+                                onChange={(e) => setSchoolId(e.target.value)}
+                                className="w-full rounded-lg border border-border bg-background px-2 py-2 text-sm"
+                              >
+                                <option value="">—</option>
+                                {(schools || []).map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="rounded-xl"
+                            disabled={
+                              addRole.isPending ||
+                              ASSIGNABLE_ROLES.every((r) => roleList.includes(r))
+                            }
+                            onClick={() =>
+                              addRole.mutate({
+                                userId: user.id,
+                                role: newRole,
+                                schoolId: schoolId || undefined,
+                                alsoAsPembina: canAlsoPembina ? alsoAsPembina : undefined,
+                              })
+                            }
+                          >
+                            Tambah
+                          </Button>
+                        </div>
+                        {canAlsoPembina && (
+                          <label className="flex items-start gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5"
+                              checked={alsoAsPembina}
+                              onChange={(e) => setAlsoAsPembina(e.target.checked)}
+                            />
+                            <span>
+                              <span className="font-medium">Juga jadikan Pembina</span>
+                              <span className="mt-0.5 block text-muted-foreground">
+                                Default tercentang; bisa di-uncheck.
+                              </span>
+                            </span>
+                          </label>
                         )}
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="rounded-xl"
-                          disabled={
-                            addRole.isPending ||
-                            ASSIGNABLE_ROLES.every((r) => roleList.includes(r))
-                          }
-                          onClick={() =>
-                            addRole.mutate({
-                              userId: user.id,
-                              role: newRole,
-                              schoolId: schoolId || undefined,
-                            })
-                          }
-                        >
-                          Tambah
-                        </Button>
                       </div>
                     )}
                   </div>

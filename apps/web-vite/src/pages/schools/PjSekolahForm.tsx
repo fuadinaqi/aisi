@@ -53,6 +53,7 @@ export function PjSekolahForm({ replace = false, replaceUserId, replaceUserName 
             showPhone
             showGender
             showPasswordOption
+            showAlsoAsPembina
             onCancel={() => navigate(-1)}
             onSubmit={async (data) => {
               await api.post(`/schools/${id}/pj`, {

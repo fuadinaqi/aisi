@@ -59,6 +59,7 @@ export const invitationSchema = z.object({
   gender: genderSchema.optional(),
   schoolId: z.string().optional(),
   groupId: z.string().optional(),
+  alsoAsPembina: z.boolean().optional().default(true),
 });
 
 export const paginationSchema = z.object({
@@ -87,6 +88,7 @@ export const createSchoolWithPjSchema = z.object({
     phone: z.string().optional(),
     gender: genderSchema,
     password: passwordSchema.optional(),
+    alsoAsPembina: z.boolean().optional().default(true),
   }),
 });
 
@@ -96,6 +98,7 @@ export const invitePjSchema = z.object({
   phone: z.string().optional(),
   gender: genderSchema,
   password: passwordSchema.optional(),
+  alsoAsPembina: z.boolean().optional().default(true),
   replace: z.boolean().default(false),
   replaceUserId: z.string().optional(),
 });

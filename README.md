@@ -70,16 +70,24 @@ pnpm db:migrate
 # Seed database
 pnpm db:seed
 
-# Start stack
-# terminal 1 — API Go
-cd apps/api-go && go run ./cmd/server
-# terminal 2 — Vite
-pnpm --filter @dakwah/web-vite dev
+# Start stack (DB + API Go + Vite) — satu perintah
+pnpm dev:restart
+
+# Atau PowerShell (sama + opsi -Migrate):
+# pwsh scripts/dev-stack.ps1
+# pwsh scripts/dev-stack.ps1 -Migrate
 ```
 
 - Frontend: http://localhost:5173
 - API: http://localhost:4000
 - Health: http://localhost:4000/health
+
+| Script | Fungsi |
+| ------ | ------ |
+| `pnpm dev:restart` | Stop port 4000/5173 → start DB → API + Vite |
+| `pnpm dev:stack` | Start DB + API + Vite (tanpa stop) |
+| `pnpm dev:stop` | Kill proses di port 4000 & 5173 |
+| `pnpm dev:db` / `dev:api` / `dev:web-vite` | Jalankan masing-masing terpisah |
 
 ### Akun Seed
 

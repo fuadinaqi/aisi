@@ -234,9 +234,10 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 		claims, _ := middleware.Claims(r)
 		id := chi.URLParam(r, "id")
 		var in struct {
-			Role     string  `json:"role"`
-			SchoolID *string `json:"schoolId"`
-			GroupID  *string `json:"groupId"`
+			Role          string  `json:"role"`
+			SchoolID      *string `json:"schoolId"`
+			GroupID       *string `json:"groupId"`
+			AlsoAsPembina *bool   `json:"alsoAsPembina"`
 		}
 		if json.NewDecoder(r.Body).Decode(&in) != nil || !validAssignableRole(in.Role) {
 			httpx.Error(w, 400, "Role tidak valid")
@@ -255,6 +256,7 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 400, "User sudah memiliki role ini")
 			return
 		}
+		withPembina := (in.Role == "ADMIN" || in.Role == "PJ_SEKOLAH") && (in.AlsoAsPembina == nil || *in.AlsoAsPembina)
 		tx, err := db.Begin(r.Context())
 		if err != nil {
 			httpx.Error(w, 500, "Gagal menambahkan role")
@@ -264,6 +266,9 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 		if _, err = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,$3::"Role")`, uuid.NewString(), id, in.Role); err != nil {
 			httpx.Error(w, 500, "Gagal menambahkan role")
 			return
+		}
+		if withPembina {
+			_, _ = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") SELECT $1,$2,'PEMBINA'::"Role" WHERE NOT EXISTS (SELECT 1 FROM "UserRole" WHERE "userId"=$2 AND "role"='PEMBINA'::"Role")`, uuid.NewString(), id)
 		}
 		if in.SchoolID != nil && *in.SchoolID != "" && (in.Role == "PJ_SEKOLAH" || in.Role == "PEMBINA" || in.Role == "ANGGOTA") {
 			var schoolOK bool

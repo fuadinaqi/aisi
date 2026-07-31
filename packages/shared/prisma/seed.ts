@@ -639,7 +639,11 @@ async function main() {
   console.log(`Password anggota : ${PASSWORD.anggota}`);
   console.log(`Total sekolah    : ${SCHOOLS.length}`);
   console.log(`Total kelompok   : ${groups.length}`);
-  console.log(`Kelompok/sekolah : ${GROUPS_PER_SCHOOL.join(', ')}`);
+  console.log(
+    `Kelompok/sekolah : ${Object.entries(GROUPS_PER_SCHOOL)
+      .map(([name, count]) => `${name}=${count}`)
+      .join(', ')}`,
+  );
   console.log(`Superadmin id    : ${superadmin.id}`);
 }
 

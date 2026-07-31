@@ -20,6 +20,7 @@ function SetPasswordForm() {
     name: string;
     email: string;
     role: string;
+    alsoAsPembina?: boolean;
     existingUser?: boolean;
   } | null>(null);
   const [error, setError] = useState('');
@@ -40,9 +41,15 @@ function SetPasswordForm() {
       return;
     }
     api
-      .get<ApiResponse<{ name: string; email: string; role: string; existingUser?: boolean }>>(
-        `/auth/invitation/${token}`,
-      )
+      .get<
+        ApiResponse<{
+          name: string;
+          email: string;
+          role: string;
+          alsoAsPembina?: boolean;
+          existingUser?: boolean;
+        }>
+      >(`/auth/invitation/${token}`)
       .then((res) => {
         const info = res.data.data;
         if (info.existingUser) {
@@ -79,7 +86,12 @@ function SetPasswordForm() {
               Assalamu'alaikum, <strong>{inviteInfo.name}</strong>
             </p>
             <p className="text-sm text-muted-foreground">{inviteInfo.email}</p>
-            <RoleBadge role={inviteInfo.role} />
+            <div className="flex flex-wrap justify-center gap-1.5">
+              <RoleBadge role={inviteInfo.role} />
+              {inviteInfo.alsoAsPembina && inviteInfo.role !== 'PEMBINA' && (
+                <RoleBadge role="PEMBINA" />
+              )}
+            </div>
           </div>
         )}
       </CardHeader>

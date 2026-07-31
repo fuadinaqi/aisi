@@ -15,6 +15,7 @@ type InviteFormData = {
   gender?: 'IKHWAN' | 'AKHWAT';
   password?: string;
   useDirectPassword?: boolean;
+  alsoAsPembina?: boolean;
 };
 
 type InviteFormProps = {
@@ -24,12 +25,14 @@ type InviteFormProps = {
   showPhone?: boolean;
   showGender?: boolean;
   showPasswordOption?: boolean;
+  showAlsoAsPembina?: boolean;
   onSubmit: (data: {
     name: string;
     email: string;
     phone?: string;
     gender?: 'IKHWAN' | 'AKHWAT';
     password?: string;
+    alsoAsPembina?: boolean;
   }) => Promise<void>;
   onCancel?: () => void;
 };
@@ -41,6 +44,7 @@ export function InviteForm({
   showPhone = false,
   showGender = false,
   showPasswordOption = false,
+  showAlsoAsPembina = false,
   onSubmit,
   onCancel,
 }: InviteFormProps) {
@@ -53,7 +57,7 @@ export function InviteForm({
     watch,
     formState: { isSubmitting },
   } = useForm<InviteFormData>({
-    defaultValues: { gender: 'IKHWAN' },
+    defaultValues: { gender: 'IKHWAN', alsoAsPembina: true },
   });
 
   const useDirectPassword = watch('useDirectPassword');
@@ -67,6 +71,7 @@ export function InviteForm({
         email: data.email.trim(),
         phone: data.phone?.trim() || undefined,
         ...(showGender ? { gender: data.gender || 'IKHWAN' } : {}),
+        ...(showAlsoAsPembina ? { alsoAsPembina: !!data.alsoAsPembina } : {}),
         ...(showPasswordOption && data.useDirectPassword && data.password
           ? { password: data.password }
           : {}),
@@ -118,6 +123,18 @@ export function InviteForm({
           <Label>No. telepon (opsional)</Label>
           <Input className="rounded-xl" {...register('phone')} placeholder="08xxxxxxxxxx" />
         </div>
+      )}
+
+      {showAlsoAsPembina && (
+        <label className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
+          <input type="checkbox" className="mt-1" {...register('alsoAsPembina')} />
+          <span className="text-sm">
+            <span className="font-medium">Juga jadikan Pembina</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Default tercentang; bisa di-uncheck jika tidak diperlukan.
+            </span>
+          </span>
+        </label>
       )}
 
       {showPasswordOption && (

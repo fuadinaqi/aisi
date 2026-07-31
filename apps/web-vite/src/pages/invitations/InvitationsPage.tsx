@@ -47,7 +47,9 @@ export default function InvitationsPage() {
                     <p className="font-medium">{inv.name}</p>
                     <p className="truncate text-sm text-muted-foreground">{inv.email}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {inv.role} · {formatDate(inv.createdAt)}
+                      {inv.role}
+                      {inv.alsoAsPembina && inv.role !== 'PEMBINA' ? ' + PEMBINA' : ''} ·{' '}
+                      {formatDate(inv.createdAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

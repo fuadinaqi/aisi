@@ -24,6 +24,14 @@ type Handler struct {
 type request struct {
 	Name, Email, Role         string
 	Gender, SchoolID, GroupID *string
+	AlsoAsPembina             *bool `json:"alsoAsPembina"`
+}
+
+func alsoAsPembina(v *bool) bool {
+	if v == nil {
+		return true
+	}
+	return *v
 }
 
 func (h Handler) Routes() chi.Router {
@@ -121,9 +129,10 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "User sudah memiliki role ini")
 		return
 	}
+	withPembina := (in.Role == "ADMIN" || in.Role == "PJ_SEKOLAH") && alsoAsPembina(in.AlsoAsPembina)
 	id, token := uuid.NewString(), uuid.NewString()
 	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
-	_, err := h.DB.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","gender","schoolId","groupId","token","invitedById","expiresAt") VALUES ($1,$2,$3,$4::"Role",$5::"Gender",$6,$7,$8,$9,$10)`, id, in.Name, in.Email, in.Role, in.Gender, in.SchoolID, in.GroupID, token, claims.UserID, expires)
+	_, err := h.DB.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","alsoAsPembina","gender","schoolId","groupId","token","invitedById","expiresAt") VALUES ($1,$2,$3,$4::"Role",$5,$6::"Gender",$7,$8,$9,$10,$11)`, id, in.Name, in.Email, in.Role, withPembina, in.Gender, in.SchoolID, in.GroupID, token, claims.UserID, expires)
 	if err != nil {
 		httpx.Error(w, 500, "Gagal membuat undangan")
 		return
@@ -140,7 +149,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	if existingUser {
 		msg = "Undangan peran tambahan berhasil dikirim"
 	}
-	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "status": "PENDING", "expiresAt": expires, "existingUser": existingUser}, msg)
+	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "alsoAsPembina": withPembina, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "status": "PENDING", "expiresAt": expires, "existingUser": existingUser}, msg)
 }
 
 func (h Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +160,7 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, "Gagal mengambil undangan")
 		return
 	}
-	rows, err := h.DB.Query(r.Context(), `SELECT "id","name","email","role"::text,"gender"::text,"schoolId","groupId","status"::text,"expiresAt","createdAt" FROM "UserInvitation" WHERE "invitedById"=$1 ORDER BY "createdAt" DESC OFFSET $2 LIMIT $3`, claims.UserID, (page-1)*limit, limit)
+	rows, err := h.DB.Query(r.Context(), `SELECT "id","name","email","role"::text,"alsoAsPembina","gender"::text,"schoolId","groupId","status"::text,"expiresAt","createdAt" FROM "UserInvitation" WHERE "invitedById"=$1 ORDER BY "createdAt" DESC OFFSET $2 LIMIT $3`, claims.UserID, (page-1)*limit, limit)
 	if err != nil {
 		httpx.Error(w, 500, "Gagal mengambil undangan")
 		return
@@ -160,10 +169,11 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 	items := []map[string]any{}
 	for rows.Next() {
 		var id, name, mail, role, status string
+		var alsoAsPembina bool
 		var gender, school, group *string
 		var expires, created time.Time
-		if rows.Scan(&id, &name, &mail, &role, &gender, &school, &group, &status, &expires, &created) == nil {
-			items = append(items, map[string]any{"id": id, "name": name, "email": mail, "role": role, "gender": gender, "schoolId": school, "groupId": group, "status": status, "expiresAt": expires, "createdAt": created})
+		if rows.Scan(&id, &name, &mail, &role, &alsoAsPembina, &gender, &school, &group, &status, &expires, &created) == nil {
+			items = append(items, map[string]any{"id": id, "name": name, "email": mail, "role": role, "alsoAsPembina": alsoAsPembina, "gender": gender, "schoolId": school, "groupId": group, "status": status, "expiresAt": expires, "createdAt": created})
 		}
 	}
 	httpx.Paginated(w, items, page, limit, total)

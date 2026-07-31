@@ -366,19 +366,20 @@ model PasswordResetToken {
 }
 
 model UserInvitation {
-  id          String           @id @default(cuid())
-  email       String
-  name        String
-  role        Role
-  schoolId    String?
-  groupId     String?
-  gender      Gender?
-  token       String           @unique @default(uuid())
-  status      InvitationStatus @default(PENDING)
-  invitedById String
-  expiresAt   DateTime
-  usedAt      DateTime?
-  createdAt   DateTime         @default(now())
+  id             String           @id @default(cuid())
+  email          String
+  name           String
+  role           Role
+  alsoAsPembina  Boolean          @default(false)
+  schoolId       String?
+  groupId        String?
+  gender         Gender?
+  token          String           @unique @default(uuid())
+  status         InvitationStatus @default(PENDING)
+  invitedById    String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime         @default(now())
 
   invitedBy User @relation("InvitationCreator", fields: [invitedById], references: [id])
 

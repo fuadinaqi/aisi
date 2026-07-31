@@ -12,6 +12,7 @@ interface InviteInfo {
   name: string;
   email: string;
   role: string;
+  alsoAsPembina?: boolean;
   existingUser: boolean;
 }
 
@@ -91,21 +92,36 @@ function AcceptRoleForm() {
               Assalamu&apos;alaikum, <strong>{inviteInfo.name}</strong>
             </p>
             <p className="text-sm text-muted-foreground">{inviteInfo.email}</p>
-            <RoleBadge role={inviteInfo.role} />
+            <div className="flex flex-wrap justify-center gap-1.5">
+              <RoleBadge role={inviteInfo.role} />
+              {inviteInfo.alsoAsPembina && inviteInfo.role !== 'PEMBINA' && (
+                <RoleBadge role="PEMBINA" />
+              )}
+            </div>
           </div>
         )}
       </CardHeader>
       <CardContent className="space-y-4">
         {done ? (
           <p className="text-center text-green-600">
-            Peran {inviteInfo ? getRoleLabel(inviteInfo.role) : ''} berhasil ditambahkan.
+            Peran {inviteInfo ? getRoleLabel(inviteInfo.role) : ''}
+            {inviteInfo?.alsoAsPembina && inviteInfo.role !== 'PEMBINA'
+              ? ` & ${getRoleLabel('PEMBINA')}`
+              : ''}{' '}
+            berhasil ditambahkan.
           </p>
         ) : (
           <>
             {inviteInfo && (
               <p className="text-sm text-muted-foreground">
-                Anda diundang menambahkan peran <strong>{getRoleLabel(inviteInfo.role)}</strong> ke
-                akun yang sudah ada.
+                Anda diundang menambahkan peran <strong>{getRoleLabel(inviteInfo.role)}</strong>
+                {inviteInfo.alsoAsPembina && inviteInfo.role !== 'PEMBINA' ? (
+                  <>
+                    {' '}
+                    dan <strong>{getRoleLabel('PEMBINA')}</strong>
+                  </>
+                ) : null}{' '}
+                ke akun yang sudah ada.
               </p>
             )}
 

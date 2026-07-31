@@ -26,6 +26,7 @@ type FormData = {
   pjGender: 'IKHWAN' | 'AKHWAT';
   pjPassword: string;
   useDirectPassword: boolean;
+  alsoAsPembina: boolean;
 };
 
 export default function NewSchoolPage() {
@@ -44,6 +45,7 @@ export default function NewSchoolPage() {
       city: 'Depok',
       pjGender: 'IKHWAN',
       useDirectPassword: false,
+      alsoAsPembina: true,
     },
   });
 
@@ -62,6 +64,7 @@ export default function NewSchoolPage() {
           email: data.pjEmail.trim(),
           phone: data.pjPhone.trim() || undefined,
           gender: data.pjGender,
+          alsoAsPembina: data.alsoAsPembina,
           ...(data.useDirectPassword && data.pjPassword ? { password: data.pjPassword } : {}),
         },
       };
@@ -170,6 +173,20 @@ export default function NewSchoolPage() {
                     {...register('pjPhone')}
                   />
                 </div>
+
+                <label className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    {...register('alsoAsPembina')}
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Juga jadikan Pembina</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      PJ Sekolah ikut mendapat peran Pembina (bisa di-uncheck).
+                    </span>
+                  </span>
+                </label>
 
                 <label className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
                   <input

@@ -138,6 +138,7 @@ export interface InvitationItem {
   name: string;
   email: string;
   role: string;
+  alsoAsPembina?: boolean;
   status: string;
   createdAt: string;
 }
