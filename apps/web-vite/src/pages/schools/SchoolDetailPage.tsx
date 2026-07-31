@@ -152,9 +152,9 @@ export default function SchoolDetailPage() {
             action={
               canManageGroups ? (
                 <Button asChild size="sm" className="rounded-xl">
-                  <Link to={`/schools/${id}/kelompok/baru`}>
+                  <Link to={`/schools/${id}/kelompok/baru`} aria-label="Tambah kelompok">
                     <Plus className="mr-1 h-4 w-4" />
-                    Tambah
+                    Tambah kelompok
                   </Link>
                 </Button>
               ) : undefined

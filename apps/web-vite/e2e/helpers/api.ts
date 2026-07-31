@@ -4,6 +4,11 @@ type ApiEnvelope<T> = { success: boolean; data: T; message?: string };
 
 const tokenCache = new Map<string, string>();
 
+export function clearApiTokenCache(email?: string): void {
+  if (email) tokenCache.delete(email);
+  else tokenCache.clear();
+}
+
 export async function apiLogin(email: string, password: string): Promise<string> {
   const cached = tokenCache.get(email);
   if (cached) return cached;

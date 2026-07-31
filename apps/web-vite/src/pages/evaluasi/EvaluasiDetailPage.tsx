@@ -22,9 +22,10 @@ export default function EvaluasiDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery<EvaluationItem>({
+  const { data, isLoading, isError, error } = useQuery<EvaluationItem>({
     queryKey: ['evaluation', id],
     queryFn: async () => (await api.get<ApiResponse<EvaluationItem>>(`/evaluations/${id}`)).data.data,
+    retry: false,
   });
 
   if (isLoading) {
@@ -35,7 +36,23 @@ export default function EvaluasiDetailPage() {
     );
   }
 
-  if (!data) return null;
+  if (isError || !data) {
+    const msg =
+      (error as { response?: { data?: { message?: string }; status?: number } })?.response?.data
+        ?.message ||
+      ((error as { response?: { status?: number } })?.response?.status === 403
+        ? 'Akses ditolak'
+        : 'Evaluasi tidak ditemukan');
+    return (
+      <PageContainer>
+        <PageHeader title="Evaluasi" description={msg} />
+        <p className="text-sm text-destructive">{msg}</p>
+        <Link to="/evaluasi" className="mt-3 inline-block text-sm text-primary hover:underline">
+          Kembali ke daftar evaluasi
+        </Link>
+      </PageContainer>
+    );
+  }
 
   const group = data.group ?? { id: '', name: 'Evaluasi' };
   const attendances = data.attendances ?? [];

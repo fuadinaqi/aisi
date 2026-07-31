@@ -601,6 +601,7 @@ async function main() {
       email: 'calon.anggota@gmail.com',
       name: 'Calon Anggota',
       role: Role.ANGGOTA,
+      gender: Gender.IKHWAN,
       groupId: groups[0]!.id,
       token: '00000000-0000-4000-8000-000000000001',
       status: InvitationStatus.PENDING,

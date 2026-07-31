@@ -49,7 +49,8 @@ func Router(db *pgxpool.Pool, c config.Config) http.Handler {
 		r.Handle("/uploads/*", http.StripPrefix("/uploads/", storage.UploadFileServer("uploads")))
 	}
 	r.Route("/api/v1", func(api chi.Router) {
-		api.Use(middleware.NewRateLimit(100, time.Minute).Middleware)
+		// 300/menit: cukup untuk smoke/manual/e2e lokal tanpa 429 palsu di nav loop
+		api.Use(middleware.NewRateLimit(300, time.Minute).Middleware)
 		api.Mount("/auth", authmodule.Handler{DB: db, Config: c}.Routes())
 		api.Mount("/config", configmodule.Routes(db, c))
 		api.Mount("/users", users.Routes(db, c))

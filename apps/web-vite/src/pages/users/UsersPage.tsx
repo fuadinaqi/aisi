@@ -8,6 +8,7 @@ import { RoleGuard } from '@/components/layout/RoleGuard';
 import { EmptyState, LoadingSkeleton, PointBadge, RoleBadge } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { formatDate, getRoleLabel, isPointEligibleRole } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 
@@ -35,11 +36,15 @@ export default function UsersPage() {
   const [newRole, setNewRole] = useState<string>('PEMBINA');
   const [schoolId, setSchoolId] = useState('');
   const [alsoAsPembina, setAlsoAsPembina] = useState(true);
+  const [search, setSearch] = useState('');
 
   const { data, isLoading } = useQuery<UserItem[]>({
-    queryKey: ['users'],
+    queryKey: ['users', search],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<UserItem[]>>('/users?limit=50');
+      const params = new URLSearchParams({ limit: '100' });
+      const q = search.trim();
+      if (q) params.set('search', q);
+      const res = await api.get<ApiResponse<UserItem[]>>(`/users?${params}`);
       return res.data.data;
     },
   });
@@ -113,12 +118,25 @@ export default function UsersPage() {
           }
         />
 
+        <div className="mb-4">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama atau email..."
+            aria-label="Cari pengguna"
+          />
+        </div>
+
         {isLoading ? (
           <LoadingSkeleton className="h-64" />
         ) : !data?.length ? (
           <EmptyState
-            title="Belum ada pengguna"
-            description="Undang pengguna baru untuk mulai mengelola tim."
+            title={search.trim() ? 'Pengguna tidak ditemukan' : 'Belum ada pengguna'}
+            description={
+              search.trim()
+                ? 'Coba kata kunci lain.'
+                : 'Undang pengguna baru untuk mulai mengelola tim.'
+            }
           />
         ) : (
           <Card className="overflow-hidden">

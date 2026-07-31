@@ -31,9 +31,12 @@ test.describe('Multi-role @p0', () => {
   test('superadmin assign role tambahan via API', async ({ page }) => {
     const token = await apiLogin(USERS.superadmin.email, USERS.superadmin.password);
     // Ambil user admin id
-    const listRes = await fetch(`${API_URL}/api/v1/users?limit=50`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const listRes = await fetch(
+      `${API_URL}/api/v1/users?limit=20&search=${encodeURIComponent(USERS.admin.email)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     expect(listRes.ok).toBeTruthy();
     const listJson = (await listRes.json()) as {
       data: { id: string; email: string; roles: { role: string }[] }[];

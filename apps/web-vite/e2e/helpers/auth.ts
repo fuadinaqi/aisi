@@ -31,6 +31,12 @@ async function loginPayload(email: string, password: string): Promise<{ accessTo
 
 const sessionCache = new Map<string, { accessToken: string; user: AuthUser }>();
 
+/** Hapus cache sesi (mis. setelah role user diubah di DB). */
+export function clearAuthSessionCache(email?: string): void {
+  if (email) sessionCache.delete(email);
+  else sessionCache.clear();
+}
+
 /** Login via API (hindari rate limit berlebih) lalu inject Zustand persist. */
 export async function loginAs(page: Page, user: SeedUser): Promise<void> {
   let session = sessionCache.get(user.email);

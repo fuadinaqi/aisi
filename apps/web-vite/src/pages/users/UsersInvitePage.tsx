@@ -68,12 +68,18 @@ export default function InviteAdminPage() {
         <ListGroup className="p-5">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label>Nama lengkap</Label>
-              <Input className="rounded-xl" {...register('name', { required: true })} placeholder="Nama admin" />
+              <Label htmlFor="name">Nama lengkap</Label>
+              <Input
+                id="name"
+                className="rounded-xl"
+                {...register('name', { required: true })}
+                placeholder="Nama admin"
+              />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
+                id="email"
                 type="email"
                 className="rounded-xl"
                 {...register('email', { required: true })}

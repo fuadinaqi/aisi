@@ -1,0 +1,247 @@
+{
+  "generatedAt": "2026-07-31T05:46:19.087Z",
+  "summary": {
+    "total": 47,
+    "pass": 41,
+    "fail": 0,
+    "skip": 6,
+    "blocked": 0
+  },
+  "results": [
+    {
+      "id": "SETUP-ANGGOTA-ROLE",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "CFG-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "CFG-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "CFG-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "CFG-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "CFG-N02",
+      "status": "Skip",
+      "note": "skip: validasi SELECT tanpa opsi bergantung form tambah interaktif penuh"
+    },
+    {
+      "id": "MUT-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MUT-02",
+      "status": "Skip",
+      "note": "skip: tombol kirim tidak ada (sudah submit / master kosong)"
+    },
+    {
+      "id": "MUT-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MUT-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MUT-N02",
+      "status": "Skip",
+      "note": "skip: tidak ada state submit ulang / pekan diblok yang terobservasi"
+    },
+    {
+      "id": "IC-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "IC-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "IC-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "IC-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "IC-N02",
+      "status": "Skip",
+      "note": "skip: validasi form tambah IC kosong bergantung dialog UI penuh"
+    },
+    {
+      "id": "EVT-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVT-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVT-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVT-04",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVT-05",
+      "status": "Skip",
+      "note": "skip: butuh siklus reject terpisah; approve sudah di EVT-04"
+    },
+    {
+      "id": "EVT-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVT-N02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVT-N03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVT-N04",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVT-N05",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MAT-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MAT-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MAT-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MAT-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MAT-N02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "MAT-N03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ANL-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ANL-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ANL-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "KKS-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "KKS-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "KKS-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "KKS-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "KKS-N02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "NTF-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "NTF-02",
+      "status": "Skip",
+      "note": "skip: tidak ada unread / tombol tandai dibaca"
+    },
+    {
+      "id": "NTF-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "LDR-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "LDR-N01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "E2E-P1-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "E2E-P1-02",
+      "status": "Pass",
+      "note": ""
+    }
+  ]
+}

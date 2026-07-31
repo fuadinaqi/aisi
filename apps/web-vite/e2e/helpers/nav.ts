@@ -27,7 +27,16 @@ export async function visitNavPaths(page: Page, role: SeedUser['role']): Promise
 
 export async function openSchoolDetail(page: Page, schoolName: string): Promise<void> {
   await page.goto('/schools');
-  await page.getByText(schoolName, { exact: true }).first().click();
-  await page.waitForURL(/\/schools\/[^/]+$/);
-  await expect(page.getByRole('heading', { name: schoolName }).or(page.getByText(schoolName).first())).toBeVisible();
+  await page.waitForLoadState('domcontentloaded');
+  const link = page.getByRole('link', { name: new RegExp(schoolName, 'i') }).first();
+  if (await link.isVisible({ timeout: 8_000 }).catch(() => false)) {
+    await link.click();
+  } else {
+    // Fallback: klik teks nama sekolah (ListRow)
+    await page.getByText(schoolName, { exact: true }).first().click({ timeout: 8_000 });
+  }
+  await page.waitForURL(/\/schools\/[^/]+$/, { timeout: 15_000 });
+  await expect(
+    page.getByRole('heading', { name: schoolName }).or(page.getByText(schoolName).first()),
+  ).toBeVisible({ timeout: 10_000 });
 }

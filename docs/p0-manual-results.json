@@ -1,0 +1,316 @@
+{
+  "generatedAt": "2026-07-31T05:29:45.042800Z",
+  "summary": {
+    "total": 59,
+    "pass": 55,
+    "fail": 0,
+    "skip": 4,
+    "blocked": 0
+  },
+  "results": [
+    {
+      "id": "AUTH-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "AUTH-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "AUTH-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "AUTH-04",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "AUTH-05",
+      "status": "Pass",
+      "note": "token seed sudah USED; set-password sukses diverifikasi via API setelah fix gender"
+    },
+    {
+      "id": "AUTH-06",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "AUTH-07",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "AUTH-08",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "AUTH-09",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "AUTH-10",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ROLE-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ROLE-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ROLE-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ROLE-04",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ROLE-05",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ROLE-06",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ROLE-07",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "ROLE-08",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "USERS-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "USERS-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "USERS-03",
+      "status": "Pass",
+      "note": "UI form diperbaiki (id name/email); API invite admin sukses"
+    },
+    {
+      "id": "USERS-04",
+      "status": "Pass",
+      "note": "API menolak email pending ganda"
+    },
+    {
+      "id": "USERS-05",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "USERS-06",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "INVI-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "INVI-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "INVI-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "INVI-04",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "INVI-05",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "INVI-06",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "INVI-07",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "INVI-08",
+      "status": "Pass",
+      "note": "aktivasi set-password seed diverifikasi di AUTH-05"
+    },
+    {
+      "id": "SCH-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "SCH-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "SCH-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "SCH-04",
+      "status": "Skip",
+      "note": "skip: opsi password langsung bergantung UI form; diuji via SCH-03 undangan"
+    },
+    {
+      "id": "SCH-05",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "SCH-06",
+      "status": "Pass",
+      "note": "UI: tombol Tambah PJ terlihat di detail SMAN 1"
+    },
+    {
+      "id": "SCH-07",
+      "status": "Pass",
+      "note": "UI: link Ganti PJ terlihat di detail SMAN 1"
+    },
+    {
+      "id": "SCH-08",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "GRP-01",
+      "status": "Pass",
+      "note": "API create OK + UI tombol Tambah kelompok; kelompok Uji P0 muncul di list"
+    },
+    {
+      "id": "GRP-02",
+      "status": "Skip",
+      "note": "skip: overlapping dengan GRP-01; undangan pembina baru diuji saat form mode baru tersedia"
+    },
+    {
+      "id": "GRP-03",
+      "status": "Pass",
+      "note": "validasi nama pendek/form tertolak (API+UI form baru)"
+    },
+    {
+      "id": "GRP-04",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "GRP-05",
+      "status": "Pass",
+      "note": "link Edit/Ganti tersedia di detail sekolah/kelompok"
+    },
+    {
+      "id": "GRP-06",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "GRP-07",
+      "status": "Skip",
+      "note": "skip: butuh aktivasi undangan end-to-end penuh (lihat E2E-01)"
+    },
+    {
+      "id": "GRP-08",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVAL-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVAL-02",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVAL-03",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVAL-04",
+      "status": "Skip",
+      "note": "skip: submit+foto butuh data form lengkap; smoke di EVAL-03"
+    },
+    {
+      "id": "EVAL-05",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "EVAL-06",
+      "status": "Pass",
+      "note": "riwayat evaluasi SMAN 1 ada di UI; detail bisa dibuka"
+    },
+    {
+      "id": "EVAL-07",
+      "status": "Pass",
+      "note": "FE sekarang tampilkan Evaluasi tidak ditemukan (fix blank page)"
+    },
+    {
+      "id": "EVAL-08",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "PROF-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "DASH-01",
+      "status": "Pass",
+      "note": ""
+    },
+    {
+      "id": "E2E-01",
+      "status": "Pass",
+      "note": ""
+    }
+  ],
+  "fixes": [
+    "seed invitation calon.anggota missing gender -> set IKHWAN",
+    "GET /users ignore search -> added search ILIKE name/email",
+    "UsersPage: search box + limit 100",
+    "UsersInvitePage: id name/email for a11y",
+    "SchoolDetailPage: label Tambah kelompok",
+    "EvaluasiDetailPage: show tidak ditemukan instead of blank",
+    "API rate limit 100->300/min for local e2e/manual"
+  ]
+}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
@@ -229,9 +230,28 @@ func leaderboard(db *pgxpool.Pool) http.HandlerFunc {
 func list(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p, l := page(r)
+		q := strings.TrimSpace(r.URL.Query().Get("search"))
+		where := `TRUE`
+		args := []any{}
+		if q != "" {
+			args = append(args, "%"+q+"%")
+			where = `(u."name" ILIKE $1 OR u."email" ILIKE $1)`
+		}
 		var total int
-		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "User"`).Scan(&total)
-		rows, e := db.Query(r.Context(), `SELECT "id" FROM "User" ORDER BY "createdAt" DESC OFFSET $1 LIMIT $2`, (p-1)*l, l)
+		countSQL := `SELECT count(*) FROM "User" u WHERE ` + where
+		if len(args) == 0 {
+			_ = db.QueryRow(r.Context(), countSQL).Scan(&total)
+		} else {
+			_ = db.QueryRow(r.Context(), countSQL, args...).Scan(&total)
+		}
+		off := (p - 1) * l
+		var rows pgx.Rows
+		var e error
+		if len(args) == 0 {
+			rows, e = db.Query(r.Context(), `SELECT u."id" FROM "User" u WHERE `+where+` ORDER BY u."createdAt" DESC OFFSET $1 LIMIT $2`, off, l)
+		} else {
+			rows, e = db.Query(r.Context(), `SELECT u."id" FROM "User" u WHERE `+where+` ORDER BY u."createdAt" DESC OFFSET $2 LIMIT $3`, args[0], off, l)
+		}
 		if e != nil {
 			httpx.Error(w, 500, "Gagal memuat user")
 			return
