@@ -28,6 +28,7 @@ type Config struct {
 	R2SecretAccessKey     string
 	R2Bucket              string
 	R2PublicURL           string
+	SentryDSN             string
 }
 
 func Load() (Config, error) {
@@ -62,6 +63,7 @@ func Load() (Config, error) {
 		R2SecretAccessKey:    os.Getenv("R2_SECRET_ACCESS_KEY"),
 		R2Bucket:             bucket,
 		R2PublicURL:          strings.TrimRight(os.Getenv("R2_PUBLIC_URL"), "/"),
+		SentryDSN:            os.Getenv("SENTRY_DSN"),
 	}
 	var err error
 	if c.JWTAccessExpires, err = parseDuration(value("JWT_ACCESS_EXPIRES", "15m")); err != nil { return c, fmt.Errorf("JWT_ACCESS_EXPIRES: %w", err) }

@@ -115,22 +115,35 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if in.Role == "PEMBINA" || in.Role == "ANGGOTA" || in.Role == "PJ_SEKOLAH" {
-		if in.Gender == nil || !validGender(*in.Gender) {
-			httpx.Error(w, 400, "Jenis kelamin wajib dipilih")
-			return
-		}
+	withPembina := (in.Role == "ADMIN" || in.Role == "PJ_SEKOLAH") && alsoAsPembina(in.AlsoAsPembina)
+	needsGender := in.Role == "PEMBINA" || in.Role == "ANGGOTA" || in.Role == "PJ_SEKOLAH" || withPembina
+	if needsGender && (in.Gender == nil || !validGender(*in.Gender)) {
+		httpx.Error(w, 400, "Jenis kelamin wajib dipilih")
+		return
+	}
+	if (in.Role == "PEMBINA" || in.Role == "PJ_SEKOLAH") && (in.SchoolID == nil || *in.SchoolID == "") {
+		httpx.Error(w, 400, "Sekolah wajib dipilih untuk undangan ini")
+		return
 	}
 	if h.pendingInvitation(r, in.Email) {
 		httpx.Error(w, 400, "Email sudah memiliki undangan aktif")
 		return
 	}
 	existingUser := h.activeUser(r, in.Email)
+	schoolAttachOnly := false
 	if existingUser && h.userHasRole(r, in.Email, in.Role) {
-		httpx.Error(w, 400, "User sudah memiliki role ini")
-		return
+		// Pembina boleh di beberapa sekolah: undang ulang = tautkan sekolah baru.
+		if in.Role == "PEMBINA" && in.SchoolID != nil && *in.SchoolID != "" {
+			if h.userInSchool(r, in.Email, *in.SchoolID) {
+				httpx.Error(w, 400, "Pembina sudah terdaftar di sekolah ini")
+				return
+			}
+			schoolAttachOnly = true
+		} else {
+			httpx.Error(w, 400, "User sudah memiliki role ini")
+			return
+		}
 	}
-	withPembina := (in.Role == "ADMIN" || in.Role == "PJ_SEKOLAH") && alsoAsPembina(in.AlsoAsPembina)
 	id, token := uuid.NewString(), uuid.NewString()
 	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
 	_, err := h.DB.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","alsoAsPembina","gender","schoolId","groupId","token","invitedById","expiresAt") VALUES ($1,$2,$3,$4::"Role",$5,$6::"Gender",$7,$8,$9,$10,$11)`, id, in.Name, in.Email, in.Role, withPembina, in.Gender, in.SchoolID, in.GroupID, token, claims.UserID, expires)
@@ -147,10 +160,12 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msg := "Undangan berhasil dikirim"
-	if existingUser {
+	if schoolAttachOnly {
+		msg = "Undangan penugasan pembina ke sekolah berhasil dikirim"
+	} else if existingUser {
 		msg = "Undangan peran tambahan berhasil dikirim"
 	}
-	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "alsoAsPembina": withPembina, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "status": "PENDING", "expiresAt": expires, "existingUser": existingUser}, msg)
+	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "alsoAsPembina": withPembina, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "status": "PENDING", "expiresAt": expires, "existingUser": existingUser, "schoolAttachOnly": schoolAttachOnly}, msg)
 }
 
 func (h Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -237,6 +252,12 @@ func (h Handler) activeUser(r *http.Request, email string) bool {
 func (h Handler) userHasRole(r *http.Request, email, role string) bool {
 	var exists bool
 	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."email"=$1 AND ur."role"=$2::"Role")`, email, role).Scan(&exists)
+	return exists
+}
+
+func (h Handler) userInSchool(r *http.Request, email, schoolID string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserSchool" us ON us."userId"=u."id" WHERE u."email"=$1 AND us."schoolId"=$2)`, email, schoolID).Scan(&exists)
 	return exists
 }
 func validRole(v string) bool {

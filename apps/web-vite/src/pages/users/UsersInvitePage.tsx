@@ -9,11 +9,13 @@ import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { GenderSelect } from '@/components/shared/GenderField';
 import { toastError, toastSuccess } from '@/lib/toast';
 
 type FormData = {
   name: string;
   email: string;
+  gender: 'IKHWAN' | 'AKHWAT';
   alsoAsPembina: boolean;
 };
 
@@ -24,10 +26,13 @@ export default function InviteAdminPage() {
   const {
     register,
     handleSubmit,
-    formState: { isSubmitting },
+    watch,
+    formState: { isSubmitting, errors },
   } = useForm<FormData>({
-    defaultValues: { alsoAsPembina: true },
+    defaultValues: { gender: 'IKHWAN', alsoAsPembina: true },
   });
+
+  const alsoAsPembina = watch('alsoAsPembina');
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -38,6 +43,7 @@ export default function InviteAdminPage() {
         email: data.email.trim(),
         role: 'ADMIN',
         alsoAsPembina: data.alsoAsPembina,
+        ...(data.alsoAsPembina ? { gender: data.gender } : {}),
       });
       await invalidateInvitationQueries(queryClient);
       setSuccess('Undangan admin berhasil dikirim. Cek log API untuk link aktivasi.');
@@ -83,6 +89,17 @@ export default function InviteAdminPage() {
                 </span>
               </span>
             </label>
+            {alsoAsPembina && (
+              <div className="space-y-2">
+                <Label>Jenis kelamin</Label>
+                <GenderSelect
+                  {...register('gender', {
+                    required: alsoAsPembina ? 'Jenis kelamin wajib dipilih' : false,
+                  })}
+                />
+                {errors.gender && <p className="text-sm text-destructive">{errors.gender.message}</p>}
+              </div>
+            )}
             {error && (
               <div className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
             )}

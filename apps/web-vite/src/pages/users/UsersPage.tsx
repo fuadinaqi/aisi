@@ -217,7 +217,9 @@ export default function UsersPage() {
                           </label>
                           {needsSchool && (
                             <label className="block flex-1 text-xs">
-                              <span className="mb-1 block text-muted-foreground">Sekolah (opsional)</span>
+                              <span className="mb-1 block text-muted-foreground">
+                                Sekolah{newRole === 'ANGGOTA' ? ' (opsional)' : ''}
+                              </span>
                               <select
                                 value={schoolId}
                                 onChange={(e) => setSchoolId(e.target.value)}
@@ -238,7 +240,8 @@ export default function UsersPage() {
                             className="rounded-xl"
                             disabled={
                               addRole.isPending ||
-                              ASSIGNABLE_ROLES.every((r) => roleList.includes(r))
+                              ASSIGNABLE_ROLES.every((r) => roleList.includes(r)) ||
+                              ((newRole === 'PJ_SEKOLAH' || newRole === 'PEMBINA') && !schoolId)
                             }
                             onClick={() =>
                               addRole.mutate({

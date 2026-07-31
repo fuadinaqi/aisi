@@ -45,14 +45,12 @@ export default function EditKelompokPage() {
   });
 
   const { data: pembinaList = [], isLoading: pembinaLoading } = useQuery<PembinaOption[]>({
-    queryKey: ['school-pembina', group?.school.id, group?.gender],
+    queryKey: ['school-pembina', group?.school.id],
     queryFn: async () =>
       (
-        await api.get<ApiResponse<PembinaOption[]>>(
-          `/schools/${group!.school.id}/pembina?gender=${group!.gender}`,
-        )
+        await api.get<ApiResponse<PembinaOption[]>>(`/schools/${group!.school.id}/pembina`)
       ).data.data,
-    enabled: !!group?.school.id && !!group?.gender && canChangePembina,
+    enabled: !!group?.school.id && canChangePembina,
   });
 
   const {
@@ -185,10 +183,14 @@ export default function EditKelompokPage() {
                     {pembinaList.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.email})
+                        {p.gender ? ` · ${p.gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}` : ''}
                       </option>
                     ))}
                   </select>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  Pembina boleh beda gender dari jenis kelompok.
+                </p>
                 {errors.pembinaId && (
                   <p className="text-sm text-destructive">{errors.pembinaId.message}</p>
                 )}

@@ -206,14 +206,22 @@ func leaderboard(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 500, "Gagal memuat leaderboard")
 			return
 		}
-		defer rows.Close()
-		out := []map[string]any{}
+		type row struct {
+			id, name string
+			points   int
+		}
+		collected := []row{}
 		for rows.Next() {
 			var id, n string
 			var points int
 			if rows.Scan(&id, &n, &points) == nil {
-				out = append(out, map[string]any{"id": id, "name": n, "totalPoints": points, "roles": roles(db, r, id)})
+				collected = append(collected, row{id, n, points})
 			}
+		}
+		rows.Close()
+		out := []map[string]any{}
+		for _, item := range collected {
+			out = append(out, map[string]any{"id": item.id, "name": item.name, "totalPoints": item.points, "roles": roles(db, r, item.id)})
 		}
 		httpx.Paginated(w, out, p, l, total)
 	}
@@ -228,14 +236,18 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 500, "Gagal memuat user")
 			return
 		}
-		defer rows.Close()
-		out := []map[string]any{}
+		ids := []string{}
 		for rows.Next() {
 			var id string
 			if rows.Scan(&id) == nil {
-				if u, e := user(db, r, id); e == nil {
-					out = append(out, u)
-				}
+				ids = append(ids, id)
+			}
+		}
+		rows.Close()
+		out := []map[string]any{}
+		for _, id := range ids {
+			if u, e := user(db, r, id); e == nil {
+				out = append(out, u)
 			}
 		}
 		httpx.Paginated(w, out, p, l, total)
@@ -388,6 +400,10 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		withPembina := (in.Role == "ADMIN" || in.Role == "PJ_SEKOLAH") && (in.AlsoAsPembina == nil || *in.AlsoAsPembina)
+		if (in.Role == "PJ_SEKOLAH" || in.Role == "PEMBINA") && (in.SchoolID == nil || *in.SchoolID == "") {
+			httpx.Error(w, 400, "Sekolah wajib dipilih untuk role ini")
+			return
+		}
 		tx, err := db.Begin(r.Context())
 		if err != nil {
 			httpx.Error(w, 500, "Gagal menambahkan role")

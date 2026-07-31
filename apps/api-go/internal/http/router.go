@@ -25,12 +25,18 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/storage"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func Router(db *pgxpool.Pool, c config.Config) http.Handler {
 	r := chi.NewRouter()
-	r.Use(chimiddleware.RequestID, chimiddleware.RealIP, chimiddleware.Recoverer, chimiddleware.Timeout(30*time.Second))
+	r.Use(chimiddleware.RequestID, chimiddleware.RealIP, chimiddleware.Timeout(30*time.Second))
+	if c.SentryDSN != "" {
+		sentryHandler := sentryhttp.New(sentryhttp.Options{Repanic: true})
+		r.Use(sentryHandler.Handle)
+	}
+	r.Use(chimiddleware.Recoverer)
 	r.Use(middleware.Security, middleware.CORS(c.AllowedOrigin))
 	r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 		if err := db.Ping(req.Context()); err != nil {

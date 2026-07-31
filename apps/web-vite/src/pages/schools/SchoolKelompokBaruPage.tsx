@@ -19,7 +19,13 @@ import { GenderToggle } from '@/components/shared/GenderField';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { toastError, toastSuccess } from '@/lib/toast';
 
-type PembinaOption = { id: string; name: string; email: string; gender?: string };
+type PembinaOption = {
+  id: string;
+  name: string;
+  email: string;
+  gender?: string;
+  inSchool?: boolean;
+};
 
 type FormData = {
   name: string;
@@ -30,6 +36,7 @@ type FormData = {
   pembinaName: string;
   pembinaEmail: string;
   pembinaPhone: string;
+  pembinaGender: 'IKHWAN' | 'AKHWAT';
   pembinaPassword: string;
   useDirectPassword: boolean;
 };
@@ -54,6 +61,7 @@ export default function NewSchoolGroupPage() {
       gender: 'IKHWAN',
       pembinaMode: 'new',
       pembinaId: '',
+      pembinaGender: 'IKHWAN',
       useDirectPassword: false,
     },
   });
@@ -61,16 +69,13 @@ export default function NewSchoolGroupPage() {
   const pembinaMode = watch('pembinaMode');
   const useDirectPassword = watch('useDirectPassword');
   const groupGender = watch('gender');
+  const pembinaGender = watch('pembinaGender');
 
   const { data: pembinaList = [], isLoading } = useQuery<PembinaOption[]>({
-    queryKey: ['school-pembina', id, groupGender],
+    queryKey: ['school-pembina', id],
     queryFn: async () =>
-      (
-        await api.get<ApiResponse<PembinaOption[]>>(
-          `/schools/${id}/pembina?gender=${groupGender}`,
-        )
-      ).data.data,
-    enabled: !!id && !!groupGender,
+      (await api.get<ApiResponse<PembinaOption[]>>(`/schools/${id}/pembina`)).data.data,
+    enabled: !!id,
   });
 
   const onSubmit = async (data: FormData) => {
@@ -94,7 +99,7 @@ export default function NewSchoolGroupPage() {
                 name: data.pembinaName.trim(),
                 email: data.pembinaEmail.trim(),
                 phone: data.pembinaPhone.trim() || undefined,
-                gender: data.gender,
+                gender: data.pembinaGender,
                 ...(data.useDirectPassword && data.pembinaPassword
                   ? { password: data.pembinaPassword }
                   : {}),
@@ -180,15 +185,12 @@ export default function NewSchoolGroupPage() {
                 <Label>Jenis kelompok</Label>
                 <GenderToggle
                   value={groupGender}
-                  onChange={(value) => {
-                    setValue('gender', value);
-                    setValue('pembinaId', '');
-                    if (pembinaMode === 'existing' && pembinaList.length === 0) {
-                      setValue('pembinaMode', 'new');
-                    }
-                  }}
+                  onChange={(value) => setValue('gender', value)}
                 />
                 <input type="hidden" {...register('gender')} />
+                <p className="text-xs text-muted-foreground">
+                  Jenis kelompok untuk anggota. Pembina boleh beda gender.
+                </p>
               </div>
 
               <div className="border-t border-border/60 pt-5">
@@ -222,13 +224,19 @@ export default function NewSchoolGroupPage() {
                       {pembinaList.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name} ({p.email})
+                          {p.gender ? ` · ${p.gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}` : ''}
+                          {p.inSchool ? '' : ' · dari sekolah lain'}
                         </option>
                       ))}
                     </select>
                     {pembinaList.length === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Belum ada pembina {groupGender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}. Pilih opsi
-                        &quot;Pembina baru&quot;.
+                        Belum ada pembina. Pilih opsi &quot;Pembina baru&quot;.
+                      </p>
+                    )}
+                    {pembinaList.some((p) => !p.inSchool) && (
+                      <p className="text-xs text-muted-foreground">
+                        Pembina dari sekolah lain akan otomatis ditautkan ke sekolah ini.
                       </p>
                     )}
                   </div>
@@ -250,6 +258,14 @@ export default function NewSchoolGroupPage() {
                         className="rounded-xl"
                         {...register('pembinaEmail', { required: pembinaMode === 'new' })}
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Jenis kelamin pembina</Label>
+                      <GenderToggle
+                        value={pembinaGender}
+                        onChange={(value) => setValue('pembinaGender', value)}
+                      />
+                      <input type="hidden" {...register('pembinaGender')} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="pembinaPhone">No. telepon (opsional)</Label>

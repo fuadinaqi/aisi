@@ -143,14 +143,23 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var pembinaOK bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."id"=$1 AND u."isActive" AND u."gender"=$2::"Gender" AND ur."role"='PEMBINA')`, in.PembinaID, in.Gender).Scan(&pembinaOK)
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."id"=$1 AND u."isActive" AND ur."role"='PEMBINA')`, in.PembinaID).Scan(&pembinaOK)
 	if !pembinaOK {
-		httpx.Error(w, 400, "Pembina tidak ditemukan atau jenis kelamin tidak sesuai kelompok")
+		httpx.Error(w, 400, "Pembina tidak ditemukan")
 		return
 	}
-	id := uuid.NewString()
-	_, e := h.DB.Exec(r.Context(), `INSERT INTO "Group" ("id","name","level","gender","schoolId","pembinaId","updatedAt") VALUES ($1,$2,$3::"GroupLevel",$4::"Gender",$5,$6,NOW())`, id, in.Name, in.Level, in.Gender, in.SchoolID, in.PembinaID)
+	tx, e := h.DB.Begin(r.Context())
 	if e != nil {
+		httpx.Error(w, 500, "Gagal membuat kelompok")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	id := uuid.NewString()
+	_, e = tx.Exec(r.Context(), `INSERT INTO "Group" ("id","name","level","gender","schoolId","pembinaId","updatedAt") VALUES ($1,$2,$3::"GroupLevel",$4::"Gender",$5,$6,NOW())`, id, in.Name, in.Level, in.Gender, in.SchoolID, in.PembinaID)
+	if e == nil {
+		_, e = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), in.PembinaID, in.SchoolID)
+	}
+	if e != nil || tx.Commit(r.Context()) != nil {
 		httpx.Error(w, 400, "Gagal membuat kelompok")
 		return
 	}
@@ -219,12 +228,6 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, 400, "Jenis kelompok tidak dapat diubah karena masih ada anggota")
 			return
 		}
-		var pg string
-		_ = h.DB.QueryRow(r.Context(), `SELECT "gender"::text FROM "User" WHERE "id"=$1`, oldPembina).Scan(&pg)
-		if pg != in.Gender {
-			httpx.Error(w, 400, "Jenis kelamin Pembina kelompok harus sesuai")
-			return
-		}
 	}
 	if in.PembinaID != "" && in.PembinaID != oldPembina {
 		c, _ := middleware.Claims(r)
@@ -232,9 +235,28 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, 403, "Hanya PJ Sekolah atau Admin yang dapat mengganti pembina")
 			return
 		}
+		var pembinaOK bool
+		_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."id"=$1 AND u."isActive" AND ur."role"='PEMBINA')`, in.PembinaID).Scan(&pembinaOK)
+		if !pembinaOK {
+			httpx.Error(w, 400, "Pembina tidak ditemukan")
+			return
+		}
 	}
-	_, e = h.DB.Exec(r.Context(), `UPDATE "Group" SET "name"=COALESCE(NULLIF($1,''),"name"),"level"=COALESCE(NULLIF($2,'')::"GroupLevel","level"),"gender"=COALESCE(NULLIF($3,'')::"Gender","gender"),"pembinaId"=COALESCE(NULLIF($4,''),"pembinaId"),"isActive"=COALESCE($5,"isActive"),"updatedAt"=NOW() WHERE "id"=$6`, in.Name, in.Level, in.Gender, in.PembinaID, in.IsActive, id)
+	tx, e := h.DB.Begin(r.Context())
 	if e != nil {
+		httpx.Error(w, 500, "Gagal memperbarui kelompok")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	_, e = tx.Exec(r.Context(), `UPDATE "Group" SET "name"=COALESCE(NULLIF($1,''),"name"),"level"=COALESCE(NULLIF($2,'')::"GroupLevel","level"),"gender"=COALESCE(NULLIF($3,'')::"Gender","gender"),"pembinaId"=COALESCE(NULLIF($4,''),"pembinaId"),"isActive"=COALESCE($5,"isActive"),"updatedAt"=NOW() WHERE "id"=$6`, in.Name, in.Level, in.Gender, in.PembinaID, in.IsActive, id)
+	if e == nil && in.PembinaID != "" {
+		var schoolID string
+		_ = tx.QueryRow(r.Context(), `SELECT "schoolId" FROM "Group" WHERE "id"=$1`, id).Scan(&schoolID)
+		if schoolID != "" {
+			_, e = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), in.PembinaID, schoolID)
+		}
+	}
+	if e != nil || tx.Commit(r.Context()) != nil {
 		httpx.Error(w, 400, "Gagal memperbarui kelompok")
 		return
 	}

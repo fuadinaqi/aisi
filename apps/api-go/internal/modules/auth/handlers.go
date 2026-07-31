@@ -342,11 +342,16 @@ func (h Handler) setPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := uuid.NewString()
+	needsGender := role == "PEMBINA" || role == "ANGGOTA" || role == "PJ_SEKOLAH" || alsoAsPembina
+	if needsGender && (gender == nil || (*gender != "IKHWAN" && *gender != "AKHWAT")) {
+		httpx.Error(w, 400, "Undangan tidak memiliki jenis kelamin. Minta undangan ulang.")
+		return
+	}
 	g := "IKHWAN"
-	if gender != nil {
+	if gender != nil && *gender != "" {
 		g = *gender
 	}
-	_, err = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,NOW())`, uid, name, email, hash, g)
+	_, err = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5::"Gender",NOW())`, uid, name, email, hash, g)
 	if err == nil {
 		_, err = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,$3::"Role")`, uuid.NewString(), uid, role)
 	}

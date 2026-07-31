@@ -2,6 +2,7 @@ package evaluations
 
 import (
 	"encoding/json"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -358,18 +359,37 @@ func submit(db *pgxpool.Pool) http.HandlerFunc {
 		if err == nil {
 			err = award(tx, r, createdBy, points, map[bool]string{true: "Submit evaluasi tepat waktu", false: "Submit evaluasi terlambat"}[points == 10], "EVALUATION", id)
 		}
+		var hadirUIDs []string
 		rows, er := tx.Query(r.Context(), `SELECT "userId" FROM "EvaluationAttendance" WHERE "evaluationId"=$1 AND "status"='HADIR'`, id)
-		if er == nil {
+		if er != nil {
+			err = er
+		} else {
 			for rows.Next() {
 				var uid string
-				_ = rows.Scan(&uid)
-				if err == nil {
-					err = award(tx, r, uid, constants.PointAnggotaHadirPembinaan, "Hadir pembinaan mingguan", "EVALUATION", id)
+				if scanErr := rows.Scan(&uid); scanErr != nil {
+					err = scanErr
+					break
 				}
+				hadirUIDs = append(hadirUIDs, uid)
 			}
 			rows.Close()
+			if err == nil {
+				err = rows.Err()
+			}
 		}
-		if err != nil || tx.Commit(r.Context()) != nil {
+		for _, uid := range hadirUIDs {
+			if err != nil {
+				break
+			}
+			err = award(tx, r, uid, constants.PointAnggotaHadirPembinaan, "Hadir pembinaan mingguan", "EVALUATION", id)
+		}
+		if err != nil {
+			log.Printf("submit evaluasi %s: %v", id, err)
+			httpx.Error(w, 500, "Gagal submit evaluasi")
+			return
+		}
+		if err = tx.Commit(r.Context()); err != nil {
+			log.Printf("submit evaluasi commit %s: %v", id, err)
 			httpx.Error(w, 500, "Gagal submit evaluasi")
 			return
 		}
@@ -377,11 +397,18 @@ func submit(db *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 func award(tx pgx.Tx, r *http.Request, uid string, points int, desc, typ, ref string) error {
-	var roles []string
-	if err := tx.QueryRow(r.Context(), `SELECT COALESCE(array_agg("role"::text),'{}') FROM "UserRole" WHERE "userId"=$1`, uid).Scan(&roles); err != nil {
+	if uid == "" {
+		return nil
+	}
+	var eligible bool
+	if err := tx.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM "UserRole"
+			WHERE "userId"=$1 AND "role" IN ('PEMBINA'::"Role",'ANGGOTA'::"Role")
+		)`, uid).Scan(&eligible); err != nil {
 		return err
 	}
-	if !constants.IsPointEligible(roles) {
+	if !eligible {
 		return nil
 	}
 	_, err := tx.Exec(r.Context(), `INSERT INTO "PointLog" ("id","userId","points","description","refType","refId") VALUES($1,$2,$3,$4,$5,$6)`, uuid.NewString(), uid, points, desc, typ, ref)

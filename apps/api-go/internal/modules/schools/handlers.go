@@ -314,7 +314,19 @@ func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	g := r.URL.Query().Get("gender")
-	rows, e := h.DB.Query(r.Context(), `SELECT DISTINCT u."id",u."name",u."email",u."gender"::text,u."phone" FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" LEFT JOIN "UserSchool" us ON us."userId"=u."id" LEFT JOIN "Group" gr ON gr."pembinaId"=u."id" AND gr."isActive" WHERE u."isActive" AND ur."role"='PEMBINA' AND (us."schoolId"=$1 OR gr."schoolId"=$1) AND ($2='' OR u."gender"::text=$2) ORDER BY u."name"`, sid, g)
+	// Semua pembina (boleh lintas sekolah); tandai yang sudah terkait sekolah ini.
+	rows, e := h.DB.Query(r.Context(), `
+		SELECT u."id",u."name",u."email",u."gender"::text,u."phone",
+			EXISTS(
+				SELECT 1 FROM "UserSchool" us WHERE us."userId"=u."id" AND us."schoolId"=$1
+			) OR EXISTS(
+				SELECT 1 FROM "Group" gr WHERE gr."pembinaId"=u."id" AND gr."schoolId"=$1 AND gr."isActive"
+			) AS "inSchool"
+		FROM "User" u
+		JOIN "UserRole" ur ON ur."userId"=u."id"
+		WHERE u."isActive" AND ur."role"='PEMBINA'
+		  AND ($2='' OR u."gender"::text=$2)
+		ORDER BY "inSchool" DESC, u."name"`, sid, g)
 	if e != nil {
 		httpx.Error(w, 500, "Gagal mengambil pembina")
 		return
@@ -324,8 +336,9 @@ func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id, n, mail, gender string
 		var phone *string
-		if rows.Scan(&id, &n, &mail, &gender, &phone) == nil {
-			out = append(out, map[string]any{"id": id, "name": n, "email": mail, "gender": gender, "phone": phone})
+		var inSchool bool
+		if rows.Scan(&id, &n, &mail, &gender, &phone, &inSchool) == nil {
+			out = append(out, map[string]any{"id": id, "name": n, "email": mail, "gender": gender, "phone": phone, "inSchool": inSchool})
 		}
 	}
 	httpx.Success(w, 200, out, "")
@@ -341,24 +354,158 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 		Level     string `json:"level"`
 		Gender    string `json:"gender"`
 		PembinaID string `json:"pembinaId"`
+		Pembina   *struct {
+			Name     string  `json:"name"`
+			Email    string  `json:"email"`
+			Phone    *string `json:"phone"`
+			Gender   string  `json:"gender"`
+			Password *string `json:"password"`
+		} `json:"pembina"`
 	}
-	if !decode(r, &in) || len(in.Name) < 2 || (in.Level != "LEVEL_1" && in.Level != "LEVEL_2") || !gender(in.Gender) || in.PembinaID == "" {
-		httpx.Error(w, 400, "Data kelompok tidak valid; undangan pembina baru gunakan endpoint invitations")
+	if !decode(r, &in) || len(in.Name) < 2 || (in.Level != "LEVEL_1" && in.Level != "LEVEL_2") || !gender(in.Gender) || (in.PembinaID == "" && in.Pembina == nil) {
+		httpx.Error(w, 400, "Data kelompok tidak valid")
 		return
 	}
-	var ok bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."id"=$1 AND u."isActive" AND u."gender"=$2::"Gender" AND ur."role"='PEMBINA')`, in.PembinaID, in.Gender).Scan(&ok)
-	if !ok {
-		httpx.Error(w, 400, "Pembina tidak ditemukan atau jenis kelamin tidak sesuai kelompok")
+	if in.PembinaID != "" && in.Pembina != nil {
+		httpx.Error(w, 400, "Pilih pembina existing atau pembina baru, bukan keduanya")
 		return
 	}
-	id := uuid.NewString()
-	_, e := h.DB.Exec(r.Context(), `INSERT INTO "Group" ("id","name","level","gender","schoolId","pembinaId","updatedAt") VALUES ($1,$2,$3::"GroupLevel",$4::"Gender",$5,$6,NOW())`, id, in.Name, in.Level, in.Gender, sid, in.PembinaID)
+
+	if in.PembinaID != "" {
+		var ok bool
+		_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."id"=$1 AND u."isActive" AND ur."role"='PEMBINA')`, in.PembinaID).Scan(&ok)
+		if !ok {
+			httpx.Error(w, 400, "Pembina tidak ditemukan")
+			return
+		}
+		tx, e := h.DB.Begin(r.Context())
+		if e != nil {
+			httpx.Error(w, 500, "Gagal membuat kelompok")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		id := uuid.NewString()
+		_, e = tx.Exec(r.Context(), `INSERT INTO "Group" ("id","name","level","gender","schoolId","pembinaId","updatedAt") VALUES ($1,$2,$3::"GroupLevel",$4::"Gender",$5,$6,NOW())`, id, in.Name, in.Level, in.Gender, sid, in.PembinaID)
+		if e == nil {
+			// Tautkan pembina ke sekolah ini (boleh sudah punya sekolah lain).
+			_, e = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), in.PembinaID, sid)
+		}
+		if e != nil || tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal membuat kelompok")
+			return
+		}
+		httpx.Success(w, 201, map[string]any{"group": map[string]string{"id": id, "name": in.Name}, "mode": "direct"}, "Kelompok berhasil dibuat")
+		return
+	}
+
+	p := in.Pembina
+	if len(p.Name) < 2 || p.Email == "" {
+		httpx.Error(w, 400, "Data pembina tidak valid")
+		return
+	}
+	pgender := p.Gender
+	if pgender == "" {
+		pgender = in.Gender
+	}
+	if !gender(pgender) {
+		httpx.Error(w, 400, "Jenis kelamin pembina tidak valid")
+		return
+	}
+	// Email sudah pembina aktif: tautkan ke sekolah + buat kelompok (multi-sekolah).
+	// Gender pembina boleh beda dari jenis kelompok.
+	var existingPembinaID string
+	_ = h.DB.QueryRow(r.Context(), `
+		SELECT u."id" FROM "User" u
+		JOIN "UserRole" ur ON ur."userId"=u."id"
+		WHERE u."email"=$1 AND u."isActive" AND ur."role"='PEMBINA'`,
+		p.Email).Scan(&existingPembinaID)
+	if existingPembinaID != "" {
+		tx, e := h.DB.Begin(r.Context())
+		if e != nil {
+			httpx.Error(w, 500, "Gagal membuat kelompok")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		gid := uuid.NewString()
+		_, e = tx.Exec(r.Context(), `INSERT INTO "Group" ("id","name","level","gender","schoolId","pembinaId","updatedAt") VALUES ($1,$2,$3::"GroupLevel",$4::"Gender",$5,$6,NOW())`, gid, in.Name, in.Level, in.Gender, sid, existingPembinaID)
+		if e == nil {
+			_, e = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), existingPembinaID, sid)
+		}
+		if e != nil || tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal membuat kelompok")
+			return
+		}
+		httpx.Success(w, 201, map[string]any{
+			"mode":    "direct",
+			"group":   map[string]string{"id": gid, "name": in.Name},
+			"pembina": map[string]any{"id": existingPembinaID, "email": p.Email},
+		}, "Kelompok dibuat; pembina existing ditautkan ke sekolah ini")
+		return
+	}
+	if h.activeEmail(r, p.Email) {
+		httpx.Error(w, 400, "Email pembina sudah terdaftar atau memiliki undangan aktif")
+		return
+	}
+
+	hasPassword := p.Password != nil && *p.Password != ""
+	c, _ := middleware.Claims(r)
+	tx, e := h.DB.Begin(r.Context())
 	if e != nil {
 		httpx.Error(w, 500, "Gagal membuat kelompok")
 		return
 	}
-	httpx.Success(w, 201, map[string]string{"id": id, "name": in.Name}, "Kelompok berhasil dibuat")
+	defer tx.Rollback(r.Context())
+
+	if !hasPassword {
+		token := uuid.NewString()
+		iid := uuid.NewString()
+		expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
+		_, e = tx.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","alsoAsPembina","gender","schoolId","token","invitedById","expiresAt") VALUES ($1,$2,$3,'PEMBINA',false,$4::"Gender",$5,$6,$7,$8)`, iid, p.Name, p.Email, pgender, sid, token, c.UserID, expires)
+		if e != nil || tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal mengundang pembina")
+			return
+		}
+		if e = email.New(h.Config).SendInvitation(r.Context(), p.Email, p.Name, h.Config.AppURL+"/set-password?token="+token); e != nil {
+			httpx.Error(w, 502, "Undangan dibuat, namun email gagal dikirim")
+			return
+		}
+		httpx.Success(w, 201, map[string]any{
+			"mode": "invite",
+			"invitation": map[string]any{"id": iid, "email": p.Email, "status": "PENDING"},
+		}, "Undangan pembina berhasil dikirim")
+		return
+	}
+
+	if err := auth.ValidatePassword(*p.Password); err != nil {
+		httpx.Error(w, 400, err.Error())
+		return
+	}
+	uid := uuid.NewString()
+	hash, he := auth.HashPassword(*p.Password)
+	if he != nil {
+		httpx.Error(w, 500, "Gagal membuat pembina")
+		return
+	}
+	_, e = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","phone","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::"Gender",NOW())`, uid, p.Name, p.Email, p.Phone, hash, pgender)
+	if e == nil {
+		_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'PEMBINA')`, uuid.NewString(), uid)
+	}
+	if e == nil {
+		_, e = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") VALUES ($1,$2,$3)`, uuid.NewString(), uid, sid)
+	}
+	gid := uuid.NewString()
+	if e == nil {
+		_, e = tx.Exec(r.Context(), `INSERT INTO "Group" ("id","name","level","gender","schoolId","pembinaId","updatedAt") VALUES ($1,$2,$3::"GroupLevel",$4::"Gender",$5,$6,NOW())`, gid, in.Name, in.Level, in.Gender, sid, uid)
+	}
+	if e != nil || tx.Commit(r.Context()) != nil {
+		httpx.Error(w, 500, "Gagal membuat kelompok")
+		return
+	}
+	httpx.Success(w, 201, map[string]any{
+		"mode":    "direct",
+		"group":   map[string]string{"id": gid, "name": in.Name},
+		"pembina": map[string]any{"id": uid, "name": p.Name, "email": p.Email},
+	}, "Kelompok dan akun pembina berhasil dibuat")
 }
 func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 	sid := chi.URLParam(r, "id")
