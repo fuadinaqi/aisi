@@ -1,6 +1,6 @@
 
-import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@dakwah/shared';
@@ -25,7 +25,13 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [error, setError] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const {
     register,
@@ -50,6 +56,16 @@ export default function LoginPage() {
       toastError(err, 'Login gagal');
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-[hsl(var(--surface))]" aria-busy="true" aria-label="Memuat" />
+    );
+  }
+
+  if (accessToken) {
+    return <Navigate to={safeRedirect(searchParams.get('redirect'))} replace />;
+  }
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-[hsl(var(--surface))] lg:min-h-screen lg:flex-row lg:bg-background">
