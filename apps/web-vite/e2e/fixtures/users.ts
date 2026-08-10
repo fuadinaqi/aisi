@@ -54,6 +54,7 @@ export const NAV_BY_ROLE: Record<SeedUser['role'], { href: string; label: string
   SUPERADMIN: [
     { href: '/dashboard', label: 'Beranda' },
     { href: '/schools', label: 'Sekolah' },
+    { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor' },
     { href: '/users', label: 'Pengguna' },
     { href: '/invitations', label: 'Undangan' },
     { href: '/events', label: 'Agenda' },
@@ -67,6 +68,7 @@ export const NAV_BY_ROLE: Record<SeedUser['role'], { href: string; label: string
   ADMIN: [
     { href: '/dashboard', label: 'Beranda' },
     { href: '/schools', label: 'Sekolah' },
+    { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor' },
     { href: '/events', label: 'Agenda' },
     { href: '/materi', label: 'Materi' },
     { href: '/analytics', label: 'Analitik' },
@@ -78,6 +80,7 @@ export const NAV_BY_ROLE: Record<SeedUser['role'], { href: string; label: string
   PJ_SEKOLAH: [
     { href: '/dashboard', label: 'Beranda' },
     { href: '/schools', label: 'Sekolah' },
+    { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor' },
     { href: '/pembina', label: 'Pembina' },
     { href: '/config/ic', label: 'Indikator Capaian' },
     { href: '/events', label: 'Agenda' },

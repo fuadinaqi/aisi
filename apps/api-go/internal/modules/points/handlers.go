@@ -9,6 +9,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -138,6 +139,8 @@ func manual(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 500, "Gagal menambahkan poin")
 			return
 		}
+		ref := claims.UserID
+		notify.PointEarned(r.Context(), db, in.UserID, in.Points, in.Description, &ref)
 		httpx.Success(w, 200, nil, "Poin berhasil ditambahkan")
 	}
 }

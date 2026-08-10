@@ -8,6 +8,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -296,6 +297,7 @@ func save(db *pgxpool.Pool, submit bool) http.HandlerFunc {
 			httpx.Error(w, 400, "Semua poin mutabaah wajib diisi")
 			return
 		}
+		awardedPoints := false
 		if submit {
 			_, e = tx.Exec(r.Context(), `UPDATE "MutabaahEntry" SET "isSubmitted"=true,"submittedAt"=NOW(),"updatedAt"=NOW() WHERE "id"=$1`, id)
 			if e == nil && constants.IsPointEligible(c.Roles) {
@@ -305,6 +307,7 @@ func save(db *pgxpool.Pool, submit bool) http.HandlerFunc {
 					_, e = tx.Exec(r.Context(), `INSERT INTO "PointLog" ("id","userId","points","description","refType","refId") VALUES($1,$2,$3,'Mengirim mutabaah yaumiyah','MUTABAAH',$4)`, uuid.NewString(), c.UserID, constants.PointAnggotaSubmitMutabaah, id)
 					if e == nil {
 						_, e = tx.Exec(r.Context(), `UPDATE "User" SET "totalPoints"="totalPoints"+$1,"updatedAt"=NOW() WHERE "id"=$2`, constants.PointAnggotaSubmitMutabaah, c.UserID)
+						awardedPoints = e == nil
 					}
 				}
 			}
@@ -312,6 +315,10 @@ func save(db *pgxpool.Pool, submit bool) http.HandlerFunc {
 		if e != nil || tx.Commit(r.Context()) != nil {
 			httpx.Error(w, 500, "Gagal menyimpan mutabaah")
 			return
+		}
+		if awardedPoints {
+			ref := id
+			notify.PointEarned(r.Context(), db, c.UserID, constants.PointAnggotaSubmitMutabaah, "Mengirim mutabaah yaumiyah", &ref)
 		}
 		entryResponse(w, r, db, c.UserID, in.GroupID, week, map[bool]string{true: "Mutabaah berhasil dikirim", false: "Mutabaah berhasil disimpan"}[submit])
 	}

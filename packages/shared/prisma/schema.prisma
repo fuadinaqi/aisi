@@ -38,6 +38,7 @@ enum NotifType {
   NEW_MATERI
   POINT_EARNED
   NEW_KKS
+  NEW_MENTOR_APPLICATION
   GENERAL
 }
 
@@ -106,17 +107,26 @@ enum ICType {
   SEKUNDER
 }
 
+enum MentorApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 model School {
   id        String   @id @default(cuid())
   name      String   @unique
   city      String   @default("Depok")
+  address   String?
+  mapsUrl   String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users  UserSchool[]
-  groups Group[]
-  events Event[]
+  users      UserSchool[]
+  groups     Group[]
+  events     Event[]
+  mentorNeed MentorNeed?
 }
 
 model User {
@@ -162,6 +172,7 @@ model User {
   icProgressAsMember MemberICProgress[] @relation("ICMember")
   icProgressChecked  MemberICProgress[] @relation("ICChecker")
   feedbacks          Feedback[]
+  mentorNeedsCreated MentorNeed[]       @relation("MentorNeedCreator")
 }
 
 model UserRole {
@@ -508,4 +519,41 @@ model Feedback {
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+model MentorNeed {
+  id          String   @id @default(cuid())
+  schoolId    String   @unique
+  description String   @db.Text
+  needIkhwan  Int      @default(0)
+  needAkhwat  Int      @default(0)
+  isPublished Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school       School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy    User                @relation("MentorNeedCreator", fields: [createdById], references: [id])
+  applications MentorApplication[]
+}
+
+model MentorApplication {
+  id              String                  @id @default(cuid())
+  mentorNeedId    String
+  name            String
+  whatsapp        String
+  age             Int
+  gender          Gender
+  address         String                  @db.Text
+  asalSma         String
+  murobbiName     String
+  murobbiWhatsapp String
+  status          MentorApplicationStatus @default(PENDING)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  mentorNeed MentorNeed @relation(fields: [mentorNeedId], references: [id], onDelete: Cascade)
+
+  @@index([mentorNeedId])
+  @@index([mentorNeedId, gender, status])
 }

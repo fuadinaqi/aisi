@@ -155,8 +155,18 @@ export interface InvitationItem {
   createdAt: string;
 }
 
+export interface NotificationItem {
+  id: string;
+  title: string;
+  body: string;
+  type?: string;
+  refId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export interface NotificationData {
-  items: { id: string; title: string; body: string; isRead: boolean; createdAt: string }[];
+  items: NotificationItem[];
   unreadCount: number;
 }
 
@@ -169,6 +179,8 @@ export interface SchoolItem {
   id: string;
   name: string;
   city: string;
+  address?: string | null;
+  mapsUrl?: string | null;
 }
 
 export interface SchoolDetail extends SchoolItem {
@@ -176,6 +188,46 @@ export interface SchoolDetail extends SchoolItem {
   groups: GroupItem[];
   totalGroups: number;
   totalAnggota: number;
+}
+
+export interface MentorQuotaSide {
+  need: number;
+  filled: number;
+  remaining: number;
+}
+
+export interface MentorNeedItem {
+  id: string | null;
+  schoolId: string;
+  schoolName: string;
+  city: string;
+  address?: string | null;
+  mapsUrl?: string | null;
+  description?: string | null;
+  needIkhwan?: number;
+  needAkhwat?: number;
+  isPublished?: boolean;
+  updatedAt?: string | null;
+  pendingCount?: number;
+  quota: {
+    ikhwan: MentorQuotaSide;
+    akhwat: MentorQuotaSide;
+  };
+  pjNames?: string[];
+}
+
+export interface MentorApplicationItem {
+  id: string;
+  name: string;
+  whatsapp: string;
+  age: number;
+  gender: 'IKHWAN' | 'AKHWAT';
+  address: string;
+  asalSma: string;
+  murobbiName: string;
+  murobbiWhatsapp: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  createdAt: string;
 }
 
 export interface KksItem {

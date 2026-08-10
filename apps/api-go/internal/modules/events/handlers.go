@@ -10,6 +10,7 @@ import (
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/storage"
 	"github.com/go-chi/chi/v5"
@@ -215,6 +216,10 @@ func save(db *pgxpool.Pool, cfg config.Config, isUpdate bool) http.HandlerFunc {
 		if in.IsPublished != nil {
 			published = *in.IsPublished
 		}
+		var wasPublished bool
+		if isUpdate {
+			_ = db.QueryRow(r.Context(), `SELECT "isPublished" FROM "Event" WHERE "id"=$1`, id).Scan(&wasPublished)
+		}
 		if !isUpdate {
 			id = uuid.NewString()
 			_, e = db.Exec(r.Context(), `INSERT INTO "Event" ("id","title","description","location","startAt","endAt","pointValue","imageUrl","schoolId","targetLevels","isPublished","createdById","updatedAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::"GroupLevel"[],$11,$12,NOW())`, id, in.Title, in.Description, in.Location, start, end, in.PointValue, in.ImageURL, school, in.TargetLevels, published, claims.UserID)
@@ -230,6 +235,9 @@ func save(db *pgxpool.Pool, cfg config.Config, isUpdate bool) http.HandlerFunc {
 		}
 		if store != nil && newImageURL != "" && existingImage != nil && *existingImage != "" && *existingImage != newImageURL {
 			store.DeleteBestEffort(r.Context(), *existingImage)
+		}
+		if published && (!isUpdate || !wasPublished) {
+			notify.EventPublished(r.Context(), db, id, in.Title, school)
 		}
 		eventByID(w, r, db, id, map[bool]int{true: 200, false: 201}[isUpdate], map[bool]string{true: "Event berhasil diperbarui", false: "Event berhasil dibuat"}[isUpdate])
 	}
@@ -425,6 +433,10 @@ func approve(db *pgxpool.Pool) http.HandlerFunc {
 		if e != nil || tx.Commit(r.Context()) != nil {
 			httpx.Error(w, 500, "Gagal memproses check-in")
 			return
+		}
+		if pts > 0 {
+			ref := id
+			notify.PointEarned(r.Context(), db, uid, pts, "Check-in event: "+title, &ref)
 		}
 		httpx.Success(w, 200, map[string]any{"id": id, "status": "APPROVED"}, "Check-in disetujui")
 	}

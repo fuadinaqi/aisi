@@ -9,6 +9,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -157,15 +158,9 @@ func create(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		_ = db.QueryRow(r.Context(), `SELECT `+feedbackColumns+` FROM "Feedback" f JOIN "User" u ON u."id"=f."userId" WHERE f."id"=$1`, item.ID).Scan(&item.ID, &item.UserID, &item.Type, &item.Subject, &item.Message, &item.Status, &item.AdminNotes, &item.SchoolID, &item.CreatedAt, &item.UpdatedAt, &item.ReadAt, &item.ResolvedAt, &item.User)
-		admins, err := db.Query(r.Context(), `SELECT DISTINCT "userId" FROM "UserRole" WHERE "role" IN ('SUPERADMIN'::"Role",'ADMIN'::"Role")`)
-		if err == nil {
-			defer admins.Close()
-			for admins.Next() {
-				var adminID string
-				if admins.Scan(&adminID) == nil {
-					_, _ = db.Exec(r.Context(), `INSERT INTO "Notification" ("id","userId","type","title","body","refId") VALUES ($1,$2,'NEW_KKS'::"NotifType",$3,$4,$5)`, uuid.NewString(), adminID, constants.KKSTypeLabels[in.Type]+" baru", in.Subject, item.ID)
-				}
-			}
+		if admins, err := notify.UserIDsByRoles(r.Context(), db, "SUPERADMIN", "ADMIN"); err == nil {
+			ref := item.ID
+			notify.CreateMany(r.Context(), db, admins, "NEW_KKS", constants.KKSTypeLabels[in.Type]+" baru", in.Subject, &ref)
 		}
 		httpx.Success(w, 201, item, "KKS berhasil dikirim")
 	}

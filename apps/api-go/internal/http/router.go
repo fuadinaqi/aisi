@@ -17,6 +17,7 @@ import (
 	invitationsmodule "github.com/dakwah-depok/aisi/apps/api-go/internal/modules/invitations"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/modules/kks"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/modules/materi"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/modules/mentorneeds"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/modules/mutabaah"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/modules/notifications"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/modules/points"
@@ -66,6 +67,9 @@ func Router(db *pgxpool.Pool, c config.Config) http.Handler {
 		api.Mount("/analytics", analytics.Routes(db, c))
 		api.Mount("/mutabaah", mutabaah.Routes(db, c))
 		api.Mount("/ic", ic.Routes(db, c))
+		mentor := mentorneeds.Handler{DB: db, Config: c}
+		api.Mount("/calon-mentor", mentor.PublicRoutes())
+		api.Mount("/mentor-needs", mentor.ProtectedRoutes())
 	})
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) { Error(w, 404, "Endpoint tidak ditemukan") })
 	return r

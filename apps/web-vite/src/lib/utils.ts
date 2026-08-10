@@ -126,12 +126,21 @@ export function formatEventTargetLevels(
 }
 
 /** Normalisasi nomor HP ke format wa.me (62...) */
+/** Normalisasi ke 628… ; null jika bukan nomor HP Indonesia yang valid. */
 export function formatWhatsAppPhone(phone: string): string | null {
-  const digits = phone.replace(/\D/g, '');
+  let digits = phone.replace(/\D/g, '');
   if (!digits) return null;
-  if (digits.startsWith('0')) return `62${digits.slice(1)}`;
-  if (digits.startsWith('62')) return digits;
+  if (digits.startsWith('0')) digits = `62${digits.slice(1)}`;
+  else if (digits.startsWith('8')) digits = `62${digits}`;
+  else if (!digits.startsWith('62')) return null;
+  // 628xxxxxxxxx — total 11–15 digit
+  if (digits.length < 11 || digits.length > 15) return null;
+  if (!digits.startsWith('628')) return null;
   return digits;
+}
+
+export function isValidWhatsAppPhone(phone?: string | null): boolean {
+  return !!phone && !!formatWhatsAppPhone(phone);
 }
 
 export function getWhatsAppUrl(phone?: string | null): string | null {

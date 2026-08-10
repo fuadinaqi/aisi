@@ -10,6 +10,7 @@ import (
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/storage"
 	"github.com/go-chi/chi/v5"
@@ -190,6 +191,10 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 			uploaded = append(uploaded, u)
 			urls = append(urls, u)
 		}
+		var wasPublished bool
+		if update {
+			_ = db.QueryRow(r.Context(), `SELECT "isPublished" FROM "WeeklyMateri" WHERE "id"=$1`, id).Scan(&wasPublished)
+		}
 		if !update {
 			c, _ := middleware.Claims(r)
 			id = uuid.NewString()
@@ -212,6 +217,13 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 					s.DeleteBestEffort(r.Context(), u)
 				}
 			}
+		}
+		if in.IsPublished && (!update || !wasPublished) {
+			levels := in.TargetLevels
+			if levels == nil {
+				levels = []string{}
+			}
+			notify.MateriPublished(r.Context(), db, id, in.Title, levels)
 		}
 		byID(w, r, db, id, map[bool]int{true: 200, false: 201}[update], map[bool]string{true: "Materi berhasil diperbarui", false: "Materi berhasil dibuat"}[update])
 	}

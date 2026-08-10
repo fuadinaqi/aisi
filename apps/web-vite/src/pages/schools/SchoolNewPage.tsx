@@ -20,6 +20,8 @@ import { toastError, toastSuccess } from '@/lib/toast';
 type FormData = {
   name: string;
   city: string;
+  address: string;
+  mapsUrl: string;
   pjName: string;
   pjEmail: string;
   pjPhone: string;
@@ -59,6 +61,8 @@ export default function NewSchoolPage() {
       const payload = {
         name: data.name.trim(),
         city: data.city.trim() || 'Depok',
+        address: data.address.trim() || undefined,
+        mapsUrl: data.mapsUrl.trim() || undefined,
         pj: {
           name: data.pjName.trim(),
           email: data.pjEmail.trim(),
@@ -127,6 +131,27 @@ export default function NewSchoolPage() {
             <div className="space-y-2">
               <Label htmlFor="city">Kota</Label>
               <Input id="city" className="rounded-xl" {...register('city')} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Alamat sekolah (opsional)</Label>
+              <textarea
+                id="address"
+                rows={2}
+                placeholder="Jl. ..."
+                className="flex w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                {...register('address')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mapsUrl">Link Google Maps (opsional)</Label>
+              <Input
+                id="mapsUrl"
+                placeholder="https://maps.google.com/..."
+                className="rounded-xl"
+                {...register('mapsUrl')}
+              />
             </div>
 
             <div className="border-t border-border/60 pt-5">

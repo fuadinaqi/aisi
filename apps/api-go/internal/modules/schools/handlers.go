@@ -3,6 +3,7 @@ package schools
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/auth"
@@ -26,7 +27,7 @@ func (h Handler) Routes() chi.Router {
 	r.Use(middleware.RequireAuth(h.Config))
 	r.Get("/", h.list)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Post("/", h.create)
-	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Put("/{id}", h.update)
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Put("/{id}", h.update)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Delete("/{id}", h.remove)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Post("/{id}/pj", h.addPJ)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Delete("/{id}/pj/{userId}", h.removePJ)
@@ -56,6 +57,8 @@ func alsoAsPembina(v *bool) bool {
 type schoolInput struct {
 	Name     string
 	City     *string
+	Address  *string `json:"address"`
+	MapsUrl  *string `json:"mapsUrl"`
 	IsActive *bool
 	PJ       *pjInput `json:"pj"`
 }
@@ -80,10 +83,10 @@ func (h Handler) access(r *http.Request, id string) bool {
 }
 func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 	c, _ := middleware.Claims(r)
-	q := `SELECT "id","name","city","isActive","createdAt","updatedAt" FROM "School" WHERE "isActive"`
+	q := `SELECT "id","name","city","address","mapsUrl","isActive","createdAt","updatedAt" FROM "School" WHERE "isActive"`
 	args := []any{}
 	if !admin(c.Roles) {
-		q = `SELECT s."id",s."name",s."city",s."isActive",s."createdAt",s."updatedAt" FROM "School" s JOIN "UserSchool" us ON us."schoolId"=s."id" WHERE s."isActive" AND us."userId"=$1`
+		q = `SELECT s."id",s."name",s."city",s."address",s."mapsUrl",s."isActive",s."createdAt",s."updatedAt" FROM "School" s JOIN "UserSchool" us ON us."schoolId"=s."id" WHERE s."isActive" AND us."userId"=$1`
 		args = append(args, c.UserID)
 	}
 	q += ` ORDER BY "name"`
@@ -96,10 +99,11 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 	out := []map[string]any{}
 	for rows.Next() {
 		var id, n, city string
+		var address, mapsUrl *string
 		var active bool
 		var created, updated time.Time
-		if rows.Scan(&id, &n, &city, &active, &created, &updated) == nil {
-			out = append(out, map[string]any{"id": id, "name": n, "city": city, "isActive": active, "createdAt": created, "updatedAt": updated})
+		if rows.Scan(&id, &n, &city, &address, &mapsUrl, &active, &created, &updated) == nil {
+			out = append(out, map[string]any{"id": id, "name": n, "city": city, "address": address, "mapsUrl": mapsUrl, "isActive": active, "createdAt": created, "updatedAt": updated})
 		}
 	}
 	httpx.Success(w, 200, out, "")
@@ -118,6 +122,19 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	if in.City != nil && *in.City != "" {
 		city = *in.City
 	}
+	var address, mapsUrl *string
+	if in.Address != nil {
+		v := strings.TrimSpace(*in.Address)
+		if v != "" {
+			address = &v
+		}
+	}
+	if in.MapsUrl != nil {
+		v := strings.TrimSpace(*in.MapsUrl)
+		if v != "" {
+			mapsUrl = &v
+		}
+	}
 	c, _ := middleware.Claims(r)
 	tx, e := h.DB.Begin(r.Context())
 	if e != nil {
@@ -126,13 +143,13 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	sid := uuid.NewString()
-	_, e = tx.Exec(r.Context(), `INSERT INTO "School" ("id","name","city","updatedAt") VALUES ($1,$2,$3,NOW())`, sid, in.Name, city)
+	_, e = tx.Exec(r.Context(), `INSERT INTO "School" ("id","name","city","address","mapsUrl","updatedAt") VALUES ($1,$2,$3,$4,$5,NOW())`, sid, in.Name, city, address, mapsUrl)
 	if e != nil {
 		httpx.Error(w, 400, "Nama sekolah sudah terdaftar")
 		return
 	}
 	mode := "invite"
-	data := map[string]any{"school": map[string]any{"id": sid, "name": in.Name, "city": city}}
+	data := map[string]any{"school": map[string]any{"id": sid, "name": in.Name, "city": city, "address": address, "mapsUrl": mapsUrl}}
 	if in.PJ.Password != nil {
 		if err := auth.ValidatePassword(*in.PJ.Password); err != nil {
 			httpx.Error(w, 400, err.Error())
@@ -189,9 +206,56 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "Body tidak valid")
 		return
 	}
+	sid := chi.URLParam(r, "id")
+	c, _ := middleware.Claims(r)
+	isAdmin := admin(c.Roles)
+	if !isAdmin {
+		if !h.access(r, sid) {
+			httpx.Error(w, 403, "Akses ditolak")
+			return
+		}
+		// PJ hanya boleh mengubah alamat & maps
+		if in.Name != "" || in.City != nil || in.IsActive != nil {
+			httpx.Error(w, 403, "PJ hanya dapat mengubah alamat dan link Google Maps")
+			return
+		}
+	}
+	var address any = nil
+	var mapsUrl any = nil
+	setAddress, setMaps := false, false
+	if in.Address != nil {
+		setAddress = true
+		v := strings.TrimSpace(*in.Address)
+		if v == "" {
+			address = nil
+		} else {
+			address = v
+		}
+	}
+	if in.MapsUrl != nil {
+		setMaps = true
+		v := strings.TrimSpace(*in.MapsUrl)
+		if v == "" {
+			mapsUrl = nil
+		} else {
+			mapsUrl = v
+		}
+	}
 	var id, name, city string
+	var addr, maps *string
 	var active bool
-	e := h.DB.QueryRow(r.Context(), `UPDATE "School" SET "name"=COALESCE(NULLIF($1,''),"name"),"city"=COALESCE(NULLIF($2,''),"city"),"isActive"=COALESCE($3,"isActive"),"updatedAt"=NOW() WHERE "id"=$4 RETURNING "id","name","city","isActive"`, in.Name, in.City, in.IsActive, chi.URLParam(r, "id")).Scan(&id, &name, &city, &active)
+	e := h.DB.QueryRow(r.Context(), `
+		UPDATE "School" SET
+			"name"=CASE WHEN $1 THEN COALESCE(NULLIF($2,''),"name") ELSE "name" END,
+			"city"=CASE WHEN $1 THEN COALESCE(NULLIF($3,''),"city") ELSE "city" END,
+			"isActive"=CASE WHEN $1 THEN COALESCE($4,"isActive") ELSE "isActive" END,
+			"address"=CASE WHEN $5 THEN $6::text ELSE "address" END,
+			"mapsUrl"=CASE WHEN $7 THEN $8::text ELSE "mapsUrl" END,
+			"updatedAt"=NOW()
+		WHERE "id"=$9
+		RETURNING "id","name","city","address","mapsUrl","isActive"`,
+		isAdmin, in.Name, in.City, in.IsActive, setAddress, address, setMaps, mapsUrl, sid,
+	).Scan(&id, &name, &city, &addr, &maps, &active)
 	if e == pgx.ErrNoRows {
 		httpx.Error(w, 404, "Sekolah tidak ditemukan")
 		return
@@ -200,7 +264,7 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "Gagal memperbarui sekolah")
 		return
 	}
-	httpx.Success(w, 200, map[string]any{"id": id, "name": name, "city": city, "isActive": active}, "Sekolah berhasil diperbarui")
+	httpx.Success(w, 200, map[string]any{"id": id, "name": name, "city": city, "address": addr, "mapsUrl": maps, "isActive": active}, "Sekolah berhasil diperbarui")
 }
 func (h Handler) remove(w http.ResponseWriter, r *http.Request) {
 	tag, e := h.DB.Exec(r.Context(), `UPDATE "School" SET "isActive"=false,"updatedAt"=NOW() WHERE "id"=$1`, chi.URLParam(r, "id"))
@@ -515,9 +579,10 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	var id, n, city string
+	var address, mapsUrl *string
 	var active bool
 	var created, updated time.Time
-	e := h.DB.QueryRow(ctx, `SELECT "id","name","city","isActive","createdAt","updatedAt" FROM "School" WHERE "id"=$1 AND "isActive"=true`, sid).Scan(&id, &n, &city, &active, &created, &updated)
+	e := h.DB.QueryRow(ctx, `SELECT "id","name","city","address","mapsUrl","isActive","createdAt","updatedAt" FROM "School" WHERE "id"=$1 AND "isActive"=true`, sid).Scan(&id, &n, &city, &address, &mapsUrl, &active, &created, &updated)
 	if e != nil {
 		httpx.Error(w, 404, "Sekolah tidak ditemukan")
 		return
@@ -731,7 +796,7 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.Success(w, 200, map[string]any{
-		"id": id, "name": n, "city": city, "isActive": active,
+		"id": id, "name": n, "city": city, "address": address, "mapsUrl": mapsUrl, "isActive": active,
 		"createdAt": created, "updatedAt": updated,
 		"pjUsers": pjUsers, "groups": groupsOut,
 		"totalGroups": len(groupsOut), "totalAnggota": totalAnggota,

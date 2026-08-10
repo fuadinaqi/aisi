@@ -12,6 +12,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/storage"
 	"github.com/go-chi/chi/v5"
@@ -392,6 +393,12 @@ func submit(db *pgxpool.Pool) http.HandlerFunc {
 			log.Printf("submit evaluasi commit %s: %v", id, err)
 			httpx.Error(w, 500, "Gagal submit evaluasi")
 			return
+		}
+		ref := id
+		pembinaDesc := map[bool]string{true: "Submit evaluasi tepat waktu", false: "Submit evaluasi terlambat"}[points == constants.PointPembinaSubmitEvaluation]
+		notify.PointEarned(r.Context(), db, createdBy, points, pembinaDesc, &ref)
+		for _, uid := range hadirUIDs {
+			notify.PointEarned(r.Context(), db, uid, constants.PointAnggotaHadirPembinaan, "Hadir pembinaan mingguan", &ref)
 		}
 		detailByID(w, r, db, id, 200, "Evaluasi berhasil disubmit")
 	}

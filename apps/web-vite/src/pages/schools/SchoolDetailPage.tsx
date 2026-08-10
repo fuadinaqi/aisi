@@ -1,9 +1,9 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, UserMinus, UserPlus, Users } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Plus, UserMinus, UserPlus, Users } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader, Section } from '@/components/layout/PageShell';
@@ -17,8 +17,10 @@ import { GenderBadge } from '@/components/shared/GenderField';
 import { getGenderLabel } from '@/lib/utils';
 import { RoleGuard } from '@/components/layout/RoleGuard';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { invalidateSchoolQueries } from '@/lib/queryInvalidation';
-import { toastSuccess } from '@/lib/toast';
+import { toastError, toastSuccess } from '@/lib/toast';
 import type { SchoolDetail } from '@/lib/types';
 
 export default function SchoolDetailPage() {
@@ -27,8 +29,12 @@ export default function SchoolDetailPage() {
   const role = useActiveRole() || '';
   const canManagePj = role === 'SUPERADMIN' || role === 'ADMIN';
   const canManageGroups = canManagePj || role === 'PJ_SEKOLAH';
+  const canEditAddress = canManageGroups;
 
   const [pjToRemove, setPjToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [address, setAddress] = useState('');
+  const [mapsUrl, setMapsUrl] = useState('');
+  const [savingAddress, setSavingAddress] = useState(false);
 
   const { data: school, isLoading } = useQuery<SchoolDetail>({
     queryKey: ['school', id],
@@ -36,11 +42,31 @@ export default function SchoolDetailPage() {
     enabled: !!id,
   });
 
+  useEffect(() => {
+    if (!school) return;
+    setAddress(school.address || '');
+    setMapsUrl(school.mapsUrl || '');
+  }, [school]);
+
   const handleRemovePj = async () => {
     if (!pjToRemove) return;
     await api.delete(`/schools/${id}/pj/${pjToRemove.id}`);
     await invalidateSchoolQueries(queryClient, id);
     toastSuccess('PJ berhasil dihapus');
+  };
+
+  const handleSaveAddress = async () => {
+    if (!id) return;
+    setSavingAddress(true);
+    try {
+      await api.put(`/schools/${id}`, { address, mapsUrl });
+      await invalidateSchoolQueries(queryClient, id);
+      toastSuccess('Alamat sekolah disimpan');
+    } catch (err) {
+      toastError(err, 'Gagal menyimpan alamat');
+    } finally {
+      setSavingAddress(false);
+    }
   };
 
   if (isLoading) {
@@ -73,6 +99,58 @@ export default function SchoolDetailPage() {
         <p className="px-0.5 text-sm text-muted-foreground">
           {school.city} · {school.totalGroups} kelompok · {school.totalAnggota} anggota
         </p>
+
+        <Section title="Alamat & Lokasi">
+          {canEditAddress ? (
+            <ListGroup className="space-y-3 p-5">
+              <div className="space-y-2">
+                <Label htmlFor="schoolAddress">Alamat sekolah</Label>
+                <textarea
+                  id="schoolAddress"
+                  rows={2}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Jl. ..."
+                  className="flex w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="schoolMapsUrl">Link Google Maps</Label>
+                <Input
+                  id="schoolMapsUrl"
+                  value={mapsUrl}
+                  onChange={(e) => setMapsUrl(e.target.value)}
+                  placeholder="https://maps.google.com/..."
+                  className="rounded-xl"
+                />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-xl"
+                disabled={savingAddress}
+                onClick={handleSaveAddress}
+              >
+                {savingAddress ? 'Menyimpan...' : 'Simpan alamat'}
+              </Button>
+            </ListGroup>
+          ) : (
+            <ListGroup className="space-y-2 p-5 text-sm">
+              <p className="text-muted-foreground">{school.address || 'Alamat belum diisi'}</p>
+              {school.mapsUrl ? (
+                <a
+                  href={school.mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  Buka Google Maps
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : null}
+            </ListGroup>
+          )}
+        </Section>
 
         <Section title="Penanggung Jawab Sekolah">
           <div className="mb-3 flex items-center justify-between px-0.5">

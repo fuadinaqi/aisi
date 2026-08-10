@@ -29,7 +29,12 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         localStorage.removeItem('accessToken');
-        if (typeof window !== 'undefined') window.location.href = '/login';
+        if (
+          typeof window !== 'undefined' &&
+          !window.location.pathname.startsWith('/calon-mentor')
+        ) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

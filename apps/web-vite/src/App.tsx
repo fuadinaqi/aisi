@@ -46,6 +46,11 @@ import KksDetailPage from '@/pages/kks/KksDetailPage';
 import ConfigPage from '@/pages/config/ConfigPage';
 import ConfigMutabaahPage from '@/pages/config/ConfigMutabaahPage';
 import ConfigIcPage from '@/pages/config/ConfigIcPage';
+import KebutuhanMentorPage from '@/pages/kebutuhan-mentor/KebutuhanMentorPage';
+import KebutuhanMentorEditPage from '@/pages/kebutuhan-mentor/KebutuhanMentorEditPage';
+import KebutuhanMentorApplicationsPage from '@/pages/kebutuhan-mentor/KebutuhanMentorApplicationsPage';
+import CalonMentorPage from '@/pages/calon-mentor/CalonMentorPage';
+import CalonMentorApplyPage from '@/pages/calon-mentor/CalonMentorApplyPage';
 
 export default function App() {
   return (
@@ -57,6 +62,8 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/set-password" element={<SetPasswordPage />} />
         <Route path="/accept-role" element={<AcceptRolePage />} />
+        <Route path="/calon-mentor" element={<CalonMentorPage />} />
+        <Route path="/calon-mentor/:schoolId" element={<CalonMentorApplyPage />} />
 
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -69,6 +76,9 @@ export default function App() {
           <Route path="/schools/:id/kelompok/baru" element={<SchoolKelompokBaruPage />} />
           <Route path="/schools/:id/pj/undang" element={<SchoolPjUndangPage />} />
           <Route path="/schools/:id/pj/:userId/ganti" element={<SchoolPjGantiPage />} />
+          <Route path="/kebutuhan-mentor" element={<KebutuhanMentorPage />} />
+          <Route path="/kebutuhan-mentor/:schoolId" element={<KebutuhanMentorEditPage />} />
+          <Route path="/kebutuhan-mentor/:schoolId/pendaftar" element={<KebutuhanMentorApplicationsPage />} />
           <Route path="/kelompok" element={<KelompokRedirectPage />} />
           <Route path="/kelompok/:id" element={<KelompokDetailPage />} />
           <Route path="/kelompok/:id/edit" element={<KelompokEditPage />} />

@@ -18,6 +18,7 @@ import {
   BookHeart,
   ListChecks,
   MessageSquareText,
+  UserPlus,
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -39,6 +40,7 @@ const navByRole: Record<string, NavItem[]> = {
   SUPERADMIN: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
     { href: '/schools', label: 'Sekolah', icon: School },
+    { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
     { href: '/users', label: 'Pengguna', icon: Users },
     { href: '/invitations', label: 'Undangan', icon: Mail },
     { href: '/events', label: 'Agenda', icon: Calendar },
@@ -52,6 +54,7 @@ const navByRole: Record<string, NavItem[]> = {
   ADMIN: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
     { href: '/schools', label: 'Sekolah', icon: School },
+    { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
     { href: '/events', label: 'Agenda', icon: Calendar },
     { href: '/materi', label: 'Materi', icon: BookOpen },
     { href: '/analytics', label: 'Analitik', icon: BarChart3 },
@@ -63,6 +66,7 @@ const navByRole: Record<string, NavItem[]> = {
   PJ_SEKOLAH: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
     { href: '/schools', label: 'Sekolah', icon: School },
+    { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
     { href: '/pembina', label: 'Pembina', icon: Users },
     { href: '/config/ic', label: 'Indikator Capaian', icon: ListChecks },
     { href: '/events', label: 'Agenda', icon: Calendar },
