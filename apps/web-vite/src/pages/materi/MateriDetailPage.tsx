@@ -1,23 +1,25 @@
-
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { useParams } from 'react-router-dom';
-import { ArrowLeft, Download, ExternalLink } from 'lucide-react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { ArrowLeft, Download, ExternalLink, Pencil } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { RichTextContent } from '@/components/shared/RichTextEditor';
 import { Button } from '@/components/ui/button';
-import { formatDate, getMediaUrl, formatEventTargetLevels } from '@/lib/utils';
+import { formatEventTargetLevels, formatWeekRange, getMediaUrl } from '@/lib/utils';
 import type { MateriItem } from '@/lib/types';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 export default function MateriDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const role = useActiveRole() || '';
   const isAnggota = role === 'ANGGOTA';
+  const canEdit = role === 'SUPERADMIN' || role === 'ADMIN';
+  const fromHistory = (location.state as { from?: string } | null)?.from === 'history';
+  const backTo = fromHistory ? '/materi/history' : '/materi';
   const { levelLabels } = useGroupLevelLabels();
 
   const { data: materi, isLoading } = useQuery<MateriItem>({
@@ -39,15 +41,30 @@ export default function MateriDetailPage() {
   return (
     <PageContainer tight className="max-w-2xl">
       <Button variant="ghost" size="sm" className="-ml-2 mb-1 rounded-xl text-muted-foreground" asChild>
-        <Link to="/materi">
+        <Link to={backTo}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           Kembali
         </Link>
       </Button>
 
-      <PageHeader title={materi.title} compact />
+      <PageHeader
+        title={materi.title}
+        compact
+        action={
+          canEdit ? (
+            <Button asChild size="sm" variant="outline" className="rounded-xl">
+              <Link to={`/materi/${materi.id}/edit`} state={{ from: fromHistory ? 'history' : undefined }}>
+                <Pencil className="mr-1 h-4 w-4" />
+                Edit
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <p className="mb-1 px-0.5 text-sm text-muted-foreground">Pekan {formatDate(materi.weekDate)}</p>
+      <p className="mb-1 px-0.5 text-sm text-muted-foreground">
+        Pekan {formatWeekRange(materi.weekDate)}
+      </p>
       <p className="mb-4 px-0.5 text-sm text-primary">
         {formatEventTargetLevels(materi.targetLevels, levelLabels, isAnggota)}
       </p>

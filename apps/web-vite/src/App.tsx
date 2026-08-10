@@ -32,6 +32,8 @@ import EventDetailPage from '@/pages/events/EventDetailPage';
 import EventCheckInsPage from '@/pages/events/EventCheckInsPage';
 import MateriPage from '@/pages/materi/MateriPage';
 import MateriNewPage from '@/pages/materi/MateriNewPage';
+import MateriHistoryPage from '@/pages/materi/MateriHistoryPage';
+import MateriEditPage from '@/pages/materi/MateriEditPage';
 import MateriDetailPage from '@/pages/materi/MateriDetailPage';
 import EvaluasiPage from '@/pages/evaluasi/EvaluasiPage';
 import EvaluasiIsiPage from '@/pages/evaluasi/EvaluasiIsiPage';
@@ -83,6 +85,8 @@ export default function App() {
           <Route path="/events/:id" element={<EventDetailPage />} />
           <Route path="/materi" element={<MateriPage />} />
           <Route path="/materi/new" element={<MateriNewPage />} />
+          <Route path="/materi/history" element={<MateriHistoryPage />} />
+          <Route path="/materi/:id/edit" element={<MateriEditPage />} />
           <Route path="/materi/:id" element={<MateriDetailPage />} />
           <Route path="/evaluasi" element={<EvaluasiPage />} />
           <Route path="/evaluasi/isi" element={<EvaluasiIsiPage />} />

@@ -1,14 +1,13 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { BookOpen, ChevronRight, ExternalLink, FileText, Link2, Plus } from 'lucide-react';
+import { BookOpen, ChevronRight, ExternalLink, FileText, History, Link2, Plus } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, formatEventTargetLevels } from '@/lib/utils';
+import { formatEventTargetLevels, formatWeekRange, toWeekDateParam } from '@/lib/utils';
 import type { MateriItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
@@ -27,28 +26,49 @@ const typeIcons = {
 export default function MateriPage() {
   const role = useActiveRole() || '';
   const canCreate = role === 'SUPERADMIN' || role === 'ADMIN';
+  const canViewHistory =
+    role === 'SUPERADMIN' || role === 'ADMIN' || role === 'PJ_SEKOLAH' || role === 'PEMBINA';
   const isAnggota = role === 'ANGGOTA';
+  const weekDate = toWeekDateParam(new Date());
 
   const { levelLabels } = useGroupLevelLabels();
 
   const { data, isLoading } = useQuery<MateriItem[]>({
-    queryKey: ['materi'],
-    queryFn: async () => (await api.get<ApiResponse<MateriItem[]>>('/materi')).data.data,
+    queryKey: ['materi', 'current-week', weekDate],
+    queryFn: async () =>
+      (
+        await api.get<ApiResponse<MateriItem[]>>('/materi', {
+          params: { weekDate, limit: 100 },
+        })
+      ).data.data,
   });
 
   return (
     <PageContainer tight>
       <PageHeader
         title="Materi Pekan"
+        description={`Pekan ${formatWeekRange(weekDate)}`}
         compact
         action={
-          canCreate ? (
-            <Button asChild size="sm" className="rounded-xl">
-              <Link to="/materi/new">
-                <Plus className="mr-1 h-4 w-4" />
-                Tambah
-              </Link>
-            </Button>
+          canViewHistory || canCreate ? (
+            <div className="flex items-center gap-2">
+              {canViewHistory && (
+                <Button asChild size="sm" variant="outline" className="rounded-xl">
+                  <Link to="/materi/history">
+                    <History className="mr-1 h-4 w-4" />
+                    Riwayat
+                  </Link>
+                </Button>
+              )}
+              {canCreate && (
+                <Button asChild size="sm" className="rounded-xl">
+                  <Link to="/materi/new">
+                    <Plus className="mr-1 h-4 w-4" />
+                    Tambah
+                  </Link>
+                </Button>
+              )}
+            </div>
           ) : undefined
         }
       />
@@ -59,7 +79,7 @@ export default function MateriPage() {
         <EmptyState title="Belum ada materi" description="Materi pembinaan pekan ini akan muncul di sini" />
       ) : (
         <section className="space-y-3">
-          <AppSectionHeader title={`${data.length} materi`} />
+          <AppSectionHeader title={`${data.length} materi pekan ini`} />
           <ListGroup>
             {data.map((m, i) => {
               const Icon = typeIcons[m.contentType] || BookOpen;
@@ -79,7 +99,9 @@ export default function MateriPage() {
                           <p className="font-medium group-hover/link:text-primary">{m.title}</p>
                           <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground group-hover/link:text-primary" />
                         </div>
-                        <p className="mt-0.5 text-sm text-muted-foreground">Pekan {formatDate(m.weekDate)}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          Pekan {formatWeekRange(m.weekDate)}
+                        </p>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                             {typeLabels[m.contentType] || m.contentType}
