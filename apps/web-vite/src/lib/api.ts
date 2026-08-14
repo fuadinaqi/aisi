@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '@/store/authStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
 
@@ -16,28 +17,64 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Refresh token di server bersifat sekali pakai (dirotasi setiap dipakai), jadi
+ * beberapa request yang 401 bersamaan harus berbagi satu panggilan refresh.
+ * Tanpa ini, hanya satu yang menang dan sisanya menganggap sesi mati.
+ */
+let refreshPromise: Promise<string> | null = null;
+
+function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post<{ data: { accessToken: string } }>(
+        `${API_URL}/auth/refresh`,
+        {},
+        { withCredentials: true },
+      )
+      .then(({ data }) => {
+        const token = data.data.accessToken;
+        useAuthStore.getState().setAccessToken(token);
+        return token;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+function forceLogout(): void {
+  useAuthStore.getState().logout();
+
+  if (typeof window === 'undefined') return;
+  const { pathname, search } = window.location;
+  if (pathname === '/login' || pathname.startsWith('/calon-mentor')) return;
+
+  const redirect = encodeURIComponent(`${pathname}${search}`);
+  window.location.replace(`/login?redirect=${redirect}`);
+}
+
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true;
-      try {
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-        localStorage.setItem('accessToken', data.data.accessToken);
-        original.headers.Authorization = `Bearer ${data.data.accessToken}`;
-        return api(original);
-      } catch {
-        localStorage.removeItem('accessToken');
-        if (
-          typeof window !== 'undefined' &&
-          !window.location.pathname.startsWith('/calon-mentor')
-        ) {
-          window.location.href = '/login';
-        }
-      }
+  async (error: AxiosError) => {
+    const original = error.config as
+      | (InternalAxiosRequestConfig & { _retry?: boolean })
+      | undefined;
+
+    if (error.response?.status !== 401 || !original || original._retry) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+    original._retry = true;
+
+    try {
+      const token = await refreshAccessToken();
+      original.headers.Authorization = `Bearer ${token}`;
+      return await api(original);
+    } catch {
+      forceLogout();
+      return Promise.reject(error);
+    }
   },
 );
 

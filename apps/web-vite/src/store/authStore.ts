@@ -16,6 +16,7 @@ interface AuthState {
   accessToken: string | null;
   activeRole: string | null;
   setAuth: (user: AuthUser, token: string) => void;
+  setAccessToken: (token: string) => void;
   setActiveRole: (role: string) => void;
   updateUser: (patch: Partial<Pick<AuthUser, 'name' | 'email' | 'totalPoints'>>) => void;
   updateRoles: (roles: string[]) => void;
@@ -40,6 +41,10 @@ export const useAuthStore = create<AuthState>()(
         const activeRole = resolveActiveRole(user.roles, get().activeRole);
         setSentryUser({ id: user.id, email: user.email, name: user.name });
         set({ user, accessToken: token, activeRole });
+      },
+      setAccessToken: (token) => {
+        localStorage.setItem('accessToken', token);
+        set({ accessToken: token });
       },
       setActiveRole: (role) => {
         const user = get().user;
