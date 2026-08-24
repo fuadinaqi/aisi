@@ -121,7 +121,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "Jenis kelamin wajib dipilih")
 		return
 	}
-	if (in.Role == "PEMBINA" || in.Role == "PJ_SEKOLAH") && (in.SchoolID == nil || *in.SchoolID == "") {
+	if in.Role == "PJ_SEKOLAH" && (in.SchoolID == nil || *in.SchoolID == "") {
 		httpx.Error(w, 400, "Sekolah wajib dipilih untuk undangan ini")
 		return
 	}

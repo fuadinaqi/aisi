@@ -18,6 +18,7 @@ import type { SchoolItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { compressImage } from '@/lib/compressImage';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 export default function NewEventPage() {
   const navigate = useNavigate();
@@ -191,19 +192,18 @@ export default function NewEventPage() {
             {canPickSchool ? (
               <div className="space-y-2">
                 <Label htmlFor="schoolId">Cakupan</Label>
-                <select
+                <SearchableSelect
                   id="schoolId"
-                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
                   value={schoolId}
-                  onChange={(e) => setSchoolId(e.target.value)}
-                >
-                  <option value="all">Semua sekolah</option>
-                  {schools.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSchoolId}
+                  options={[
+                    { value: 'all', label: 'Semua sekolah' },
+                    ...schools.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                  placeholder="Pilih cakupan"
+                  searchPlaceholder="Cari sekolah..."
+                  emptyText="Sekolah tidak ditemukan"
+                />
               </div>
             ) : (
               <p className="rounded-xl bg-muted/50 px-3 py-2 text-sm text-muted-foreground">

@@ -27,6 +27,7 @@ export default function InviteAdminPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { isSubmitting, errors },
   } = useForm<FormData>({
     defaultValues: { gender: 'IKHWAN', alsoAsPembina: true },
@@ -99,9 +100,8 @@ export default function InviteAdminPage() {
               <div className="space-y-2">
                 <Label>Jenis kelamin</Label>
                 <GenderSelect
-                  {...register('gender', {
-                    required: alsoAsPembina ? 'Jenis kelamin wajib dipilih' : false,
-                  })}
+                  value={watch('gender')}
+                  onChange={(next) => setValue('gender', next, { shouldValidate: true })}
                 />
                 {errors.gender && <p className="text-sm text-destructive">{errors.gender.message}</p>}
               </div>

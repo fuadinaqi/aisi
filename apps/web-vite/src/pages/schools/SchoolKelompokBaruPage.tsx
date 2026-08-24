@@ -18,6 +18,8 @@ import { invalidateGroupQueries, invalidateInvitationQueries } from '@/lib/query
 import { GenderToggle } from '@/components/shared/GenderField';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { pembinaSchoolHint } from '@/lib/utils';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 type PembinaOption = {
   id: string;
@@ -25,6 +27,7 @@ type PembinaOption = {
   email: string;
   gender?: string;
   inSchool?: boolean;
+  hasAnySchool?: boolean;
 };
 
 type FormData = {
@@ -70,6 +73,7 @@ export default function NewSchoolGroupPage() {
   const useDirectPassword = watch('useDirectPassword');
   const groupGender = watch('gender');
   const pembinaGender = watch('pembinaGender');
+  const pembinaId = watch('pembinaId');
 
   const { data: pembinaList = [], isLoading } = useQuery<PembinaOption[]>({
     queryKey: ['school-pembina', id],
@@ -82,6 +86,11 @@ export default function NewSchoolGroupPage() {
     try {
       setError('');
       setSuccess('');
+
+      if (data.pembinaMode === 'existing' && !data.pembinaId) {
+        setError('Pembina wajib dipilih');
+        return;
+      }
 
       const payload =
         data.pembinaMode === 'existing'
@@ -168,17 +177,12 @@ export default function NewSchoolGroupPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="level">Level</Label>
-                <select
+                <SearchableSelect
                   id="level"
-                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                  {...register('level')}
-                >
-                  {levelConfigs.map((cfg) => (
-                    <option key={cfg.level} value={cfg.level}>
-                      {cfg.label}
-                    </option>
-                  ))}
-                </select>
+                  value={watch('level')}
+                  onChange={(next) => setValue('level', next as FormData['level'])}
+                  options={levelConfigs.map((cfg) => ({ value: cfg.level, label: cfg.label }))}
+                />
               </div>
 
               <div className="space-y-2">
@@ -215,20 +219,18 @@ export default function NewSchoolGroupPage() {
                 {pembinaMode === 'existing' ? (
                   <div className="space-y-2">
                     <Label htmlFor="pembinaId">Pembina</Label>
-                    <select
+                    <SearchableSelect
                       id="pembinaId"
-                      className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                      {...register('pembinaId', { required: pembinaMode === 'existing' })}
-                    >
-                      <option value="">Pilih pembina...</option>
-                      {pembinaList.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.email})
-                          {p.gender ? ` · ${p.gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}` : ''}
-                          {p.inSchool ? '' : ' · dari sekolah lain'}
-                        </option>
-                      ))}
-                    </select>
+                      value={pembinaId}
+                      onChange={(next) => setValue('pembinaId', next, { shouldValidate: true })}
+                      options={pembinaList.map((p) => ({
+                        value: p.id,
+                        label: `${p.name} (${p.email})${p.gender ? ` · ${p.gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}` : ''}${pembinaSchoolHint(p)}`,
+                      }))}
+                      placeholder="Pilih pembina..."
+                      searchPlaceholder="Cari nama atau email pembina..."
+                      emptyText="Pembina tidak ditemukan"
+                    />
                     {pembinaList.length === 0 && (
                       <p className="text-xs text-muted-foreground">
                         Belum ada pembina. Pilih opsi &quot;Pembina baru&quot;.
@@ -236,7 +238,8 @@ export default function NewSchoolGroupPage() {
                     )}
                     {pembinaList.some((p) => !p.inSchool) && (
                       <p className="text-xs text-muted-foreground">
-                        Pembina dari sekolah lain akan otomatis ditautkan ke sekolah ini.
+                        Pembina dari sekolah lain atau yang belum terikat sekolah akan otomatis
+                        ditautkan ke sekolah ini.
                       </p>
                     )}
                   </div>

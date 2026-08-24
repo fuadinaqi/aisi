@@ -17,7 +17,8 @@ test.describe('Multi-role @p0', () => {
 
     const switcher = page.getByLabel('Ganti peran aktif').first();
     await expect(switcher).toBeVisible();
-    await switcher.selectOption('ANGGOTA');
+    await switcher.click();
+    await page.getByRole('option', { name: 'Anggota' }).click();
     await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
 
     await expect(page.getByRole('link', { name: 'Mutabaah' }).first()).toBeVisible({

@@ -372,23 +372,9 @@ test('Manual P0 — full suite @manual-p0', async ({ page }) => {
       const add = await fetch(`${API_URL}/api/v1/users/${target!.id}/roles`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'PEMBINA', schoolId: undefined }),
+        body: JSON.stringify({ role: 'PEMBINA' }),
       });
-      // may need schoolId
-      if (!add.ok) {
-        // get school id from SMAN 1
-        const schools = await fetch(`${API_URL}/api/v1/schools?limit=50`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const sj = (await schools.json()) as { data: { id: string; name: string }[] };
-        const s1 = sj.data.find((s) => s.name === SEED_SCHOOL_NAME);
-        const add2 = await fetch(`${API_URL}/api/v1/users/${target!.id}/roles`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'PEMBINA', schoolId: s1?.id }),
-        });
-        expect(add2.ok).toBeTruthy();
-      }
+      expect(add.ok).toBeTruthy();
       const del = await fetch(`${API_URL}/api/v1/users/${target!.id}/roles/PEMBINA`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },

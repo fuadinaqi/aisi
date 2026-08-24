@@ -104,6 +104,12 @@ export function getGenderLabel(gender: string) {
   return gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan';
 }
 
+export function pembinaSchoolHint(p: { inSchool?: boolean; hasAnySchool?: boolean }) {
+  if (p.inSchool) return '';
+  if (p.hasAnySchool) return ' · dari sekolah lain';
+  return ' · belum terikat sekolah';
+}
+
 export function getPrimaryRole(roles: string[]): string {
   const priority = ['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA'];
   for (const r of priority) {

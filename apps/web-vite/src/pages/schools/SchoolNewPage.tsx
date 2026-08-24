@@ -16,6 +16,7 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { GenderSelect } from '@/components/shared/GenderField';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { PjCandidatePicker } from './PjCandidatePicker';
 
 type FormData = {
   name: string;
@@ -29,6 +30,8 @@ type FormData = {
   pjPassword: string;
   useDirectPassword: boolean;
   alsoAsPembina: boolean;
+  pjMode: 'existing' | 'new';
+  pjUserId: string;
 };
 
 export default function NewSchoolPage() {
@@ -41,6 +44,7 @@ export default function NewSchoolPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { isSubmitting, errors },
   } = useForm<FormData>({
     defaultValues: {
@@ -48,29 +52,44 @@ export default function NewSchoolPage() {
       pjGender: 'IKHWAN',
       useDirectPassword: false,
       alsoAsPembina: true,
+      pjMode: 'new',
+      pjUserId: '',
     },
   });
 
   const useDirectPassword = watch('useDirectPassword');
+  const pjMode = watch('pjMode');
+  const pjUserId = watch('pjUserId');
 
   const onSubmit = async (data: FormData) => {
     try {
       setError('');
       setSuccess('');
 
+      if (data.pjMode === 'existing' && !data.pjUserId) {
+        setError('Pilih user yang akan dijadikan PJ Sekolah');
+        return;
+      }
+
       const payload = {
         name: data.name.trim(),
         city: data.city.trim() || 'Depok',
         address: data.address.trim() || undefined,
         mapsUrl: data.mapsUrl.trim() || undefined,
-        pj: {
-          name: data.pjName.trim(),
-          email: data.pjEmail.trim(),
-          phone: data.pjPhone.trim() || undefined,
-          gender: data.pjGender,
-          alsoAsPembina: data.alsoAsPembina,
-          ...(data.useDirectPassword && data.pjPassword ? { password: data.pjPassword } : {}),
-        },
+        pj:
+          data.pjMode === 'existing'
+            ? {
+                userId: data.pjUserId,
+                alsoAsPembina: data.alsoAsPembina,
+              }
+            : {
+                name: data.pjName.trim(),
+                email: data.pjEmail.trim(),
+                phone: data.pjPhone.trim() || undefined,
+                gender: data.pjGender,
+                alsoAsPembina: data.alsoAsPembina,
+                ...(data.useDirectPassword && data.pjPassword ? { password: data.pjPassword } : {}),
+              },
       };
 
       const res = await api.post('/schools', payload);
@@ -81,7 +100,9 @@ export default function NewSchoolPage() {
       const successMessage =
         mode === 'direct'
           ? 'Sekolah dan akun PJ Sekolah berhasil dibuat.'
-          : 'Sekolah berhasil dibuat. Undangan aktivasi PJ telah dikirim (cek log API jika dev).';
+          : mode === 'existing'
+            ? 'Sekolah berhasil dibuat. PJ dipilih dari user yang sudah ada.'
+            : 'Sekolah berhasil dibuat. Undangan aktivasi PJ telah dikirim (cek log API jika dev).';
       setSuccess(successMessage);
       toastSuccess('Sekolah berhasil dibuat');
 
@@ -154,14 +175,43 @@ export default function NewSchoolPage() {
               />
             </div>
 
-            <div className="border-t border-border/60 pt-5">
+              <div className="border-t border-border/60 pt-5">
               <div className="mb-4 space-y-1">
                 <p className="text-sm font-semibold">PJ Sekolah</p>
                 <p className="text-xs text-muted-foreground">
-                  Penanggung jawab sekolah akan dibuat sekaligus dengan sekolah ini.
+                  Pilih user yang sudah ada (Pembina ke atas), atau buat akun PJ baru bersama sekolah ini.
                 </p>
               </div>
 
+              <div className="mb-4 flex gap-2">
+                <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-xl border border-border/60 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                  <input type="radio" value="existing" {...register('pjMode')} />
+                  <span className="text-sm">Pilih user</span>
+                </label>
+                <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-xl border border-border/60 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                  <input type="radio" value="new" {...register('pjMode')} />
+                  <span className="text-sm">Buat akun baru</span>
+                </label>
+              </div>
+
+              {pjMode === 'existing' ? (
+                <div className="space-y-4">
+                  <PjCandidatePicker
+                    value={pjUserId}
+                    onChange={(next) => setValue('pjUserId', next, { shouldValidate: true })}
+                    targetSchoolName={watch('name') || 'sekolah ini'}
+                  />
+                  <label className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
+                    <input type="checkbox" className="mt-1" {...register('alsoAsPembina')} />
+                    <span className="text-sm">
+                      <span className="font-medium">Juga jadikan Pembina</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Ditambahkan jika user belum punya peran Pembina.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              ) : (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="pjName">Nama PJ</Label>
@@ -169,7 +219,7 @@ export default function NewSchoolPage() {
                     id="pjName"
                     placeholder="Nama lengkap"
                     className="rounded-xl"
-                    {...register('pjName', { required: true })}
+                    {...register('pjName', { required: pjMode === 'new' })}
                   />
                 </div>
 
@@ -180,7 +230,7 @@ export default function NewSchoolPage() {
                     type="email"
                     placeholder="pj@sekolah.com"
                     className="rounded-xl"
-                    {...register('pjEmail', { required: true })}
+                    {...register('pjEmail', { required: pjMode === 'new' })}
                   />
                 </div>
 
@@ -188,7 +238,8 @@ export default function NewSchoolPage() {
                   <Label htmlFor="pjGender">Jenis kelamin</Label>
                   <GenderSelect
                     id="pjGender"
-                    {...register('pjGender', { required: 'Jenis kelamin wajib dipilih' })}
+                    value={watch('pjGender')}
+                    onChange={(next) => setValue('pjGender', next, { shouldValidate: true })}
                   />
                   {errors.pjGender && (
                     <p className="text-sm text-destructive">{errors.pjGender.message}</p>
@@ -240,11 +291,12 @@ export default function NewSchoolPage() {
                       id="pjPassword"
                       placeholder="Min. 8 karakter, huruf besar & angka"
                       className="rounded-xl"
-                      {...register('pjPassword', { required: useDirectPassword })}
+                      {...register('pjPassword', { required: pjMode === 'new' && useDirectPassword })}
                     />
                   </div>
                 )}
               </div>
+              )}
             </div>
 
             {error && (

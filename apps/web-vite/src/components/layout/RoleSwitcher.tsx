@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getRoleLabel } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 interface RoleSwitcherProps {
   className?: string;
@@ -47,21 +48,14 @@ export function RoleSwitcher({
           Peran aktif
         </span>
       )}
-      <select
+      <SearchableSelect
         value={role || ''}
-        onChange={(e) => handleChange(e.target.value)}
-        aria-label="Ganti peran aktif"
-        className={cn(
-          'w-full rounded-lg border border-border/80 bg-background px-2 py-1.5 text-xs font-medium text-foreground',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        )}
-      >
-        {user.roles.map((r) => (
-          <option key={r} value={r}>
-            {getRoleLabel(r)}
-          </option>
-        ))}
-      </select>
+        onChange={handleChange}
+        ariaLabel="Ganti peran aktif"
+        size="sm"
+        options={user.roles.map((r) => ({ value: r, label: getRoleLabel(r) }))}
+        className="text-xs font-medium"
+      />
     </label>
   );
 }

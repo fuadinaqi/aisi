@@ -137,11 +137,8 @@ export default function EditAnggotaPage() {
                 render={({ field }) => (
                   <GenderSelect
                     id="gender"
-                    name={field.name}
                     value={field.value}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                    onChange={(e) => field.onChange(e.target.value as 'IKHWAN' | 'AKHWAT')}
+                    onChange={(next) => field.onChange(next)}
                   />
                 )}
               />

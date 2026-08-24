@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   MutabaahOptionsEditor,
   normalizeMutabaahOptions,
@@ -225,10 +226,10 @@ export default function MutabaahConfigPage() {
             </div>
             <div className="space-y-2">
               <Label>Tipe input</Label>
-              <select
+              <SearchableSelect
                 value={form.fieldType}
-                onChange={(e) => {
-                  const fieldType = e.target.value as MutabaahFieldType;
+                onChange={(next) => {
+                  const fieldType = next as MutabaahFieldType;
                   setForm((f) => ({
                     ...f,
                     fieldType,
@@ -238,28 +239,24 @@ export default function MutabaahConfigPage() {
                       : {}),
                   }));
                 }}
-                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-              >
-                {Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+                options={Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({
+                  value,
+                  label,
+                }))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Cakupan waktu</Label>
-              <select
+              <SearchableSelect
                 value={form.inputScope}
-                onChange={(e) => setForm((f) => ({ ...f, inputScope: e.target.value as MutabaahInputScope }))}
-                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-              >
-                {Object.entries(INPUT_SCOPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+                onChange={(next) =>
+                  setForm((f) => ({ ...f, inputScope: next as MutabaahInputScope }))
+                }
+                options={Object.entries(INPUT_SCOPE_LABELS).map(([value, label]) => ({
+                  value,
+                  label,
+                }))}
+              />
             </div>
             {form.fieldType === 'SELECT' && (
               <div className="sm:col-span-2">

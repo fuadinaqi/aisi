@@ -1,5 +1,5 @@
-import { forwardRef } from 'react';
 import { cn, getGenderLabel } from '@/lib/utils';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 const GENDER_OPTIONS = [
   { value: 'IKHWAN', label: 'Ikhwan' },
@@ -23,27 +23,31 @@ export function GenderBadge({ gender, className }: { gender: string; className?:
   );
 }
 
-export const GenderSelect = forwardRef<
-  HTMLSelectElement,
-  React.SelectHTMLAttributes<HTMLSelectElement>
->(function GenderSelect({ className, ...props }, ref) {
+export function GenderSelect({
+  id,
+  value,
+  onChange,
+  disabled,
+  className,
+}: {
+  id?: string;
+  value?: string;
+  onChange: (value: 'IKHWAN' | 'AKHWAT') => void;
+  disabled?: boolean;
+  className?: string;
+}) {
   return (
-    <select
-      ref={ref}
-      className={cn(
-        'flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm',
-        className,
-      )}
-      {...props}
-    >
-      {GENDER_OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <SearchableSelect
+      id={id}
+      value={value || ''}
+      onChange={(next) => onChange(next as 'IKHWAN' | 'AKHWAT')}
+      options={[...GENDER_OPTIONS]}
+      placeholder="Pilih jenis kelamin"
+      disabled={disabled}
+      className={className}
+    />
   );
-});
+}
 
 export function getGroupGenderTheme(gender: string) {
   if (gender === 'AKHWAT') {

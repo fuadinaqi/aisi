@@ -13,6 +13,7 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { toastError } from '@/lib/toast';
 
+const LOGIN_HEADLINE = 'Satu tempat untuk terhubung dan berproses bersama.';
 const LOGIN_QUOTE =
   '"Tumbuh bersama, berdampak untuk umat, bersinar dengan kebaikan."';
 
@@ -74,7 +75,7 @@ export default function LoginPage() {
         <AppLogo href="/login" size="lg" imageClassName="brightness-0 invert" priority />
         <div className="space-y-3">
           <h2 className="text-3xl font-semibold leading-tight tracking-tight">
-            Pendataan & monitoring pembinaan, lebih terstruktur.
+            {LOGIN_HEADLINE}
           </h2>
           <p className="max-w-md text-sm italic leading-relaxed text-primary-foreground/85">
             {LOGIN_QUOTE}

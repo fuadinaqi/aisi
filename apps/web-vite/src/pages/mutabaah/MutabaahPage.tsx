@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn, formatDate, formatWeekRange, toDateInputValue, toWeekDateParam } from '@/lib/utils';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 type MutabaahGroupOption = {
   id: string;
@@ -152,17 +153,13 @@ export default function MutabaahPage() {
         {data?.needsGroupSelection && data.groups && (
           <ListGroup className="mb-4 p-4">
             <Label className="text-xs text-muted-foreground">Kelompok</Label>
-            <select
+            <SearchableSelect
               value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              className="mt-2 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            >
-              {data.groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
+              onChange={setGroupId}
+              className="mt-2"
+              searchPlaceholder="Cari kelompok..."
+              options={data.groups.map((g) => ({ value: g.id, label: g.name }))}
+            />
           </ListGroup>
         )}
 

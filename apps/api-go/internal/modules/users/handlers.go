@@ -415,12 +415,25 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 404, "User tidak ditemukan")
 			return
 		}
-		if db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserRole" WHERE "userId"=$1 AND "role"=$2::"Role")`, id, in.Role).Scan(&exists) == nil && exists {
-			httpx.Error(w, 400, "User sudah memiliki role ini")
-			return
+		alreadyHasRole := db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserRole" WHERE "userId"=$1 AND "role"=$2::"Role")`, id, in.Role).Scan(&exists) == nil && exists
+		schoolAttachOnly := false
+		if alreadyHasRole {
+			// Pembina boleh di beberapa sekolah: request ulang dengan schoolId = tautkan sekolah baru.
+			if in.Role == "PEMBINA" && in.SchoolID != nil && *in.SchoolID != "" {
+				var inSchool bool
+				_ = db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, id, *in.SchoolID).Scan(&inSchool)
+				if inSchool {
+					httpx.Error(w, 400, "Pembina sudah terdaftar di sekolah ini")
+					return
+				}
+				schoolAttachOnly = true
+			} else {
+				httpx.Error(w, 400, "User sudah memiliki role ini")
+				return
+			}
 		}
 		withPembina := (in.Role == "ADMIN" || in.Role == "PJ_SEKOLAH") && (in.AlsoAsPembina == nil || *in.AlsoAsPembina)
-		if (in.Role == "PJ_SEKOLAH" || in.Role == "PEMBINA") && (in.SchoolID == nil || *in.SchoolID == "") {
+		if in.Role == "PJ_SEKOLAH" && (in.SchoolID == nil || *in.SchoolID == "") {
 			httpx.Error(w, 400, "Sekolah wajib dipilih untuk role ini")
 			return
 		}
@@ -430,9 +443,11 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
-		if _, err = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,$3::"Role")`, uuid.NewString(), id, in.Role); err != nil {
-			httpx.Error(w, 500, "Gagal menambahkan role")
-			return
+		if !schoolAttachOnly {
+			if _, err = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,$3::"Role")`, uuid.NewString(), id, in.Role); err != nil {
+				httpx.Error(w, 500, "Gagal menambahkan role")
+				return
+			}
 		}
 		if withPembina {
 			_, _ = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") SELECT $1,$2,'PEMBINA'::"Role" WHERE NOT EXISTS (SELECT 1 FROM "UserRole" WHERE "userId"=$2 AND "role"='PEMBINA'::"Role")`, uuid.NewString(), id)
@@ -458,7 +473,11 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		u, _ := user(db, r, id)
-		httpx.Success(w, 200, u, "Role berhasil ditambahkan")
+		msg := "Role berhasil ditambahkan"
+		if schoolAttachOnly {
+			msg = "Pembina ditautkan ke sekolah"
+		}
+		httpx.Success(w, 200, u, msg)
 	}
 }
 

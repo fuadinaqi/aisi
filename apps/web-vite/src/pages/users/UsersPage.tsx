@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatDate, getRoleLabel, isPointEligibleRole } from '@/lib/utils';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { toast } from '@/lib/toast';
 
 interface UserItem {
@@ -29,6 +30,14 @@ interface SchoolItem {
 }
 
 const ASSIGNABLE_ROLES = ['ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA'] as const;
+
+function roleOptionsFor(roleList: string[]) {
+  const missing = ASSIGNABLE_ROLES.filter((r) => !roleList.includes(r));
+  if (roleList.includes('PEMBINA') && !missing.includes('PEMBINA')) {
+    return [...missing, 'PEMBINA' as const];
+  }
+  return missing;
+}
 
 export default function UsersPage() {
   const qc = useQueryClient();
@@ -72,11 +81,13 @@ export default function UsersPage() {
       const body: { role: string; schoolId?: string; alsoAsPembina?: boolean } = { role };
       if (schoolId) body.schoolId = schoolId;
       if (role === 'ADMIN' || role === 'PJ_SEKOLAH') body.alsoAsPembina = alsoAsPembina;
-      await api.post(`/users/${userId}/roles`, body);
+      const res = await api.post<ApiResponse<UserItem>>(`/users/${userId}/roles`, body);
+      return res.data.message || 'Role berhasil ditambahkan';
     },
-    onSuccess: () => {
-      toast.success('Role berhasil ditambahkan');
+    onSuccess: (message) => {
+      toast.success(message);
       qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['school-pembina'] });
       setExpandedId(null);
       setSchoolId('');
       setAlsoAsPembina(true);
@@ -144,6 +155,15 @@ export default function UsersPage() {
               {data.map((user) => {
                 const roleList = user.roles.map((r) => r.role);
                 const isExpanded = expandedId === user.id;
+                const options = roleOptionsFor(roleList);
+                const alreadyPembina = roleList.includes('PEMBINA');
+                const attachingPembinaSchool = newRole === 'PEMBINA' && alreadyPembina;
+                const schoolOptional =
+                  newRole === 'ANGGOTA' || (newRole === 'PEMBINA' && !alreadyPembina);
+                const linkedSchoolIds = new Set((user.schools || []).map((s) => s.school.id));
+                const schoolChoices = (schools || []).filter(
+                  (s) => !(attachingPembinaSchool && linkedSchoolIds.has(s.id)),
+                );
                 return (
                   <div key={user.id} className="px-5 py-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -181,8 +201,10 @@ export default function UsersPage() {
                           ))}
                         </div>
                         <p className="truncate text-sm text-muted-foreground">{user.email}</p>
-                        {user.schools?.[0] && (
-                          <p className="text-xs text-muted-foreground">{user.schools[0].school.name}</p>
+                        {user.schools && user.schools.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {user.schools.map((s) => s.school.name).join(' · ')}
+                          </p>
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -202,8 +224,7 @@ export default function UsersPage() {
                               setExpandedId(null);
                               return;
                             }
-                            const next =
-                              ASSIGNABLE_ROLES.find((r) => !roleList.includes(r)) || 'PEMBINA';
+                            const next = roleOptionsFor(roleList)[0] || 'PEMBINA';
                             setExpandedId(user.id);
                             setNewRole(next);
                             setSchoolId('');
@@ -221,35 +242,34 @@ export default function UsersPage() {
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                           <label className="block flex-1 text-xs">
                             <span className="mb-1 block text-muted-foreground">Peran</span>
-                            <select
+                            <SearchableSelect
+                              size="sm"
                               value={newRole}
-                              onChange={(e) => setNewRole(e.target.value)}
-                              className="w-full rounded-lg border border-border bg-background px-2 py-2 text-sm"
-                            >
-                              {ASSIGNABLE_ROLES.filter((r) => !roleList.includes(r)).map((r) => (
-                                <option key={r} value={r}>
-                                  {getRoleLabel(r)}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(next) => {
+                                setNewRole(next);
+                                setSchoolId('');
+                              }}
+                              options={options.map((r) => ({
+                                value: r,
+                                label: `${getRoleLabel(r)}${r === 'PEMBINA' && alreadyPembina ? ' (tautan sekolah)' : ''}`,
+                              }))}
+                            />
                           </label>
                           {needsSchool && (
                             <label className="block flex-1 text-xs">
                               <span className="mb-1 block text-muted-foreground">
-                                Sekolah{newRole === 'ANGGOTA' ? ' (opsional)' : ''}
+                                Sekolah{schoolOptional ? ' (opsional)' : ''}
                               </span>
-                              <select
+                              <SearchableSelect
+                                size="sm"
                                 value={schoolId}
-                                onChange={(e) => setSchoolId(e.target.value)}
-                                className="w-full rounded-lg border border-border bg-background px-2 py-2 text-sm"
-                              >
-                                <option value="">—</option>
-                                {(schools || []).map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.name}
-                                  </option>
-                                ))}
-                              </select>
+                                onChange={setSchoolId}
+                                options={schoolChoices.map((s) => ({ value: s.id, label: s.name }))}
+                                placeholder="Pilih sekolah"
+                                searchPlaceholder="Cari sekolah..."
+                                emptyOptionLabel="—"
+                                emptyText="Sekolah tidak ditemukan"
+                              />
                             </label>
                           )}
                           <Button
@@ -258,8 +278,9 @@ export default function UsersPage() {
                             className="rounded-xl"
                             disabled={
                               addRole.isPending ||
-                              ASSIGNABLE_ROLES.every((r) => roleList.includes(r)) ||
-                              ((newRole === 'PJ_SEKOLAH' || newRole === 'PEMBINA') && !schoolId)
+                              options.length === 0 ||
+                              (newRole === 'PJ_SEKOLAH' && !schoolId) ||
+                              (attachingPembinaSchool && !schoolId)
                             }
                             onClick={() =>
                               addRole.mutate({
@@ -270,9 +291,21 @@ export default function UsersPage() {
                               })
                             }
                           >
-                            Tambah
+                            {attachingPembinaSchool ? 'Tautkan' : 'Tambah'}
                           </Button>
                         </div>
+                        {newRole === 'PEMBINA' && !alreadyPembina && (
+                          <p className="text-xs text-muted-foreground">
+                            Sekolah boleh dikosongkan. Pembina bisa belum terikat sekolah, atau
+                            ditautkan ke beberapa sekolah sekaligus.
+                          </p>
+                        )}
+                        {attachingPembinaSchool && (
+                          <p className="text-xs text-muted-foreground">
+                            Pilih sekolah tambahan. Pembina yang sama bisa mengisi di beberapa
+                            sekolah.
+                          </p>
+                        )}
                         {canAlsoPembina && (
                           <label className="flex items-start gap-2 text-xs">
                             <input
@@ -284,7 +317,8 @@ export default function UsersPage() {
                             <span>
                               <span className="font-medium">Juga jadikan Pembina</span>
                               <span className="mt-0.5 block text-muted-foreground">
-                                Default tercentang; bisa di-uncheck.
+                                Default tercentang; bisa di-uncheck. Tidak otomatis mengikat ke
+                                sekolah.
                               </span>
                             </span>
                           </label>

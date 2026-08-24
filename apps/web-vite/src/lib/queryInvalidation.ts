@@ -42,6 +42,7 @@ export async function invalidateInvitationQueries(queryClient: QueryClient) {
 /** Invalidate sekolah setelah create/update PJ/kelompok. */
 export async function invalidateSchoolQueries(queryClient: QueryClient, schoolId?: string) {
   await queryClient.invalidateQueries({ queryKey: ['schools'] });
+  await queryClient.invalidateQueries({ queryKey: ['pj-candidates'] });
   if (schoolId) {
     await queryClient.invalidateQueries({ queryKey: ['school', schoolId] });
   }

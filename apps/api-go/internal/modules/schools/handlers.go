@@ -2,6 +2,7 @@ package schools
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -27,10 +28,12 @@ func (h Handler) Routes() chi.Router {
 	r.Use(middleware.RequireAuth(h.Config))
 	r.Get("/", h.list)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Post("/", h.create)
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Get("/pj-candidates", h.pjCandidates)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Put("/{id}", h.update)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Delete("/{id}", h.remove)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Post("/{id}/pj", h.addPJ)
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Delete("/{id}/pj/{userId}", h.removePJ)
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN")).Get("/{id}/pj-candidates", h.pjCandidates)
 	r.Get("/{id}/pembina", h.pembina)
 	r.Post("/{id}/groups", h.createGroup)
 	r.Get("/{id}/stats", h.stats)
@@ -39,6 +42,7 @@ func (h Handler) Routes() chi.Router {
 }
 
 type pjInput struct {
+	UserID          *string `json:"userId"`
 	Name, Email     string
 	Phone           *string
 	Gender          string
@@ -46,6 +50,13 @@ type pjInput struct {
 	AlsoAsPembina   *bool   `json:"alsoAsPembina"`
 	Replace         bool
 	ReplaceUserID   *string `json:"replaceUserId"`
+}
+
+func ptrStr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return strings.TrimSpace(*p)
 }
 
 func alsoAsPembina(v *bool) bool {
@@ -110,11 +121,16 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 }
 func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	var in schoolInput
-	if !decode(r, &in) || len(in.Name) < 2 || in.PJ == nil || len(in.PJ.Name) < 2 || in.PJ.Email == "" || !gender(in.PJ.Gender) {
+	if !decode(r, &in) || len(in.Name) < 2 || in.PJ == nil {
 		httpx.Error(w, 400, "Data sekolah atau PJ tidak valid")
 		return
 	}
-	if h.activeEmail(r, in.PJ.Email) {
+	existingUserID := ptrStr(in.PJ.UserID)
+	if existingUserID == "" && (len(in.PJ.Name) < 2 || in.PJ.Email == "" || !gender(in.PJ.Gender)) {
+		httpx.Error(w, 400, "Data sekolah atau PJ tidak valid")
+		return
+	}
+	if existingUserID == "" && h.activeEmail(r, in.PJ.Email) {
 		httpx.Error(w, 400, "Email PJ sudah terdaftar atau memiliki undangan aktif")
 		return
 	}
@@ -150,7 +166,15 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	mode := "invite"
 	data := map[string]any{"school": map[string]any{"id": sid, "name": in.Name, "city": city, "address": address, "mapsUrl": mapsUrl}}
-	if in.PJ.Password != nil {
+	if existingUserID != "" {
+		pjUser, status, msg := assignExistingPJ(r, tx, sid, existingUserID, alsoAsPembina(in.PJ.AlsoAsPembina), false, nil)
+		if status != 0 {
+			httpx.Error(w, status, msg)
+			return
+		}
+		mode = "existing"
+		data["pjUser"] = pjUser
+	} else if in.PJ.Password != nil {
 		if err := auth.ValidatePassword(*in.PJ.Password); err != nil {
 			httpx.Error(w, 400, err.Error())
 			return
@@ -197,6 +221,9 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	msg := "Sekolah berhasil dibuat. Undangan PJ Sekolah telah dikirim."
 	if mode == "direct" {
 		msg = "Sekolah dan akun PJ Sekolah berhasil dibuat"
+	}
+	if mode == "existing" {
+		msg = "Sekolah berhasil dibuat dan PJ dipilih dari user yang sudah ada"
 	}
 	httpx.Success(w, 201, data, msg)
 }
@@ -276,7 +303,12 @@ func (h Handler) remove(w http.ResponseWriter, r *http.Request) {
 }
 func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 	var in pjInput
-	if !decode(r, &in) || len(in.Name) < 2 || in.Email == "" || !gender(in.Gender) {
+	if !decode(r, &in) {
+		httpx.Error(w, 400, "Data PJ tidak valid")
+		return
+	}
+	existingUserID := ptrStr(in.UserID)
+	if existingUserID == "" && (len(in.Name) < 2 || in.Email == "" || !gender(in.Gender)) {
 		httpx.Error(w, 400, "Data PJ tidak valid")
 		return
 	}
@@ -287,7 +319,7 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 404, "Sekolah tidak ditemukan")
 		return
 	}
-	if h.activeEmail(r, in.Email) {
+	if existingUserID == "" && h.activeEmail(r, in.Email) {
 		httpx.Error(w, 400, "Email sudah terdaftar atau memiliki undangan aktif")
 		return
 	}
@@ -297,6 +329,19 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if existingUserID != "" {
+		pjUser, status, msg := assignExistingPJ(r, tx, sid, existingUserID, alsoAsPembina(in.AlsoAsPembina), in.Replace, in.ReplaceUserID)
+		if status != 0 {
+			httpx.Error(w, status, msg)
+			return
+		}
+		if tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal membuat PJ")
+			return
+		}
+		httpx.Success(w, 201, map[string]any{"mode": "existing", "pjUser": pjUser, "movedFrom": pjUser["movedFrom"]}, msg)
+		return
+	}
 	if in.Replace {
 		if in.ReplaceUserID != nil {
 			_, e = tx.Exec(r.Context(), `DELETE FROM "UserSchool" WHERE "schoolId"=$1 AND "userId"=$2`, sid, *in.ReplaceUserID)
@@ -371,6 +416,187 @@ func (h Handler) removePJ(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.Success(w, 200, nil, "PJ Sekolah berhasil dihapus dari sekolah")
 }
+
+func (h Handler) pjCandidates(w http.ResponseWriter, r *http.Request) {
+	sid := chi.URLParam(r, "id")
+	if sid != "" {
+		var exists bool
+		_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "School" WHERE "id"=$1 AND "isActive")`, sid).Scan(&exists)
+		if !exists {
+			httpx.Error(w, 404, "Sekolah tidak ditemukan")
+			return
+		}
+	}
+	rows, e := h.DB.Query(r.Context(), `
+		SELECT u."id", u."name", u."email", u."phone", u."gender"::text,
+			(SELECT COALESCE(json_agg(ur."role"::text), '[]'::json) FROM "UserRole" ur WHERE ur."userId"=u."id"),
+			(SELECT COALESCE(json_agg(json_build_object('id', s."id", 'name', s."name")), '[]'::json)
+			 FROM "UserSchool" us
+			 JOIN "School" s ON s."id"=us."schoolId" AND s."isActive"
+			 WHERE us."userId"=u."id"
+			   AND EXISTS (SELECT 1 FROM "UserRole" urp WHERE urp."userId"=u."id" AND urp."role"='PJ_SEKOLAH'))
+		FROM "User" u
+		WHERE u."isActive"
+		  AND EXISTS (
+			SELECT 1 FROM "UserRole" ur
+			WHERE ur."userId"=u."id"
+			  AND ur."role" IN ('PEMBINA','PJ_SEKOLAH','ADMIN','SUPERADMIN')
+		  )
+		  AND ($1='' OR NOT EXISTS (
+			SELECT 1 FROM "UserSchool" us
+			JOIN "UserRole" ur ON ur."userId"=u."id" AND ur."role"='PJ_SEKOLAH'
+			WHERE us."userId"=u."id" AND us."schoolId"=$1
+		  ))
+		ORDER BY u."name"`, sid)
+	if e != nil {
+		httpx.Error(w, 500, "Gagal mengambil calon PJ")
+		return
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var id, name, email, gender string
+		var phone *string
+		var rolesRaw, pjRaw []byte
+		if rows.Scan(&id, &name, &email, &phone, &gender, &rolesRaw, &pjRaw) != nil {
+			httpx.Error(w, 500, "Gagal membaca calon PJ")
+			return
+		}
+		var roles []string
+		var pjSchools []map[string]any
+		_ = json.Unmarshal(rolesRaw, &roles)
+		_ = json.Unmarshal(pjRaw, &pjSchools)
+		if roles == nil {
+			roles = []string{}
+		}
+		if pjSchools == nil {
+			pjSchools = []map[string]any{}
+		}
+		out = append(out, map[string]any{
+			"id": id, "name": name, "email": email, "phone": phone, "gender": gender,
+			"roles": roles, "pjSchools": pjSchools,
+		})
+	}
+	if rows.Err() != nil {
+		httpx.Error(w, 500, "Gagal mengambil calon PJ")
+		return
+	}
+	httpx.Success(w, 200, out, "")
+}
+
+func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembina, replace bool, replaceUserID *string) (map[string]any, int, string) {
+	ctx := r.Context()
+	var name, email string
+	var eligible, active bool
+	e := tx.QueryRow(ctx, `
+		SELECT u."name", u."email", u."isActive",
+			EXISTS (
+				SELECT 1 FROM "UserRole" ur
+				WHERE ur."userId"=u."id"
+				  AND ur."role" IN ('PEMBINA','PJ_SEKOLAH','ADMIN','SUPERADMIN')
+			)
+		FROM "User" u WHERE u."id"=$1`, userID).Scan(&name, &email, &active, &eligible)
+	if e == pgx.ErrNoRows {
+		return nil, 404, "User tidak ditemukan"
+	}
+	if e != nil {
+		return nil, 500, "Gagal memeriksa user"
+	}
+	if !active {
+		return nil, 400, "User tidak aktif"
+	}
+	if !eligible {
+		return nil, 400, "Hanya user dengan peran Pembina ke atas yang dapat dijadikan PJ Sekolah"
+	}
+
+	var alreadyHere bool
+	_ = tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM "UserSchool" us
+			JOIN "UserRole" ur ON ur."userId"=us."userId" AND ur."role"='PJ_SEKOLAH'
+			WHERE us."userId"=$1 AND us."schoolId"=$2
+		)`, userID, sid).Scan(&alreadyHere)
+	if alreadyHere {
+		return nil, 400, "User sudah menjadi PJ di sekolah ini"
+	}
+
+	var hasPjRole bool
+	_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM "UserRole" WHERE "userId"=$1 AND "role"='PJ_SEKOLAH')`, userID).Scan(&hasPjRole)
+
+	movedFrom := []map[string]string{}
+	if hasPjRole {
+		rows, qe := tx.Query(ctx, `
+			SELECT s."id", s."name"
+			FROM "UserSchool" us
+			JOIN "School" s ON s."id"=us."schoolId"
+			WHERE us."userId"=$1 AND us."schoolId"<>$2 AND s."isActive"`, userID, sid)
+		if qe != nil {
+			return nil, 500, "Gagal memeriksa sekolah PJ"
+		}
+		type schoolRow struct{ id, name string }
+		var others []schoolRow
+		for rows.Next() {
+			var row schoolRow
+			if rows.Scan(&row.id, &row.name) != nil {
+				rows.Close()
+				return nil, 500, "Gagal membaca sekolah PJ"
+			}
+			others = append(others, row)
+		}
+		rows.Close()
+		if rows.Err() != nil {
+			return nil, 500, "Gagal memeriksa sekolah PJ"
+		}
+		for _, other := range others {
+			var remaining int
+			if tx.QueryRow(ctx, `
+				SELECT count(*) FROM "UserSchool" us
+				JOIN "UserRole" ur ON ur."userId"=us."userId" AND ur."role"='PJ_SEKOLAH'
+				WHERE us."schoolId"=$1 AND us."userId"<>$2`, other.id, userID).Scan(&remaining) != nil {
+				return nil, 500, "Gagal memeriksa PJ sekolah lain"
+			}
+			if remaining < 1 {
+				return nil, 400, fmt.Sprintf("Tidak dapat memindahkan: %s harus memiliki minimal 1 PJ Sekolah lain", other.name)
+			}
+			movedFrom = append(movedFrom, map[string]string{"id": other.id, "name": other.name})
+		}
+	}
+
+	if replace {
+		var re error
+		if replaceUserID != nil && strings.TrimSpace(*replaceUserID) != "" {
+			_, re = tx.Exec(ctx, `DELETE FROM "UserSchool" WHERE "schoolId"=$1 AND "userId"=$2`, sid, strings.TrimSpace(*replaceUserID))
+		} else {
+			_, re = tx.Exec(ctx, `DELETE FROM "UserSchool" us USING "UserRole" ur WHERE us."userId"=ur."userId" AND us."schoolId"=$1 AND ur."role"='PJ_SEKOLAH' AND us."userId"<>$2`, sid, userID)
+		}
+		if re != nil {
+			return nil, 500, "Gagal mengganti PJ"
+		}
+	}
+
+	if _, e = tx.Exec(ctx, `DELETE FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"<>$2`, userID, sid); e != nil {
+		return nil, 500, "Gagal memindahkan PJ"
+	}
+	if _, e = tx.Exec(ctx, `INSERT INTO "UserRole" ("id","userId","role") SELECT $1,$2,'PJ_SEKOLAH'::"Role" WHERE NOT EXISTS (SELECT 1 FROM "UserRole" WHERE "userId"=$2 AND "role"='PJ_SEKOLAH'::"Role")`, uuid.NewString(), userID); e != nil {
+		return nil, 500, "Gagal menambahkan peran PJ Sekolah"
+	}
+	if alsoPembina {
+		_, _ = tx.Exec(ctx, `INSERT INTO "UserRole" ("id","userId","role") SELECT $1,$2,'PEMBINA'::"Role" WHERE NOT EXISTS (SELECT 1 FROM "UserRole" WHERE "userId"=$2 AND "role"='PEMBINA'::"Role")`, uuid.NewString(), userID)
+	}
+	if _, e = tx.Exec(ctx, `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), userID, sid); e != nil {
+		return nil, 500, "Gagal menautkan PJ ke sekolah"
+	}
+
+	msg := "PJ Sekolah berhasil ditambahkan"
+	if replace {
+		msg = "PJ Sekolah berhasil diganti"
+	}
+	if len(movedFrom) > 0 {
+		msg = "PJ Sekolah dipindahkan ke sekolah ini"
+	}
+	return map[string]any{"id": userID, "name": name, "email": email, "movedFrom": movedFrom}, 0, msg
+}
+
 func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
@@ -385,12 +611,15 @@ func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
 				SELECT 1 FROM "UserSchool" us WHERE us."userId"=u."id" AND us."schoolId"=$1
 			) OR EXISTS(
 				SELECT 1 FROM "Group" gr WHERE gr."pembinaId"=u."id" AND gr."schoolId"=$1 AND gr."isActive"
-			) AS "inSchool"
+			) AS "inSchool",
+			EXISTS(SELECT 1 FROM "UserSchool" us2 WHERE us2."userId"=u."id")
+			OR EXISTS(SELECT 1 FROM "Group" gr2 WHERE gr2."pembinaId"=u."id" AND gr2."isActive")
+			AS "hasAnySchool"
 		FROM "User" u
 		JOIN "UserRole" ur ON ur."userId"=u."id"
 		WHERE u."isActive" AND ur."role"='PEMBINA'
 		  AND ($2='' OR u."gender"::text=$2)
-		ORDER BY "inSchool" DESC, u."name"`, sid, g)
+		ORDER BY "inSchool" DESC, "hasAnySchool" DESC, u."name"`, sid, g)
 	if e != nil {
 		httpx.Error(w, 500, "Gagal mengambil pembina")
 		return
@@ -400,9 +629,9 @@ func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id, n, mail, gender string
 		var phone *string
-		var inSchool bool
-		if rows.Scan(&id, &n, &mail, &gender, &phone, &inSchool) == nil {
-			out = append(out, map[string]any{"id": id, "name": n, "email": mail, "gender": gender, "phone": phone, "inSchool": inSchool})
+		var inSchool, hasAnySchool bool
+		if rows.Scan(&id, &n, &mail, &gender, &phone, &inSchool, &hasAnySchool) == nil {
+			out = append(out, map[string]any{"id": id, "name": n, "email": mail, "gender": gender, "phone": phone, "inSchool": inSchool, "hasAnySchool": hasAnySchool})
 		}
 	}
 	httpx.Success(w, 200, out, "")

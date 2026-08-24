@@ -55,6 +55,7 @@ export function InviteForm({
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { isSubmitting, errors },
   } = useForm<InviteFormData>({
     defaultValues: { gender: 'IKHWAN', alsoAsPembina: true },
@@ -115,9 +116,8 @@ export function InviteForm({
         <div className="space-y-2">
           <Label>Jenis kelamin</Label>
           <GenderSelect
-            {...register('gender', {
-              required: showGender ? 'Jenis kelamin wajib dipilih' : false,
-            })}
+            value={watch('gender')}
+            onChange={(next) => setValue('gender', next, { shouldValidate: true })}
           />
           {errors.gender && <p className="text-sm text-destructive">{errors.gender.message}</p>}
         </div>

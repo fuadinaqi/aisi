@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 type FormState = {
   category: ICCategory;
@@ -255,30 +256,27 @@ export default function ICConfigPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Kategori</Label>
-                <select
+                <SearchableSelect
                   value={form.category}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ICCategory }))}
-                  className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                >
-                  {levelCategories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {getICCategoryLabel(cat, level)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(next) => setForm((f) => ({ ...f, category: next as ICCategory }))}
+                  options={levelCategories.map((cat) => ({
+                    value: cat,
+                    label: getICCategoryLabel(cat, level),
+                  }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Tipe</Label>
-                <select
+                <SearchableSelect
                   value={form.type}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, type: e.target.value as 'PRIMER' | 'SEKUNDER' }))
+                  onChange={(next) =>
+                    setForm((f) => ({ ...f, type: next as 'PRIMER' | 'SEKUNDER' }))
                   }
-                  className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                >
-                  <option value="PRIMER">{IC_TYPE_LABELS.PRIMER}</option>
-                  <option value="SEKUNDER">{IC_TYPE_LABELS.SEKUNDER}</option>
-                </select>
+                  options={[
+                    { value: 'PRIMER', label: IC_TYPE_LABELS.PRIMER },
+                    { value: 'SEKUNDER', label: IC_TYPE_LABELS.SEKUNDER },
+                  ]}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Nomor IC</Label>

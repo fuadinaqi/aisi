@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn, formatWeekRange, toDateInputValue, toWeekDateParam } from '@/lib/utils';
 import type { EvaluationItem, GroupItem } from '@/lib/types';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 const STATUSES = ['HADIR', 'IZIN', 'SAKIT', 'TIDAK_HADIR'] as const;
 const statusLabels: Record<string, string> = {
@@ -201,18 +202,14 @@ export default function IsiEvaluasiPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Kelompok</Label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
+              <SearchableSelect
                 value={groupId}
+                onChange={handleGroupChange}
                 disabled={evalLoading}
-                onChange={(e) => handleGroupChange(e.target.value)}
-              >
-                {groups?.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Pilih kelompok"
+                searchPlaceholder="Cari kelompok..."
+                options={(groups || []).map((g) => ({ value: g.id, label: g.name }))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Pekan (Senin)</Label>

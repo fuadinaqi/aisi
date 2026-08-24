@@ -13,6 +13,7 @@ import {
   parseMutabaahOptions,
 } from '@/lib/mutabaah';
 import { cn } from '@/lib/utils';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 function formatNumberInputValue(raw: number | null | undefined) {
   if (raw === null || raw === undefined) return '';
@@ -144,28 +145,23 @@ export function MutabaahFieldInput({
 
       return (
         <div className="space-y-3">
-          <select
+          <SearchableSelect
             disabled={disabled}
             value={selectValue.value}
-            onChange={(e) => {
-              const next = e.target.value;
+            onChange={(next) => {
               onChange({
                 value: next,
                 otherText: next === MUTABAAH_OTHER_VALUE ? selectValue.otherText ?? '' : undefined,
               });
             }}
-            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-          >
-            <option value="">Pilih...</option>
-            {options.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-            {item.allowOther && (
-              <option value={MUTABAAH_OTHER_VALUE}>{otherLabel}</option>
-            )}
-          </select>
+            placeholder="Pilih..."
+            emptyOptionLabel="Pilih..."
+            searchPlaceholder="Cari pilihan..."
+            options={[
+              ...options.map((opt) => ({ value: opt.value, label: opt.label })),
+              ...(item.allowOther ? [{ value: MUTABAAH_OTHER_VALUE, label: otherLabel }] : []),
+            ]}
+          />
           {showOtherInput && (
             <Input
               disabled={disabled}

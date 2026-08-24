@@ -19,8 +19,17 @@ import type { GroupItem } from '@/lib/types';
 import { GenderSelect } from '@/components/shared/GenderField';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { pembinaSchoolHint } from '@/lib/utils';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
-type PembinaOption = { id: string; name: string; email: string; gender?: string };
+type PembinaOption = {
+  id: string;
+  name: string;
+  email: string;
+  gender?: string;
+  inSchool?: boolean;
+  hasAnySchool?: boolean;
+};
 
 type FormData = {
   name: string;
@@ -57,6 +66,8 @@ export default function EditKelompokPage() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { isSubmitting, errors },
   } = useForm<FormData>({
     defaultValues: {
@@ -66,6 +77,10 @@ export default function EditKelompokPage() {
       pembinaId: '',
     },
   });
+
+  useEffect(() => {
+    register('pembinaId', { required: canChangePembina ? 'Pembina wajib dipilih' : false });
+  }, [register, canChangePembina]);
 
   useEffect(() => {
     if (!group) return;
@@ -141,25 +156,21 @@ export default function EditKelompokPage() {
 
             <div className="space-y-2">
               <Label htmlFor="level">Level</Label>
-              <select
+              <SearchableSelect
                 id="level"
-                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                {...register('level')}
-              >
-                {levelConfigs.map((cfg) => (
-                  <option key={cfg.level} value={cfg.level}>
-                    {cfg.label}
-                  </option>
-                ))}
-              </select>
+                value={watch('level')}
+                onChange={(next) => setValue('level', next as FormData['level'])}
+                options={levelConfigs.map((cfg) => ({ value: cfg.level, label: cfg.label }))}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="gender">Jenis kelompok</Label>
               <GenderSelect
                 id="gender"
+                value={watch('gender')}
+                onChange={(next) => setValue('gender', next, { shouldValidate: true })}
                 disabled={(group.members?.length ?? 0) > 0}
-                {...register('gender', { required: 'Jenis kelompok wajib dipilih' })}
               />
               {(group.members?.length ?? 0) > 0 && (
                 <p className="text-xs text-muted-foreground">
@@ -175,21 +186,22 @@ export default function EditKelompokPage() {
                 {pembinaLoading ? (
                   <p className="text-sm text-muted-foreground">Memuat daftar pembina...</p>
                 ) : (
-                  <select
+                  <SearchableSelect
                     id="pembinaId"
-                    className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                    {...register('pembinaId', { required: 'Pembina wajib dipilih' })}
-                  >
-                    {pembinaList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.email})
-                        {p.gender ? ` · ${p.gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    value={watch('pembinaId')}
+                    onChange={(next) => setValue('pembinaId', next, { shouldValidate: true })}
+                    options={pembinaList.map((p) => ({
+                      value: p.id,
+                      label: `${p.name} (${p.email})${p.gender ? ` · ${p.gender === 'AKHWAT' ? 'Akhwat' : 'Ikhwan'}` : ''}${pembinaSchoolHint(p)}`,
+                    }))}
+                    placeholder="Pilih pembina..."
+                    searchPlaceholder="Cari nama atau email pembina..."
+                    emptyText="Pembina tidak ditemukan"
+                  />
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Pembina boleh beda gender dari jenis kelompok.
+                  Pembina boleh beda gender dari jenis kelompok, termasuk dari sekolah lain atau
+                  yang belum terikat sekolah.
                 </p>
                 {errors.pembinaId && (
                   <p className="text-sm text-destructive">{errors.pembinaId.message}</p>
