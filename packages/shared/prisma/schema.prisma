@@ -296,10 +296,11 @@ model Event {
   endAt       DateTime
   pointValue  Int      @default(0)
   imageUrl    String?
-  schoolId    String?
+  schoolId     String?
   targetLevels GroupLevel[] @default([])
-  isPublished Boolean  @default(true)
-  createdById String
+  targetGender Gender?
+  isPublished  Boolean      @default(true)
+  createdById  String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

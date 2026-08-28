@@ -8,7 +8,7 @@ import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup } from '@/components/layout/AppUI';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, formatEventTargetLevels, getMediaUrl } from '@/lib/utils';
+import { formatDate, formatEventTargetGender, formatEventTargetLevels, getMediaUrl } from '@/lib/utils';
 import type { EventItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
@@ -103,6 +103,8 @@ export default function EventsPage() {
                         )}
                         <p className="mt-1 text-xs text-muted-foreground">
                           {formatEventTargetLevels(e.targetLevels, levelLabels, isAnggota)}
+                          {' · '}
+                          {formatEventTargetGender(e.targetGender)}
                         </p>
                         {e.location && (
                           <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">

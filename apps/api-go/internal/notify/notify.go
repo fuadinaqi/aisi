@@ -79,18 +79,38 @@ func PJUserIDsForSchool(ctx context.Context, db *pgxpool.Pool, schoolID string) 
 	return out, rows.Err()
 }
 
-// AudienceForEvent: PJ/PEMBINA/ANGGOTA di sekolah (atau semua sekolah jika schoolID nil).
-func AudienceForEvent(ctx context.Context, db *pgxpool.Pool, schoolID *string) ([]string, error) {
-	if schoolID == nil || *schoolID == "" {
-		return UserIDsByRoles(ctx, db, "PJ_SEKOLAH", "PEMBINA", "ANGGOTA")
+// AudienceForEvent: PJ sekolah + pembina/anggota kelompok yang cocok (sekolah & gender).
+// schoolID nil = semua sekolah; targetGender nil = ikhwan & akhwat.
+func AudienceForEvent(ctx context.Context, db *pgxpool.Pool, schoolID *string, targetGender *string) ([]string, error) {
+	if schoolID != nil && *schoolID == "" {
+		schoolID = nil
 	}
-	rows, err := db.Query(ctx, `
-		SELECT DISTINCT u."id"
-		FROM "User" u
-		INNER JOIN "UserSchool" us ON us."userId"=u."id"
-		INNER JOIN "UserRole" ur ON ur."userId"=u."id"
-		WHERE us."schoolId"=$1 AND u."isActive"=true
-		  AND ur."role" IN ('PJ_SEKOLAH'::"Role",'PEMBINA'::"Role",'ANGGOTA'::"Role")`, *schoolID)
+	q := `
+		SELECT DISTINCT u."id" FROM "User" u
+		WHERE u."isActive"=true AND (
+			EXISTS (
+				SELECT 1 FROM "UserRole" ur
+				WHERE ur."userId"=u."id" AND ur."role"='PJ_SEKOLAH'::"Role"
+				  AND (
+					$1::text IS NULL
+					OR EXISTS (SELECT 1 FROM "UserSchool" us WHERE us."userId"=u."id" AND us."schoolId"=$1)
+				  )
+			)
+			OR EXISTS (
+				SELECT 1 FROM "Group" g
+				WHERE g."pembinaId"=u."id" AND g."isActive"=true
+				  AND ($1::text IS NULL OR g."schoolId"=$1)
+				  AND ($2::"Gender" IS NULL OR g."gender"=$2)
+			)
+			OR EXISTS (
+				SELECT 1 FROM "GroupMember" gm
+				INNER JOIN "Group" g ON g."id"=gm."groupId"
+				WHERE gm."userId"=u."id" AND gm."isActive"=true AND g."isActive"=true
+				  AND ($1::text IS NULL OR g."schoolId"=$1)
+				  AND ($2::"Gender" IS NULL OR g."gender"=$2)
+			)
+		)`
+	rows, err := db.Query(ctx, q, schoolID, targetGender)
 	if err != nil {
 		return nil, err
 	}
@@ -145,8 +165,11 @@ func PointEarned(ctx context.Context, db *pgxpool.Pool, userID string, points in
 	CreateMany(ctx, db, []string{userID}, "POINT_EARNED", title, description, refID)
 }
 
-func EventPublished(ctx context.Context, db *pgxpool.Pool, eventID, title string, schoolID *string) {
-	ids, err := AudienceForEvent(ctx, db, schoolID)
+func EventPublished(ctx context.Context, db *pgxpool.Pool, eventID, title string, schoolID *string, targetGender *string) {
+	if schoolID != nil && *schoolID == "" {
+		schoolID = nil
+	}
+	ids, err := AudienceForEvent(ctx, db, schoolID, targetGender)
 	if err != nil || len(ids) == 0 {
 		return
 	}

@@ -162,6 +162,12 @@ export function formatEventTargetLevels(
   return targetLevels.map((level) => labels[level] || level).join(', ');
 }
 
+export function formatEventTargetGender(targetGender?: string | null) {
+  if (targetGender === 'AKHWAT') return 'Akhwat saja';
+  if (targetGender === 'IKHWAN') return 'Ikhwan saja';
+  return 'Ikhwan & Akhwat';
+}
+
 /** Normalisasi nomor HP ke format wa.me (62...) */
 /** Normalisasi ke 628… ; null jika bukan nomor HP Indonesia yang valid. */
 export function formatWhatsAppPhone(phone: string): string | null {

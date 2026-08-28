@@ -29,6 +29,7 @@ type eventInput struct {
 	ImageURL     *string  `json:"imageUrl"`
 	SchoolID     *string  `json:"schoolId"`
 	TargetLevels []string `json:"targetLevels"`
+	TargetGender string   `json:"targetGender"`
 	IsPublished  *bool    `json:"isPublished"`
 }
 
@@ -91,12 +92,19 @@ func levels(v any) []string {
 	}
 	return out
 }
+func genderPtr(v string) *string {
+	s := strings.ToUpper(strings.TrimSpace(v))
+	if s == "IKHWAN" || s == "AKHWAT" {
+		return &s
+	}
+	return nil
+}
 func multipartEvent(r *http.Request) (eventInput, *multipart.FileHeader, error) {
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
 		if e := r.ParseMultipartForm(12 << 20); e != nil {
 			return eventInput{}, nil, e
 		}
-		in := eventInput{Title: r.FormValue("title"), Description: nil, Location: nil, StartAt: r.FormValue("startAt"), EndAt: r.FormValue("endAt"), ImageURL: nil, SchoolID: nil, TargetLevels: levels(r.FormValue("targetLevels"))}
+		in := eventInput{Title: r.FormValue("title"), Description: nil, Location: nil, StartAt: r.FormValue("startAt"), EndAt: r.FormValue("endAt"), ImageURL: nil, SchoolID: nil, TargetLevels: levels(r.FormValue("targetLevels")), TargetGender: r.FormValue("targetGender")}
 		if v := r.FormValue("description"); v != "" {
 			in.Description = &v
 		}
@@ -143,6 +151,10 @@ func validate(in eventInput) (time.Time, time.Time, string) {
 		if v != "LEVEL_1" && v != "LEVEL_2" {
 			return a, b, "targetLevels tidak valid"
 		}
+	}
+	g := strings.ToUpper(strings.TrimSpace(in.TargetGender))
+	if g != "" && g != "ALL" && g != "IKHWAN" && g != "AKHWAT" {
+		return a, b, "targetGender tidak valid"
 	}
 	return a, b, ""
 }
@@ -220,11 +232,12 @@ func save(db *pgxpool.Pool, cfg config.Config, isUpdate bool) http.HandlerFunc {
 		if isUpdate {
 			_ = db.QueryRow(r.Context(), `SELECT "isPublished" FROM "Event" WHERE "id"=$1`, id).Scan(&wasPublished)
 		}
+		tg := genderPtr(in.TargetGender)
 		if !isUpdate {
 			id = uuid.NewString()
-			_, e = db.Exec(r.Context(), `INSERT INTO "Event" ("id","title","description","location","startAt","endAt","pointValue","imageUrl","schoolId","targetLevels","isPublished","createdById","updatedAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::"GroupLevel"[],$11,$12,NOW())`, id, in.Title, in.Description, in.Location, start, end, in.PointValue, in.ImageURL, school, in.TargetLevels, published, claims.UserID)
+			_, e = db.Exec(r.Context(), `INSERT INTO "Event" ("id","title","description","location","startAt","endAt","pointValue","imageUrl","schoolId","targetLevels","targetGender","isPublished","createdById","updatedAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::"GroupLevel"[],$11::"Gender",$12,$13,NOW())`, id, in.Title, in.Description, in.Location, start, end, in.PointValue, in.ImageURL, school, in.TargetLevels, tg, published, claims.UserID)
 		} else {
-			_, e = db.Exec(r.Context(), `UPDATE "Event" SET "title"=$1,"description"=$2,"location"=$3,"startAt"=$4,"endAt"=$5,"pointValue"=$6,"imageUrl"=$7,"targetLevels"=$8::"GroupLevel"[],"isPublished"=$9,"updatedAt"=NOW() WHERE "id"=$10`, in.Title, in.Description, in.Location, start, end, in.PointValue, in.ImageURL, in.TargetLevels, published, id)
+			_, e = db.Exec(r.Context(), `UPDATE "Event" SET "title"=$1,"description"=$2,"location"=$3,"startAt"=$4,"endAt"=$5,"pointValue"=$6,"imageUrl"=$7,"targetLevels"=$8::"GroupLevel"[],"targetGender"=$9::"Gender","isPublished"=$10,"updatedAt"=NOW() WHERE "id"=$11`, in.Title, in.Description, in.Location, start, end, in.PointValue, in.ImageURL, in.TargetLevels, tg, published, id)
 		}
 		if e != nil {
 			if store != nil && newImageURL != "" {
@@ -237,7 +250,7 @@ func save(db *pgxpool.Pool, cfg config.Config, isUpdate bool) http.HandlerFunc {
 			store.DeleteBestEffort(r.Context(), *existingImage)
 		}
 		if published && (!isUpdate || !wasPublished) {
-			notify.EventPublished(r.Context(), db, id, in.Title, school)
+			notify.EventPublished(r.Context(), db, id, in.Title, school, tg)
 		}
 		eventByID(w, r, db, id, map[bool]int{true: 200, false: 201}[isUpdate], map[bool]string{true: "Event berhasil diperbarui", false: "Event berhasil dibuat"}[isUpdate])
 	}
@@ -248,7 +261,7 @@ func visibility(db *pgxpool.Pool, r *http.Request) (string, []any) {
 	if admin(c.Roles) {
 		return base, nil
 	}
-	var schools, lev []string
+	var schools, lev, genders []string
 	if role(c.Roles, "PJ_SEKOLAH") {
 		rows, _ := db.Query(r.Context(), `SELECT "schoolId" FROM "UserSchool" WHERE "userId"=$1`, c.UserID)
 		for rows.Next() {
@@ -264,27 +277,30 @@ func visibility(db *pgxpool.Pool, r *http.Request) (string, []any) {
 			lev = append(lev, x)
 		}
 		rows.Close()
+		genders = []string{"IKHWAN", "AKHWAT"}
 	} else if role(c.Roles, "PEMBINA") {
-		rows, _ := db.Query(r.Context(), `SELECT DISTINCT "schoolId","level"::text FROM "Group" WHERE "pembinaId"=$1 AND "isActive"=true`, c.UserID)
+		rows, _ := db.Query(r.Context(), `SELECT DISTINCT "schoolId","level"::text,"gender"::text FROM "Group" WHERE "pembinaId"=$1 AND "isActive"=true`, c.UserID)
 		for rows.Next() {
-			var a, b string
-			_ = rows.Scan(&a, &b)
+			var a, b, g string
+			_ = rows.Scan(&a, &b, &g)
 			schools = append(schools, a)
 			lev = append(lev, b)
+			genders = append(genders, g)
 		}
 		rows.Close()
 	} else {
-		rows, _ := db.Query(r.Context(), `SELECT DISTINCT g."schoolId",g."level"::text FROM "GroupMember" m JOIN "Group" g ON g."id"=m."groupId" WHERE m."userId"=$1 AND m."isActive"=true AND g."isActive"=true`, c.UserID)
+		rows, _ := db.Query(r.Context(), `SELECT DISTINCT g."schoolId",g."level"::text,g."gender"::text FROM "GroupMember" m JOIN "Group" g ON g."id"=m."groupId" WHERE m."userId"=$1 AND m."isActive"=true AND g."isActive"=true`, c.UserID)
 		for rows.Next() {
-			var a, b string
-			_ = rows.Scan(&a, &b)
+			var a, b, g string
+			_ = rows.Scan(&a, &b, &g)
 			schools = append(schools, a)
 			lev = append(lev, b)
+			genders = append(genders, g)
 		}
 		rows.Close()
 	}
-	args := []any{schools, lev}
-	return base + ` AND (e."schoolId" IS NULL OR e."schoolId"=ANY($1)) AND (cardinality(e."targetLevels")=0 OR e."targetLevels" && $2::"GroupLevel"[])`, args
+	args := []any{schools, lev, genders}
+	return base + ` AND (e."schoolId" IS NULL OR e."schoolId"=ANY($1)) AND (cardinality(e."targetLevels")=0 OR e."targetLevels" && $2::"GroupLevel"[]) AND (e."targetGender" IS NULL OR e."targetGender"=ANY($3::"Gender"[]))`, args
 }
 func list(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -302,7 +318,7 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 		args = append(args, (p-1)*l)
 		limIdx := len(args) + 1
 		args = append(args, l)
-		rows, e := db.Query(r.Context(), `SELECT e."id",e."title",e."description",e."location",e."startAt",e."endAt",e."pointValue",e."imageUrl",e."schoolId",e."targetLevels",e."isPublished",COALESCE(json_build_object('id',s."id",'name',s."name"),'null'::json),COALESCE((SELECT json_build_object('id',a."id",'status',a."status"::text,'checkedAt',a."checkedAt",'photoUrl',a."photoUrl") FROM "EventAttendance" a WHERE a."eventId"=e."id" AND a."userId"=$`+strconv.Itoa(userIdx)+`),'null'::json) FROM "Event" e LEFT JOIN "School" s ON s."id"=e."schoolId" WHERE `+where+` ORDER BY e."startAt" ASC OFFSET $`+strconv.Itoa(offIdx)+` LIMIT $`+strconv.Itoa(limIdx), args...)
+		rows, e := db.Query(r.Context(), `SELECT e."id",e."title",e."description",e."location",e."startAt",e."endAt",e."pointValue",e."imageUrl",e."schoolId",e."targetLevels",e."targetGender"::text,e."isPublished",COALESCE(json_build_object('id',s."id",'name',s."name"),'null'::json),COALESCE((SELECT json_build_object('id',a."id",'status',a."status"::text,'checkedAt',a."checkedAt",'photoUrl',a."photoUrl") FROM "EventAttendance" a WHERE a."eventId"=e."id" AND a."userId"=$`+strconv.Itoa(userIdx)+`),'null'::json) FROM "Event" e LEFT JOIN "School" s ON s."id"=e."schoolId" WHERE `+where+` ORDER BY e."startAt" ASC OFFSET $`+strconv.Itoa(offIdx)+` LIMIT $`+strconv.Itoa(limIdx), args...)
 		if e != nil {
 			httpx.Error(w, 500, "Gagal memuat event")
 			return
@@ -315,10 +331,11 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 			var a, b time.Time
 			var pv int
 			var ls []string
+			var tg *string
 			var pub bool
 			var school, check json.RawMessage
-			_ = rows.Scan(&id, &t, &d, &loc, &a, &b, &pv, &img, &sid, &ls, &pub, &school, &check)
-			out = append(out, map[string]any{"id": id, "title": t, "description": d, "location": loc, "startAt": a, "endAt": b, "pointValue": pv, "imageUrl": img, "schoolId": sid, "targetLevels": ls, "isPublished": pub, "school": school, "myCheckIn": check})
+			_ = rows.Scan(&id, &t, &d, &loc, &a, &b, &pv, &img, &sid, &ls, &tg, &pub, &school, &check)
+			out = append(out, map[string]any{"id": id, "title": t, "description": d, "location": loc, "startAt": a, "endAt": b, "pointValue": pv, "imageUrl": img, "schoolId": sid, "targetLevels": ls, "targetGender": tg, "isPublished": pub, "school": school, "myCheckIn": check})
 		}
 		httpx.Paginated(w, out, p, l, total)
 	}
@@ -343,7 +360,7 @@ func detail(db *pgxpool.Pool) http.HandlerFunc {
 		where, args := visibility(db, r)
 		args = append(args, c.UserID, id)
 		var data json.RawMessage
-		e := db.QueryRow(r.Context(), `SELECT json_build_object('id',e."id",'title',e."title",'description',e."description",'location',e."location",'startAt',e."startAt",'endAt',e."endAt",'pointValue',e."pointValue",'imageUrl',e."imageUrl",'schoolId',e."schoolId",'targetLevels',e."targetLevels",'isPublished',e."isPublished",'myCheckIn',COALESCE((SELECT json_build_object('id',a."id",'status',a."status"::text,'checkedAt',a."checkedAt",'photoUrl',a."photoUrl",'approvedAt',a."approvedAt",'rejectionNote',a."rejectionNote") FROM "EventAttendance" a WHERE a."eventId"=e."id" AND a."userId"=$`+strconv.Itoa(len(args)-1)+`),'null'::json),'isOngoing',(NOW() BETWEEN e."startAt" AND e."endAt"),'hasEnded',(NOW()>e."endAt"),'hasStarted',(NOW()>=e."startAt")) FROM "Event" e WHERE e."id"=$`+strconv.Itoa(len(args))+` AND `+where, args...).Scan(&data)
+		e := db.QueryRow(r.Context(), `SELECT json_build_object('id',e."id",'title',e."title",'description',e."description",'location',e."location",'startAt',e."startAt",'endAt',e."endAt",'pointValue',e."pointValue",'imageUrl',e."imageUrl",'schoolId',e."schoolId",'targetLevels',e."targetLevels",'targetGender',e."targetGender",'isPublished',e."isPublished",'myCheckIn',COALESCE((SELECT json_build_object('id',a."id",'status',a."status"::text,'checkedAt',a."checkedAt",'photoUrl',a."photoUrl",'approvedAt',a."approvedAt",'rejectionNote',a."rejectionNote") FROM "EventAttendance" a WHERE a."eventId"=e."id" AND a."userId"=$`+strconv.Itoa(len(args)-1)+`),'null'::json),'isOngoing',(NOW() BETWEEN e."startAt" AND e."endAt"),'hasEnded',(NOW()>e."endAt"),'hasStarted',(NOW()>=e."startAt")) FROM "Event" e WHERE e."id"=$`+strconv.Itoa(len(args))+` AND `+where, args...).Scan(&data)
 		if e == pgx.ErrNoRows {
 			httpx.Error(w, 404, "Event tidak ditemukan")
 			return
@@ -523,8 +540,15 @@ func checkin(db *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 		}
 		id := chi.URLParam(r, "id")
 		c, _ := middleware.Claims(r)
+		where, args := visibility(db, r)
+		idIdx := len(args) + 1
+		var n int
+		if e := db.QueryRow(r.Context(), `SELECT count(*) FROM "Event" e WHERE e."id"=$`+strconv.Itoa(idIdx)+` AND `+where, append(args, id)...).Scan(&n); e != nil || n == 0 {
+			httpx.Error(w, 404, "Event tidak ditemukan")
+			return
+		}
 		var gid string
-		e := db.QueryRow(r.Context(), `SELECT g."id" FROM "GroupMember" m JOIN "Group" g ON g."id"=m."groupId" WHERE m."userId"=$1 AND m."isActive"=true AND g."isActive"=true LIMIT 1`, c.UserID).Scan(&gid)
+		e := db.QueryRow(r.Context(), `SELECT g."id" FROM "GroupMember" m JOIN "Group" g ON g."id"=m."groupId" JOIN "Event" ev ON ev."id"=$2 WHERE m."userId"=$1 AND m."isActive"=true AND g."isActive"=true AND (ev."targetGender" IS NULL OR g."gender"=ev."targetGender") LIMIT 1`, c.UserID, id).Scan(&gid)
 		if e != nil {
 			httpx.Error(w, 400, "Kelompok tidak ditemukan")
 			return

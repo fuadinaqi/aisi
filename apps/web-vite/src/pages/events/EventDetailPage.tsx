@@ -10,7 +10,7 @@ import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { ListGroup } from '@/components/layout/AppUI';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
-import { formatDate, formatEventTargetLevels, getMediaUrl } from '@/lib/utils';
+import { formatDate, formatEventTargetGender, formatEventTargetLevels, getMediaUrl } from '@/lib/utils';
 import { invalidateEventQueries } from '@/lib/queryInvalidation';
 import type { EventItem } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
@@ -143,6 +143,8 @@ export default function EventDetailPage() {
           <p className="mt-1 font-medium">{event.school?.name || 'Semua sekolah'}</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {formatEventTargetLevels(event.targetLevels, levelLabels, isAnggota)}
+            {' · '}
+            {formatEventTargetGender(event.targetGender)}
           </p>
         </div>
 

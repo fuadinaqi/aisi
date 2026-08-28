@@ -112,6 +112,7 @@ export interface EventItem {
   imageUrl?: string | null;
   school?: { id: string; name: string } | null;
   targetLevels?: string[];
+  targetGender?: 'IKHWAN' | 'AKHWAT' | null;
   myCheckIn?: {
     id: string;
     status: 'PENDING' | 'APPROVED' | 'REJECTED';

@@ -39,6 +39,7 @@ export default function NewEventPage() {
   const [schoolId, setSchoolId] = useState('all');
   const [levelMode, setLevelMode] = useState<'all' | 'specific'>('all');
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
+  const [targetGender, setTargetGender] = useState<'all' | 'IKHWAN' | 'AKHWAT'>('all');
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -82,6 +83,7 @@ export default function NewEventPage() {
         'targetLevels',
         levelMode === 'specific' ? JSON.stringify(selectedLevels) : '[]',
       );
+      formData.append('targetGender', targetGender === 'all' ? '' : targetGender);
       if (image) {
         const optimized = await compressImage(image);
         formData.append('image', optimized);
@@ -259,6 +261,57 @@ export default function NewEventPage() {
                         ))}
                       </div>
                     )}
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Peserta</Label>
+              <div className="space-y-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3">
+                  <input
+                    type="radio"
+                    name="targetGender"
+                    checked={targetGender === 'all'}
+                    onChange={() => setTargetGender('all')}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">Semua</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Default — ikhwan dan akhwat
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3">
+                  <input
+                    type="radio"
+                    name="targetGender"
+                    checked={targetGender === 'IKHWAN'}
+                    onChange={() => setTargetGender('IKHWAN')}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">Ikhwan saja</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Hanya kelompok dan anggota ikhwan
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3">
+                  <input
+                    type="radio"
+                    name="targetGender"
+                    checked={targetGender === 'AKHWAT'}
+                    onChange={() => setTargetGender('AKHWAT')}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">Akhwat saja</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Hanya kelompok dan anggota akhwat
+                    </span>
                   </span>
                 </label>
               </div>

@@ -214,6 +214,7 @@ export const eventSchema = z
     imageUrl: z.string().optional(),
     schoolId: z.string().nullable().optional(),
     targetLevels: z.array(z.enum(['LEVEL_1', 'LEVEL_2'])).default([]),
+    targetGender: z.enum(['IKHWAN', 'AKHWAT']).nullable().optional(),
     isPublished: z.boolean().default(true),
   })
   .refine((data) => data.endAt > data.startAt, {
