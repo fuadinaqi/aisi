@@ -9,6 +9,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/validate"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -442,6 +443,7 @@ func (h Handler) updateMember(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "Body tidak valid")
 		return
 	}
+	in.Email = validate.NormalizeEmail(in.Email)
 	if in.Gender != nil {
 		var gg string
 		_ = h.DB.QueryRow(r.Context(), `SELECT "gender"::text FROM "Group" WHERE "id"=$1`, id).Scan(&gg)

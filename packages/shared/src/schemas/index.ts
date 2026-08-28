@@ -1,5 +1,19 @@
 import { z } from 'zod';
 
+export const emailSchema = z
+  .string()
+  .trim()
+  .email('Email tidak valid')
+  .transform((v) => v.toLowerCase());
+
+function emailField(message: string) {
+  return z
+    .string()
+    .trim()
+    .email(message)
+    .transform((v) => v.toLowerCase());
+}
+
 export const passwordSchema = z
   .string()
   .min(8, 'Password minimal 8 karakter')
@@ -11,7 +25,7 @@ export const genderSchema = z.enum(['IKHWAN', 'AKHWAT'], {
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Email tidak valid'),
+  email: emailSchema,
   password: z.string().min(1, 'Password wajib diisi'),
 });
 
@@ -61,7 +75,7 @@ export const updateProfileSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email('Email tidak valid'),
+  email: emailSchema,
 });
 
 export const resetPasswordSchema = z
@@ -77,7 +91,7 @@ export const resetPasswordSchema = z
 
 export const invitationSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
-  email: z.string().email('Email tidak valid'),
+  email: emailSchema,
   role: z.enum(['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA']),
   gender: genderSchema.optional(),
   schoolId: z.string().optional(),
@@ -107,7 +121,7 @@ export const createSchoolWithPjSchema = z.object({
   city: z.string().default('Depok'),
   pj: z.object({
     name: z.string().min(2, 'Nama PJ minimal 2 karakter'),
-    email: z.string().email('Email PJ tidak valid'),
+    email: emailField('Email PJ tidak valid'),
     phone: z.string().optional(),
     gender: genderSchema,
     password: passwordSchema.optional(),
@@ -117,7 +131,7 @@ export const createSchoolWithPjSchema = z.object({
 
 export const invitePjSchema = z.object({
   name: z.string().min(2, 'Nama PJ minimal 2 karakter'),
-  email: z.string().email('Email PJ tidak valid'),
+  email: emailField('Email PJ tidak valid'),
   phone: z.string().optional(),
   gender: genderSchema,
   password: passwordSchema.optional(),
@@ -128,20 +142,20 @@ export const invitePjSchema = z.object({
 
 export const inviteAnggotaSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
-  email: z.string().email('Email tidak valid'),
+  email: emailSchema,
   gender: genderSchema.optional(),
 });
 
 export const updateGroupMemberSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter').optional(),
-  email: z.string().email('Email tidak valid').optional(),
+  email: emailSchema.optional(),
   phone: z.string().optional().nullable(),
   gender: genderSchema.optional(),
 });
 
 const pembinaInputSchema = z.object({
   name: z.string().min(2, 'Nama pembina minimal 2 karakter'),
-  email: z.string().email('Email pembina tidak valid'),
+  email: emailField('Email pembina tidak valid'),
   phone: z.string().optional(),
   gender: genderSchema,
   password: passwordSchema.optional(),

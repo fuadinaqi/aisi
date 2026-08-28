@@ -12,6 +12,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/validate"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -126,6 +127,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	existingUserID := ptrStr(in.PJ.UserID)
+	in.PJ.Email = validate.NormalizeEmail(in.PJ.Email)
 	if existingUserID == "" && (len(in.PJ.Name) < 2 || in.PJ.Email == "" || !gender(in.PJ.Gender)) {
 		httpx.Error(w, 400, "Data sekolah atau PJ tidak valid")
 		return
@@ -308,6 +310,7 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	existingUserID := ptrStr(in.UserID)
+	in.Email = validate.NormalizeEmail(in.Email)
 	if existingUserID == "" && (len(in.Name) < 2 || in.Email == "" || !gender(in.Gender)) {
 		httpx.Error(w, 400, "Data PJ tidak valid")
 		return
@@ -692,6 +695,11 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := in.Pembina
+	if p == nil {
+		httpx.Error(w, 400, "Data pembina tidak valid")
+		return
+	}
+	p.Email = validate.NormalizeEmail(p.Email)
 	if len(p.Name) < 2 || p.Email == "" {
 		httpx.Error(w, 400, "Data pembina tidak valid")
 		return
@@ -710,7 +718,7 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 	_ = h.DB.QueryRow(r.Context(), `
 		SELECT u."id" FROM "User" u
 		JOIN "UserRole" ur ON ur."userId"=u."id"
-		WHERE u."email"=$1 AND u."isActive" AND ur."role"='PEMBINA'`,
+		WHERE LOWER(u."email")=$1 AND u."isActive" AND ur."role"='PEMBINA'`,
 		p.Email).Scan(&existingPembinaID)
 	if existingPembinaID != "" {
 		tx, e := h.DB.Begin(r.Context())
@@ -1050,7 +1058,8 @@ func (h Handler) stats(w http.ResponseWriter, r *http.Request) {
 }
 func (h Handler) activeEmail(r *http.Request, mail string) bool {
 	var v bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE "email"=$1 AND "isActive") OR EXISTS(SELECT 1 FROM "UserInvitation" WHERE "email"=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, mail).Scan(&v)
+	mail = validate.NormalizeEmail(mail)
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive") OR EXISTS(SELECT 1 FROM "UserInvitation" WHERE LOWER("email")=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, mail).Scan(&v)
 	return v
 }
 func gender(v string) bool { return v == "IKHWAN" || v == "AKHWAT" }

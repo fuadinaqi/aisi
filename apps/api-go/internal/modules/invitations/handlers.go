@@ -11,6 +11,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/validate"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -82,7 +83,12 @@ func (h Handler) assertGroupAccess(r *http.Request, groupID string) bool {
 
 func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	var in request
-	if json.NewDecoder(r.Body).Decode(&in) != nil || len(in.Name) < 2 || in.Email == "" || !validRole(in.Role) {
+	if json.NewDecoder(r.Body).Decode(&in) != nil || len(in.Name) < 2 || !validRole(in.Role) {
+		httpx.Error(w, 400, "Data undangan tidak valid")
+		return
+	}
+	in.Email = validate.NormalizeEmail(in.Email)
+	if in.Email == "" {
 		httpx.Error(w, 400, "Data undangan tidak valid")
 		return
 	}
@@ -239,25 +245,25 @@ func (h Handler) cancel(w http.ResponseWriter, r *http.Request) {
 }
 func (h Handler) pendingInvitation(r *http.Request, email string) bool {
 	var exists bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserInvitation" WHERE "email"=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, email).Scan(&exists)
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserInvitation" WHERE LOWER("email")=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, validate.NormalizeEmail(email)).Scan(&exists)
 	return exists
 }
 
 func (h Handler) activeUser(r *http.Request, email string) bool {
 	var exists bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE "email"=$1 AND "isActive")`, email).Scan(&exists)
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive")`, validate.NormalizeEmail(email)).Scan(&exists)
 	return exists
 }
 
 func (h Handler) userHasRole(r *http.Request, email, role string) bool {
 	var exists bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."email"=$1 AND ur."role"=$2::"Role")`, email, role).Scan(&exists)
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE LOWER(u."email")=$1 AND ur."role"=$2::"Role")`, validate.NormalizeEmail(email), role).Scan(&exists)
 	return exists
 }
 
 func (h Handler) userInSchool(r *http.Request, email, schoolID string) bool {
 	var exists bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserSchool" us ON us."userId"=u."id" WHERE u."email"=$1 AND us."schoolId"=$2)`, email, schoolID).Scan(&exists)
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserSchool" us ON us."userId"=u."id" WHERE LOWER(u."email")=$1 AND us."schoolId"=$2)`, validate.NormalizeEmail(email), schoolID).Scan(&exists)
 	return exists
 }
 func validRole(v string) bool {
