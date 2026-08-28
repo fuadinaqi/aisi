@@ -134,6 +134,7 @@ export interface MateriItem {
   linkUrl?: string | null;
   contentHtml?: string | null;
   fileUrls: string[];
+  fileNames?: string[];
   targetLevels?: string[];
   createdAt?: string;
 }

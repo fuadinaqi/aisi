@@ -340,6 +340,7 @@ model WeeklyMateri {
   linkUrl      String?
   contentHtml  String?           @db.Text
   fileUrls     String[]
+  fileNames    String[]          @default([])
   targetLevels GroupLevel[]      @default([])
   createdById  String
   isPublished  Boolean           @default(true)

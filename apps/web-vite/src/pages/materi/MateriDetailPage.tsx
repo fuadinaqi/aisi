@@ -7,7 +7,7 @@ import { ListGroup } from '@/components/layout/AppUI';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { RichTextContent } from '@/components/shared/RichTextEditor';
 import { Button } from '@/components/ui/button';
-import { formatEventTargetLevels, formatWeekRange, getMediaUrl } from '@/lib/utils';
+import { formatEventTargetLevels, formatWeekRange, fileDisplayName, getMediaUrl, withDownloadFilename } from '@/lib/utils';
 import type { MateriItem } from '@/lib/types';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
@@ -95,8 +95,8 @@ export default function MateriDetailPage() {
             <p className="text-sm font-medium">File materi</p>
             <ul className="space-y-2">
               {materi.fileUrls.map((url, i) => {
-                const href = getMediaUrl(url);
-                const name = url.split('/').pop() || `File ${i + 1}`;
+                const name = fileDisplayName(url, materi.fileNames?.[i], i);
+                const href = withDownloadFilename(getMediaUrl(url), name);
                 return (
                   <li key={url}>
                     <a
@@ -106,7 +106,7 @@ export default function MateriDetailPage() {
                       className="flex items-center gap-3 rounded-xl border border-border/60 px-4 py-3 text-sm font-medium transition-colors hover:bg-muted/50"
                     >
                       <Download className="h-4 w-4 shrink-0 text-primary" />
-                      <span className="truncate">{decodeURIComponent(name)}</span>
+                      <span className="truncate">{name}</span>
                     </a>
                   </li>
                 );

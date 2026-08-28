@@ -89,6 +89,37 @@ export function getMediaUrl(url?: string | null) {
   return `${base}${url.startsWith('/') ? url : `/${url}`}`;
 }
 
+const UUID_FILENAME =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\.[^.]+)?$/i;
+
+function extFromName(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot) : '';
+}
+
+/** Nama file untuk ditampilkan. Fallback jika storage hanya menyimpan UUID. */
+export function fileDisplayName(url: string, originalName?: string | null, index = 0): string {
+  const trimmed = originalName?.trim() || '';
+  let raw = url.split('?')[0]?.split('/').pop() || '';
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    /* pakai raw */
+  }
+  if (trimmed && !UUID_FILENAME.test(trimmed)) return trimmed;
+  if (raw && !UUID_FILENAME.test(raw)) return raw;
+  const ext = extFromName(trimmed) || extFromName(raw);
+  return `File ${index + 1}${ext}`;
+}
+
+/** Tambah query filename untuk unduhan lokal (/uploads) agar nama asli dipakai. */
+export function withDownloadFilename(url: string | null, filename: string): string | null {
+  if (!url) return null;
+  if (!url.includes('/uploads/') || !filename.trim()) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}filename=${encodeURIComponent(filename)}`;
+}
+
 export function getRoleLabel(role: string) {
   const labels: Record<string, string> = {
     SUPERADMIN: 'Super Admin',

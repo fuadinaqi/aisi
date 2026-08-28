@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -96,8 +98,9 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		existing := []string{}
+		existingNames := []string{}
 		if update {
-			e := db.QueryRow(r.Context(), `SELECT "fileUrls" FROM "WeeklyMateri" WHERE "id"=$1`, id).Scan(&existing)
+			e := db.QueryRow(r.Context(), `SELECT "fileUrls", "fileNames" FROM "WeeklyMateri" WHERE "id"=$1`, id).Scan(&existing, &existingNames)
 			if e == pgx.ErrNoRows {
 				httpx.Error(w, 404, "Materi tidak ditemukan")
 				return
@@ -122,8 +125,10 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 			return
 		}
 		urls := keep
+		names := namesForKept(existing, existingNames, keep)
 		if !update {
 			urls = []string{}
+			names = []string{}
 		}
 		// Validate business rules before any storage mutation.
 		if in.ContentType == "FILE" && len(urls)+len(files) == 0 {
@@ -170,7 +175,7 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 			}
 			body := validated
 			ct := detectedType
-			name := f.Filename
+			name := storage.DisplayFilename(f.Filename)
 			if storage.IsImageType(detectedType) {
 				optimized, oct, oe := storage.OptimizeImage(validated)
 				if oe != nil {
@@ -179,7 +184,8 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 					httpx.Error(w, 400, oe.Error())
 					return
 				}
-				body, ct, name = optimized, oct, "image.jpg"
+				body, ct = optimized, oct
+				name = storage.ReplaceExt(name, ".jpg")
 			}
 			u, e := s.Put(r.Context(), storage.PrefixMateri, name, body, ct)
 			h.Close()
@@ -190,6 +196,7 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 			}
 			uploaded = append(uploaded, u)
 			urls = append(urls, u)
+			names = append(names, name)
 		}
 		var wasPublished bool
 		if update {
@@ -198,9 +205,9 @@ func save(db *pgxpool.Pool, cfg config.Config, update bool) http.HandlerFunc {
 		if !update {
 			c, _ := middleware.Claims(r)
 			id = uuid.NewString()
-			_, e = db.Exec(r.Context(), `INSERT INTO "WeeklyMateri" ("id","title","description","weekDate","contentType","linkUrl","contentHtml","fileUrls","targetLevels","isPublished","createdById","updatedAt") VALUES($1,$2,$3,$4,$5::"MateriContentType",$6,$7,$8,$9::"GroupLevel"[],$10,$11,NOW())`, id, in.Title, in.Description, wd, in.ContentType, in.LinkURL, in.ContentHTML, urls, in.TargetLevels, in.IsPublished, c.UserID)
+			_, e = db.Exec(r.Context(), `INSERT INTO "WeeklyMateri" ("id","title","description","weekDate","contentType","linkUrl","contentHtml","fileUrls","fileNames","targetLevels","isPublished","createdById","updatedAt") VALUES($1,$2,$3,$4,$5::"MateriContentType",$6,$7,$8,$9,$10::"GroupLevel"[],$11,$12,NOW())`, id, in.Title, in.Description, wd, in.ContentType, in.LinkURL, in.ContentHTML, urls, names, in.TargetLevels, in.IsPublished, c.UserID)
 		} else {
-			_, e = db.Exec(r.Context(), `UPDATE "WeeklyMateri" SET "title"=$1,"description"=$2,"weekDate"=$3,"contentType"=$4::"MateriContentType","linkUrl"=$5,"contentHtml"=$6,"fileUrls"=$7,"targetLevels"=$8::"GroupLevel"[],"isPublished"=$9,"updatedAt"=NOW() WHERE "id"=$10`, in.Title, in.Description, wd, in.ContentType, in.LinkURL, in.ContentHTML, urls, in.TargetLevels, in.IsPublished, id)
+			_, e = db.Exec(r.Context(), `UPDATE "WeeklyMateri" SET "title"=$1,"description"=$2,"weekDate"=$3,"contentType"=$4::"MateriContentType","linkUrl"=$5,"contentHtml"=$6,"fileUrls"=$7,"fileNames"=$8,"targetLevels"=$9::"GroupLevel"[],"isPublished"=$10,"updatedAt"=NOW() WHERE "id"=$11`, in.Title, in.Description, wd, in.ContentType, in.LinkURL, in.ContentHTML, urls, names, in.TargetLevels, in.IsPublished, id)
 		}
 		if e != nil {
 			rollbackUploads()
@@ -334,6 +341,41 @@ func page(p, l string) (int, int) {
 		b = n
 	}
 	return a, b
+}
+
+func namesForKept(existing, existingNames, keep []string) []string {
+	byURL := make(map[string]string, len(existing))
+	for i, u := range existing {
+		n := ""
+		if i < len(existingNames) {
+			n = existingNames[i]
+		}
+		if n == "" {
+			n = basenameURL(u)
+		}
+		byURL[u] = n
+	}
+	out := make([]string, 0, len(keep))
+	for _, u := range keep {
+		if n, ok := byURL[u]; ok && n != "" {
+			out = append(out, n)
+			continue
+		}
+		out = append(out, basenameURL(u))
+	}
+	return out
+}
+
+func basenameURL(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return "file"
+	}
+	if u, err := url.Parse(s); err == nil && u.Path != "" {
+		s = u.Path
+	}
+	s = strings.ReplaceAll(s, "\\", "/")
+	return storage.DisplayFilename(path.Base(s))
 }
 
 var _ = strings.TrimSpace

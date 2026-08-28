@@ -234,6 +234,7 @@ export const materiSchema = z
     linkUrl: z.string().url('Link tidak valid').optional(),
     contentHtml: z.string().optional(),
     fileUrls: z.array(z.string()).default([]),
+    fileNames: z.array(z.string()).optional(),
     targetLevels: z.array(z.enum(['LEVEL_1', 'LEVEL_2'])).default([]),
     isPublished: z.boolean().default(true),
   })

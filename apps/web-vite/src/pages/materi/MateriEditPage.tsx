@@ -12,7 +12,7 @@ import { LoadingSkeleton } from '@/components/shared/Badges';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn, toDateInputValue, toWeekDateParam } from '@/lib/utils';
+import { cn, fileDisplayName, toDateInputValue, toWeekDateParam } from '@/lib/utils';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { compressImagesInList } from '@/lib/compressImage';
 import { toastError, toastSuccess } from '@/lib/toast';
@@ -41,7 +41,7 @@ export default function MateriEditPage() {
   const [linkUrl, setLinkUrl] = useState('');
   const [contentHtml, setContentHtml] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [keepFileUrls, setKeepFileUrls] = useState<string[]>([]);
+  const [keepFiles, setKeepFiles] = useState<{ url: string; name: string }[]>([]);
   const [levelMode, setLevelMode] = useState<'all' | 'specific'>('all');
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -64,7 +64,12 @@ export default function MateriEditPage() {
     setContentType(materi.contentType);
     setLinkUrl(materi.linkUrl || '');
     setContentHtml(materi.contentHtml || '');
-    setKeepFileUrls(materi.fileUrls || []);
+    setKeepFiles(
+      (materi.fileUrls || []).map((url, i) => ({
+        url,
+        name: fileDisplayName(url, materi.fileNames?.[i], i),
+      })),
+    );
     const levels = materi.targetLevels || [];
     if (levels.length) {
       setLevelMode('specific');
@@ -83,7 +88,7 @@ export default function MateriEditPage() {
   };
 
   const removeKeptFile = (url: string) => {
-    setKeepFileUrls((prev) => prev.filter((u) => u !== url));
+    setKeepFiles((prev) => prev.filter((f) => f.url !== url));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,7 +104,7 @@ export default function MateriEditPage() {
         return;
       }
 
-      if (contentType === 'FILE' && keepFileUrls.length + files.length === 0) {
+      if (contentType === 'FILE' && keepFiles.length + files.length === 0) {
         setError('File wajib diunggah atau pertahankan file yang ada');
         setLoading(false);
         return;
@@ -115,7 +120,10 @@ export default function MateriEditPage() {
         'targetLevels',
         levelMode === 'specific' ? JSON.stringify(selectedLevels) : '[]',
       );
-      formData.append('keepFileUrls', JSON.stringify(contentType === 'FILE' ? keepFileUrls : []));
+      formData.append(
+        'keepFileUrls',
+        JSON.stringify(contentType === 'FILE' ? keepFiles.map((f) => f.url) : []),
+      );
 
       if (contentType === 'LINK') {
         formData.append('linkUrl', linkUrl.trim());
@@ -292,28 +300,25 @@ export default function MateriEditPage() {
 
             {contentType === 'FILE' && (
               <div className="space-y-2">
-                {keepFileUrls.length > 0 && (
+                {keepFiles.length > 0 && (
                   <div className="space-y-2">
                     <Label>File tersimpan</Label>
                     <ul className="space-y-1 text-sm">
-                      {keepFileUrls.map((url) => {
-                        const name = decodeURIComponent(url.split('/').pop() || url);
-                        return (
-                          <li
-                            key={url}
-                            className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2"
+                      {keepFiles.map((file) => (
+                        <li
+                          key={file.url}
+                          className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2"
+                        >
+                          <span className="truncate text-muted-foreground">{file.name}</span>
+                          <button
+                            type="button"
+                            className="shrink-0 text-xs text-destructive"
+                            onClick={() => removeKeptFile(file.url)}
                           >
-                            <span className="truncate text-muted-foreground">{name}</span>
-                            <button
-                              type="button"
-                              className="shrink-0 text-xs text-destructive"
-                              onClick={() => removeKeptFile(url)}
-                            >
-                              Hapus
-                            </button>
-                          </li>
-                        );
-                      })}
+                            Hapus
+                          </button>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 )}

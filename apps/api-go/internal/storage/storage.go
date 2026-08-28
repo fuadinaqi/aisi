@@ -98,7 +98,7 @@ func (s *Storage) Put(ctx context.Context, prefix, filename string, content io.R
 		ContentType: &contentType,
 	}
 	if !IsImageType(contentType) {
-		disp := "attachment"
+		disp := ContentDisposition("attachment", filename)
 		input.ContentDisposition = &disp
 	}
 	_, err := s.client.PutObject(ctx, input)
@@ -186,12 +186,15 @@ func UploadFileServer(dir string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		name := filepath.Base(r.URL.Path)
+		if q := r.URL.Query().Get("filename"); q != "" {
+			name = DisplayFilename(q)
+		}
 		ext := strings.ToLower(filepath.Ext(name))
 		switch ext {
 		case ".jpg", ".jpeg", ".png", ".gif", ".webp":
 			// inline OK
 		default:
-			w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
+			w.Header().Set("Content-Disposition", ContentDisposition("attachment", name))
 		}
 		inner.ServeHTTP(w, r)
 	})
