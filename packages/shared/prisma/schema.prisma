@@ -394,6 +394,7 @@ model UserInvitation {
   id             String           @id @default(cuid())
   email          String
   name           String
+  phone          String?
   role           Role
   alsoAsPembina  Boolean          @default(false)
   schoolId       String?

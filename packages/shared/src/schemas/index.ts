@@ -92,6 +92,7 @@ export const resetPasswordSchema = z
 export const invitationSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
   email: emailSchema,
+  phone: z.string().optional(),
   role: z.enum(['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA', 'ANGGOTA']),
   gender: genderSchema.optional(),
   schoolId: z.string().optional(),
@@ -143,7 +144,9 @@ export const invitePjSchema = z.object({
 export const inviteAnggotaSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter'),
   email: emailSchema,
+  phone: z.string().optional(),
   gender: genderSchema.optional(),
+  password: passwordSchema.optional(),
 });
 
 export const updateGroupMemberSchema = z.object({

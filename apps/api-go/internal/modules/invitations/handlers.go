@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
@@ -25,7 +26,19 @@ type Handler struct {
 type request struct {
 	Name, Email, Role         string
 	Gender, SchoolID, GroupID *string
-	AlsoAsPembina             *bool `json:"alsoAsPembina"`
+	Phone                     *string `json:"phone"`
+	AlsoAsPembina             *bool   `json:"alsoAsPembina"`
+}
+
+func optionalPhone(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*v)
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func alsoAsPembina(v *bool) bool {
@@ -152,7 +165,8 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	id, token := uuid.NewString(), uuid.NewString()
 	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
-	_, err := h.DB.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","role","alsoAsPembina","gender","schoolId","groupId","token","invitedById","expiresAt") VALUES ($1,$2,$3,$4::"Role",$5,$6::"Gender",$7,$8,$9,$10,$11)`, id, in.Name, in.Email, in.Role, withPembina, in.Gender, in.SchoolID, in.GroupID, token, claims.UserID, expires)
+	phone := optionalPhone(in.Phone)
+	_, err := h.DB.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","phone","role","alsoAsPembina","gender","schoolId","groupId","token","invitedById","expiresAt") VALUES ($1,$2,$3,$4,$5::"Role",$6,$7::"Gender",$8,$9,$10,$11,$12)`, id, in.Name, in.Email, phone, in.Role, withPembina, in.Gender, in.SchoolID, in.GroupID, token, claims.UserID, expires)
 	if err != nil {
 		httpx.Error(w, 500, "Gagal membuat undangan")
 		return

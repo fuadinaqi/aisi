@@ -192,6 +192,15 @@ export interface SchoolDetail extends SchoolItem {
   totalAnggota: number;
 }
 
+export interface AnggotaCandidate {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  gender?: string;
+  lastGroupName?: string | null;
+}
+
 export interface PjCandidate {
   id: string;
   name: string;

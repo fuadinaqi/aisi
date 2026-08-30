@@ -57,6 +57,7 @@ export async function invalidateGroupQueries(
   await queryClient.invalidateQueries({ queryKey: ['groups'] });
   if (opts?.groupId) {
     await queryClient.invalidateQueries({ queryKey: ['group', opts.groupId] });
+    await queryClient.invalidateQueries({ queryKey: ['member-candidates', opts.groupId] });
   }
   if (opts?.schoolId) {
     await queryClient.invalidateQueries({ queryKey: ['school', opts.schoolId] });

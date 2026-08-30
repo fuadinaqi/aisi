@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/auth"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/validate"
@@ -29,6 +32,7 @@ func (h Handler) Routes() chi.Router {
 	r.Get("/{id}", h.detail)
 	r.Put("/{id}", h.update)
 	r.With(middleware.RequireRole("PJ_SEKOLAH", "ADMIN", "SUPERADMIN")).Delete("/{id}", h.remove)
+	r.Get("/{id}/member-candidates", h.memberCandidates)
 	r.Get("/{id}/members", h.members)
 	r.Post("/{id}/members", h.addMember)
 	r.Get("/{id}/members/{userId}", h.member)
@@ -302,6 +306,128 @@ func (h Handler) memberRows(r *http.Request, id string) []map[string]any {
 	}
 	return out
 }
+func optionalPhone(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*v)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func (h Handler) groupGender(r *http.Request, id string) (gender string, ok bool) {
+	var active bool
+	if h.DB.QueryRow(r.Context(), `SELECT "gender"::text,"isActive" FROM "Group" WHERE "id"=$1`, id).Scan(&gender, &active) != nil || !active {
+		return "", false
+	}
+	return gender, true
+}
+
+func (h Handler) memberCandidates(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if !h.groupAccess(r, id, true) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
+	gender, ok := h.groupGender(r, id)
+	if !ok {
+		httpx.Error(w, 404, "Kelompok tidak ditemukan")
+		return
+	}
+	rows, e := h.DB.Query(r.Context(), `
+		SELECT u."id", u."name", u."email", u."phone", u."gender"::text,
+			(
+				SELECT g."name" FROM "GroupMember" gm
+				JOIN "Group" g ON g."id"=gm."groupId"
+				WHERE gm."userId"=u."id"
+				ORDER BY gm."joinedAt" DESC
+				LIMIT 1
+			)
+		FROM "User" u
+		JOIN "UserRole" ur ON ur."userId"=u."id" AND ur."role"='ANGGOTA'
+		WHERE u."isActive"
+		  AND u."gender"::text=$1
+		  AND NOT EXISTS (
+			SELECT 1 FROM "GroupMember" gm
+			JOIN "Group" g ON g."id"=gm."groupId"
+			WHERE gm."userId"=u."id" AND gm."isActive" AND g."isActive"
+		  )
+		ORDER BY u."name"`, gender)
+	if e != nil {
+		httpx.Error(w, 500, "Gagal mengambil calon anggota")
+		return
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var uid, name, mail, ug string
+		var phone, lastGroup *string
+		if rows.Scan(&uid, &name, &mail, &phone, &ug, &lastGroup) == nil {
+			out = append(out, map[string]any{
+				"id": uid, "name": name, "email": mail, "phone": phone, "gender": ug,
+				"lastGroupName": lastGroup,
+			})
+		}
+	}
+	httpx.Success(w, 200, out, "")
+}
+
+func (h Handler) addExistingMember(w http.ResponseWriter, r *http.Request, groupID, userID, groupGender string) {
+	var ug string
+	var userActive, hasRole bool
+	e := h.DB.QueryRow(r.Context(), `
+		SELECT u."gender"::text, u."isActive",
+			EXISTS(SELECT 1 FROM "UserRole" ur WHERE ur."userId"=u."id" AND ur."role"='ANGGOTA')
+		FROM "User" u WHERE u."id"=$1`, userID).Scan(&ug, &userActive, &hasRole)
+	if e != nil {
+		httpx.Error(w, 404, "User tidak ditemukan")
+		return
+	}
+	if !userActive {
+		httpx.Error(w, 400, "Akun anggota tidak aktif")
+		return
+	}
+	if !hasRole {
+		httpx.Error(w, 400, "User belum terdaftar sebagai anggota")
+		return
+	}
+	if ug != groupGender {
+		httpx.Error(w, 400, "Jenis kelamin Anggota harus sesuai kelompok")
+		return
+	}
+	var alreadyHere bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "GroupMember" WHERE "groupId"=$1 AND "userId"=$2 AND "isActive")`, groupID, userID).Scan(&alreadyHere)
+	if alreadyHere {
+		httpx.Error(w, 400, "Anggota sudah ada di kelompok ini")
+		return
+	}
+	var otherGroup string
+	_ = h.DB.QueryRow(r.Context(), `
+		SELECT g."name" FROM "GroupMember" gm
+		JOIN "Group" g ON g."id"=gm."groupId"
+		WHERE gm."userId"=$1 AND gm."isActive" AND g."isActive" AND gm."groupId"<>$2
+		LIMIT 1`, userID, groupID).Scan(&otherGroup)
+	if otherGroup != "" {
+		httpx.Error(w, 400, "Anggota masih terdaftar di kelompok "+otherGroup)
+		return
+	}
+	mid := uuid.NewString()
+	_, e = h.DB.Exec(r.Context(), `INSERT INTO "GroupMember" ("id","groupId","userId","isActive") VALUES ($1,$2,$3,true) ON CONFLICT ("groupId","userId") DO UPDATE SET "isActive"=true`, mid, groupID, userID)
+	if e != nil {
+		httpx.Error(w, 500, "Gagal menambahkan anggota")
+		return
+	}
+	httpx.Success(w, 201, map[string]any{"mode": "existing", "id": mid, "groupId": groupID, "userId": userID}, "Anggota berhasil ditambahkan")
+}
+
+func (h Handler) emailTaken(r *http.Request, mail string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive") OR EXISTS(SELECT 1 FROM "UserInvitation" WHERE LOWER("email")=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, mail).Scan(&exists)
+	return exists
+}
+
 func (h Handler) addMember(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if !h.groupAccess(r, id, true) {
@@ -309,29 +435,89 @@ func (h Handler) addMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		UserID string `json:"userId"`
+		UserID   string  `json:"userId"`
+		Name     string  `json:"name"`
+		Email    string  `json:"email"`
+		Phone    *string `json:"phone"`
+		Password *string `json:"password"`
 	}
-	if !decode(r, &in) || in.UserID == "" {
-		httpx.Error(w, 400, "userId wajib diisi")
+	if !decode(r, &in) {
+		httpx.Error(w, 400, "Body tidak valid")
 		return
 	}
-	var gg, ug string
-	e := h.DB.QueryRow(r.Context(), `SELECT g."gender"::text,u."gender"::text FROM "Group" g JOIN "User" u ON u."id"=$2 WHERE g."id"=$1 AND g."isActive"`, id, in.UserID).Scan(&gg, &ug)
+	gender, ok := h.groupGender(r, id)
+	if !ok {
+		httpx.Error(w, 404, "Kelompok tidak ditemukan")
+		return
+	}
+	if in.UserID != "" {
+		if strings.TrimSpace(in.Name) != "" || strings.TrimSpace(in.Email) != "" {
+			httpx.Error(w, 400, "Pilih anggota existing atau undang anggota baru, bukan keduanya")
+			return
+		}
+		h.addExistingMember(w, r, id, in.UserID, gender)
+		return
+	}
+
+	in.Name = strings.TrimSpace(in.Name)
+	in.Email = validate.NormalizeEmail(in.Email)
+	phone := optionalPhone(in.Phone)
+	if len(in.Name) < 2 || in.Email == "" {
+		httpx.Error(w, 400, "Nama lengkap dan email wajib diisi")
+		return
+	}
+	if h.emailTaken(r, in.Email) {
+		httpx.Error(w, 400, "Email sudah terdaftar atau memiliki undangan aktif. Jika sudah anggota tanpa kelompok, pilih dari daftar anggota terdaftar.")
+		return
+	}
+
+	hasPassword := in.Password != nil && strings.TrimSpace(*in.Password) != ""
+	if hasPassword {
+		if err := auth.ValidatePassword(*in.Password); err != nil {
+			httpx.Error(w, 400, err.Error())
+			return
+		}
+		hash, he := auth.HashPassword(*in.Password)
+		if he != nil {
+			httpx.Error(w, 500, "Gagal membuat anggota")
+			return
+		}
+		tx, e := h.DB.Begin(r.Context())
+		if e != nil {
+			httpx.Error(w, 500, "Gagal membuat anggota")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		uid := uuid.NewString()
+		mid := uuid.NewString()
+		_, e = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","phone","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::"Gender",NOW())`, uid, in.Name, in.Email, phone, hash, gender)
+		if e == nil {
+			_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'ANGGOTA')`, uuid.NewString(), uid)
+		}
+		if e == nil {
+			_, e = tx.Exec(r.Context(), `INSERT INTO "GroupMember" ("id","groupId","userId","isActive") VALUES ($1,$2,$3,true)`, mid, id, uid)
+		}
+		if e != nil || tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal membuat anggota")
+			return
+		}
+		httpx.Success(w, 201, map[string]any{"mode": "direct", "id": mid, "groupId": id, "userId": uid}, "Anggota berhasil ditambahkan")
+		return
+	}
+
+	c, _ := middleware.Claims(r)
+	token, iid := uuid.NewString(), uuid.NewString()
+	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
+	_, e := h.DB.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","phone","role","alsoAsPembina","gender","groupId","token","invitedById","expiresAt") VALUES ($1,$2,$3,$4,'ANGGOTA',false,$5::"Gender",$6,$7,$8,$9)`, iid, in.Name, in.Email, phone, gender, id, token, c.UserID, expires)
 	if e != nil {
-		httpx.Error(w, 404, "Kelompok atau user tidak ditemukan")
+		httpx.Error(w, 500, "Gagal membuat undangan anggota")
 		return
 	}
-	if gg != ug {
-		httpx.Error(w, 400, "Jenis kelamin Anggota harus sesuai kelompok")
+	if e = email.New(h.Config).SendInvitation(r.Context(), in.Email, in.Name, h.Config.AppURL+"/set-password?token="+token); e != nil {
+		httpx.Error(w, 502, "Undangan dibuat, namun email gagal dikirim")
 		return
 	}
-	mid := uuid.NewString()
-	_, e = h.DB.Exec(r.Context(), `INSERT INTO "GroupMember" ("id","groupId","userId","isActive") VALUES ($1,$2,$3,true) ON CONFLICT ("groupId","userId") DO UPDATE SET "isActive"=true`, mid, id, in.UserID)
-	if e != nil {
-		httpx.Error(w, 500, "Gagal menambahkan anggota")
-		return
-	}
-	httpx.Success(w, 201, map[string]string{"id": mid, "groupId": id, "userId": in.UserID}, "Anggota berhasil ditambahkan")
+	httpx.Success(w, 201, map[string]any{"mode": "invite", "invitation": map[string]string{"id": iid, "email": in.Email}}, "Undangan anggota berhasil dikirim")
 }
 func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 	id, uid := chi.URLParam(r, "id"), chi.URLParam(r, "userId")

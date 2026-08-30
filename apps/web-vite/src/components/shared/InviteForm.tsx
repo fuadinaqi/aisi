@@ -26,6 +26,7 @@ type InviteFormProps = {
   showGender?: boolean;
   showPasswordOption?: boolean;
   showAlsoAsPembina?: boolean;
+  successMessage?: string;
   onSubmit: (data: {
     name: string;
     email: string;
@@ -45,6 +46,7 @@ export function InviteForm({
   showGender = false,
   showPasswordOption = false,
   showAlsoAsPembina = false,
+  successMessage,
   onSubmit,
   onCancel,
 }: InviteFormProps) {
@@ -77,8 +79,8 @@ export function InviteForm({
           ? { password: data.password }
           : {}),
       });
-      setSuccess('Berhasil! Cek log API untuk link undangan jika mode undangan.');
-      toastSuccess('Undangan berhasil dikirim');
+      setSuccess(successMessage || 'Berhasil! Cek log API untuk link undangan jika mode undangan.');
+      toastSuccess(successMessage || 'Undangan berhasil dikirim');
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||

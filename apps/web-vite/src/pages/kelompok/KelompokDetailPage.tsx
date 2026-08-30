@@ -237,7 +237,7 @@ export default function KelompokDetailPage() {
         title="Hapus anggota?"
         description={
           memberToRemove
-            ? `${memberToRemove.name} akan dihapus dari kelompok ini. Tindakan ini bisa dibatalkan dengan mengundang ulang.`
+            ? `${memberToRemove.name} akan dihapus dari kelompok ini. Ia bisa ditambahkan lagi lewat pilih anggota terdaftar.`
             : ''
         }
         confirmLabel="Hapus"

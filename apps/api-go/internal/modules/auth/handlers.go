@@ -335,9 +335,9 @@ func (h Handler) setPassword(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	var id, name, email, role string
 	var alsoAsPembina bool
-	var schoolID, groupID, gender *string
+	var schoolID, groupID, gender, phone *string
 	var expires time.Time
-	err = tx.QueryRow(r.Context(), `SELECT "id","name","email","role"::text,"alsoAsPembina","schoolId","groupId","gender"::text,"expiresAt" FROM "UserInvitation" WHERE "token"=$1 AND "status"='PENDING' FOR UPDATE`, in.Token).Scan(&id, &name, &email, &role, &alsoAsPembina, &schoolID, &groupID, &gender, &expires)
+	err = tx.QueryRow(r.Context(), `SELECT "id","name","email","role"::text,"alsoAsPembina","schoolId","groupId","gender"::text,"phone","expiresAt" FROM "UserInvitation" WHERE "token"=$1 AND "status"='PENDING' FOR UPDATE`, in.Token).Scan(&id, &name, &email, &role, &alsoAsPembina, &schoolID, &groupID, &gender, &phone, &expires)
 	if err != nil || expires.Before(time.Now()) {
 		httpx.Error(w, 400, "Undangan tidak valid atau sudah expired")
 		return
@@ -364,7 +364,7 @@ func (h Handler) setPassword(w http.ResponseWriter, r *http.Request) {
 	if gender != nil && *gender != "" {
 		g = *gender
 	}
-	_, err = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5::"Gender",NOW())`, uid, name, email, hash, g)
+	_, err = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","phone","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::"Gender",NOW())`, uid, name, email, phone, hash, g)
 	if err == nil {
 		_, err = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,$3::"Role")`, uuid.NewString(), uid, role)
 	}
@@ -408,9 +408,9 @@ func (h Handler) acceptRole(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	var id, name, email, role string
 	var alsoAsPembina bool
-	var schoolID, groupID *string
+	var schoolID, groupID, phone *string
 	var expires time.Time
-	err = tx.QueryRow(r.Context(), `SELECT "id","name","email","role"::text,"alsoAsPembina","schoolId","groupId","expiresAt" FROM "UserInvitation" WHERE "token"=$1 AND "status"='PENDING' FOR UPDATE`, in.Token).Scan(&id, &name, &email, &role, &alsoAsPembina, &schoolID, &groupID, &expires)
+	err = tx.QueryRow(r.Context(), `SELECT "id","name","email","role"::text,"alsoAsPembina","schoolId","groupId","phone","expiresAt" FROM "UserInvitation" WHERE "token"=$1 AND "status"='PENDING' FOR UPDATE`, in.Token).Scan(&id, &name, &email, &role, &alsoAsPembina, &schoolID, &groupID, &phone, &expires)
 	if err != nil || expires.Before(time.Now()) {
 		httpx.Error(w, 400, "Undangan tidak valid atau sudah expired")
 		return
@@ -440,8 +440,11 @@ func (h Handler) acceptRole(w http.ResponseWriter, r *http.Request) {
 	if schoolID != nil {
 		_, _ = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), uid, *schoolID)
 	}
+	if phone != nil && strings.TrimSpace(*phone) != "" {
+		_, _ = tx.Exec(r.Context(), `UPDATE "User" SET "phone"=COALESCE(NULLIF("phone",''), $1), "updatedAt"=NOW() WHERE "id"=$2`, strings.TrimSpace(*phone), uid)
+	}
 	if groupID != nil && role == "ANGGOTA" {
-		_, _ = tx.Exec(r.Context(), `INSERT INTO "GroupMember" ("id","groupId","userId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "GroupMember" WHERE "groupId"=$2 AND "userId"=$3)`, uuid.NewString(), *groupID, uid)
+		_, _ = tx.Exec(r.Context(), `INSERT INTO "GroupMember" ("id","groupId","userId","isActive") VALUES ($1,$2,$3,true) ON CONFLICT ("groupId","userId") DO UPDATE SET "isActive"=true`, uuid.NewString(), *groupID, uid)
 	}
 	if _, err = tx.Exec(r.Context(), `UPDATE "UserInvitation" SET "status"='USED',"usedAt"=NOW() WHERE "id"=$1`, id); err != nil {
 		httpx.Error(w, 500, "Gagal menerima peran")
