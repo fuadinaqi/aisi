@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
@@ -69,7 +70,7 @@ func authorize(w http.ResponseWriter, r *http.Request, rs ...string) bool {
 func levels(v any) []string {
 	out := []string{}
 	add := func(x string) {
-		if x == "LEVEL_1" || x == "LEVEL_2" {
+		if constants.ValidGroupLevel(x) {
 			out = append(out, x)
 		}
 	}
@@ -148,7 +149,7 @@ func validate(in eventInput) (time.Time, time.Time, string) {
 		return a, b, "endAt harus setelah startAt"
 	}
 	for _, v := range in.TargetLevels {
-		if v != "LEVEL_1" && v != "LEVEL_2" {
+		if !constants.ValidGroupLevel(v) {
 			return a, b, "targetLevels tidak valid"
 		}
 	}

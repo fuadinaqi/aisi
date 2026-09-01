@@ -24,6 +24,10 @@ export const genderSchema = z.enum(['IKHWAN', 'AKHWAT'], {
   required_error: 'Jenis kelamin wajib dipilih',
 });
 
+export const GROUP_LEVELS = ['LEVEL_0', 'LEVEL_1', 'LEVEL_2'] as const;
+export const groupLevelSchema = z.enum(GROUP_LEVELS);
+export type GroupLevel = (typeof GROUP_LEVELS)[number];
+
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'Password wajib diisi'),
@@ -167,7 +171,7 @@ const pembinaInputSchema = z.object({
 export const createSchoolGroupSchema = z
   .object({
     name: z.string().min(2, 'Nama kelompok minimal 2 karakter'),
-    level: z.enum(['LEVEL_1', 'LEVEL_2']),
+    level: groupLevelSchema,
     gender: genderSchema,
     pembinaId: z.string().optional(),
     pembina: pembinaInputSchema.optional(),
@@ -179,7 +183,7 @@ export const createSchoolGroupSchema = z
 
 export const groupSchema = z.object({
   name: z.string().min(2),
-  level: z.enum(['LEVEL_1', 'LEVEL_2']),
+  level: groupLevelSchema,
   gender: genderSchema,
   schoolId: z.string(),
   pembinaId: z.string(),
@@ -187,7 +191,7 @@ export const groupSchema = z.object({
 
 export const updateGroupSchema = z.object({
   name: z.string().min(2, 'Nama kelompok minimal 2 karakter').optional(),
-  level: z.enum(['LEVEL_1', 'LEVEL_2']).optional(),
+  level: groupLevelSchema.optional(),
   gender: genderSchema.optional(),
   pembinaId: z.string().optional(),
   isActive: z.boolean().optional(),
@@ -216,7 +220,7 @@ export const eventSchema = z
     pointValue: z.number().int().min(0).default(0),
     imageUrl: z.string().optional(),
     schoolId: z.string().nullable().optional(),
-    targetLevels: z.array(z.enum(['LEVEL_1', 'LEVEL_2'])).default([]),
+    targetLevels: z.array(groupLevelSchema).default([]),
     targetGender: z.enum(['IKHWAN', 'AKHWAT']).nullable().optional(),
     isPublished: z.boolean().default(true),
   })
@@ -239,7 +243,7 @@ export const materiSchema = z
     contentHtml: z.string().optional(),
     fileUrls: z.array(z.string()).default([]),
     fileNames: z.array(z.string()).optional(),
-    targetLevels: z.array(z.enum(['LEVEL_1', 'LEVEL_2'])).default([]),
+    targetLevels: z.array(groupLevelSchema).default([]),
     isPublished: z.boolean().default(true),
   })
   .superRefine((data, ctx) => {
@@ -255,7 +259,7 @@ export const materiSchema = z
   });
 
 export const groupLevelConfigSchema = z.object({
-  level: z.enum(['LEVEL_1', 'LEVEL_2']),
+  level: groupLevelSchema,
   label: z.string().min(1),
 });
 
@@ -265,7 +269,7 @@ const mutabaahOptionSchema = z.object({
 });
 
 const mutabaahItemObjectSchema = z.object({
-  level: z.enum(['LEVEL_1', 'LEVEL_2']),
+  level: groupLevelSchema,
   title: z.string().min(2, 'Judul minimal 2 karakter'),
   description: z.string().optional(),
   target: z.string().optional(),
@@ -343,7 +347,7 @@ export const manualPointSchema = z.object({
 });
 
 export const indikatorCapaianSchema = z.object({
-  level: z.enum(['LEVEL_1', 'LEVEL_2']),
+  level: groupLevelSchema,
   category: z.enum([
     'MANA_ASY_SYAHADAH',
     'MARIFATULLAH',

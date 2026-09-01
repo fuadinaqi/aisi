@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
@@ -60,7 +61,7 @@ func parse(r *http.Request, existing []string) (input, []*multipart.FileHeader, 
 	raw := r.FormValue("targetLevels")
 	if raw != "" && raw != "all" {
 		_ = json.Unmarshal([]byte(raw), &in.TargetLevels)
-		if len(in.TargetLevels) == 0 && (raw == "LEVEL_1" || raw == "LEVEL_2") {
+		if len(in.TargetLevels) == 0 && constants.ValidGroupLevel(raw) {
 			in.TargetLevels = []string{raw}
 		}
 	}

@@ -126,7 +126,7 @@ type itemInput struct {
 }
 
 func validItem(i itemInput) bool {
-	return (i.Level == "LEVEL_1" || i.Level == "LEVEL_2") && i.Title != "" && (i.FieldType == "CHECKBOX" || i.FieldType == "NUMBER" || i.FieldType == "TEXT" || i.FieldType == "SELECT") && (i.InputScope == "" || i.InputScope == "WEEKLY" || i.InputScope == "DAILY")
+	return constants.ValidGroupLevel(i.Level) && i.Title != "" && (i.FieldType == "CHECKBOX" || i.FieldType == "NUMBER" || i.FieldType == "TEXT" || i.FieldType == "SELECT") && (i.InputScope == "" || i.InputScope == "WEEKLY" || i.InputScope == "DAILY")
 }
 func items(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/auth"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
@@ -658,7 +659,7 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 			Password *string `json:"password"`
 		} `json:"pembina"`
 	}
-	if !decode(r, &in) || len(in.Name) < 2 || (in.Level != "LEVEL_1" && in.Level != "LEVEL_2") || !gender(in.Gender) || (in.PembinaID == "" && in.Pembina == nil) {
+	if !decode(r, &in) || len(in.Name) < 2 || !constants.ValidGroupLevel(in.Level) || !gender(in.Gender) || (in.PembinaID == "" && in.Pembina == nil) {
 		httpx.Error(w, 400, "Data kelompok tidak valid")
 		return
 	}

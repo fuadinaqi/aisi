@@ -75,6 +75,7 @@ export interface GenderBreakdown {
 }
 
 export interface LevelCount {
+  level0: number;
   level1: number;
   level2: number;
 }
@@ -86,9 +87,9 @@ export interface LevelBreakdown {
 }
 
 export interface LevelGenderBreakdown {
-  groups: { level1: GenderCount; level2: GenderCount };
-  pembina: { level1: GenderCount; level2: GenderCount };
-  anggota: { level1: GenderCount; level2: GenderCount };
+  groups: { level0: GenderCount; level1: GenderCount; level2: GenderCount };
+  pembina: { level0: GenderCount; level1: GenderCount; level2: GenderCount };
+  anggota: { level0: GenderCount; level1: GenderCount; level2: GenderCount };
 }
 
 export interface EvaluationItem {

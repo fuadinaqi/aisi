@@ -9,6 +9,7 @@ import (
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/auth"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
@@ -659,7 +660,7 @@ func (h Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, nil, "Anggota berhasil dihapus")
 }
 func gender(v string) bool { return v == "IKHWAN" || v == "AKHWAT" }
-func level(v string) bool  { return v == "LEVEL_1" || v == "LEVEL_2" }
+func level(v string) bool { return constants.ValidGroupLevel(v) }
 func has(s []string, x string) bool {
 	for _, v := range s {
 		if v == x {

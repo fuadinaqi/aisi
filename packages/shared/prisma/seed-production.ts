@@ -46,6 +46,40 @@ const prisma = new PrismaClient();
 
 const MUTABAAH_ITEMS = [
   {
+    level: GroupLevel.LEVEL_0,
+    title: 'Sholat Wajib (berjamaah di masjid bagi laki laki)',
+    target: '35x',
+    fieldType: 'NUMBER' as const,
+    inputScope: 'WEEKLY' as const,
+    minValue: 0,
+    maxValue: 35,
+    isRequired: true,
+    sortOrder: 1,
+  },
+  {
+    level: GroupLevel.LEVEL_0,
+    title: "Tilawah Al Qur'an",
+    target: '14 halaman',
+    fieldType: 'NUMBER' as const,
+    inputScope: 'WEEKLY' as const,
+    minValue: 0,
+    maxValue: 50,
+    isRequired: false,
+    sortOrder: 2,
+  },
+  {
+    level: GroupLevel.LEVEL_0,
+    title: 'Dzikir pagi petang',
+    description: 'Total dzikir pagi petang pekan ini (angka)',
+    target: '5x seminggu',
+    fieldType: 'NUMBER' as const,
+    inputScope: 'WEEKLY' as const,
+    minValue: 0,
+    maxValue: 5,
+    isRequired: false,
+    sortOrder: 3,
+  },
+  {
     level: GroupLevel.LEVEL_1,
     title: 'Sholat Wajib (berjamaah di masjid bagi laki laki)',
     target: '35x',
@@ -146,6 +180,11 @@ async function main() {
   console.log('==> Seed production (bootstrap, tanpa data dummy)');
 
   await prisma.groupLevelConfig.upsert({
+    where: { level: GroupLevel.LEVEL_0 },
+    update: { label: 'Pra Dasar' },
+    create: { level: GroupLevel.LEVEL_0, label: 'Pra Dasar' },
+  });
+  await prisma.groupLevelConfig.upsert({
     where: { level: GroupLevel.LEVEL_1 },
     update: { label: 'Muda' },
     create: { level: GroupLevel.LEVEL_1, label: 'Muda' },
@@ -155,7 +194,7 @@ async function main() {
     update: { label: 'Pratama' },
     create: { level: GroupLevel.LEVEL_2, label: 'Pratama' },
   });
-  console.log('  ✓ Label level Muda / Pratama');
+  console.log('  ✓ Label level Pra Dasar / Muda / Pratama');
 
   const mutabaahCount = await prisma.mutabaahItem.count();
   if (mutabaahCount === 0) {

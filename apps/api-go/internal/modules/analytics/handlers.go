@@ -126,20 +126,20 @@ func emptyBreakdown() map[string]any {
 }
 func level(db *pgxpool.Pool, r *http.Request, ids []string, city bool) map[string]any {
 	q, a := condition(ids, city)
-	var g1, g2, p1, p2, m1, m2 int
-	_ = db.QueryRow(r.Context(), `SELECT count(*) FILTER(WHERE "level"='LEVEL_1'),count(*) FILTER(WHERE "level"='LEVEL_2'),count(DISTINCT "pembinaId") FILTER(WHERE "level"='LEVEL_1'),count(DISTINCT "pembinaId") FILTER(WHERE "level"='LEVEL_2') FROM "Group" g WHERE `+q, a...).Scan(&g1, &g2, &p1, &p2)
-	_ = db.QueryRow(r.Context(), `SELECT count(*) FILTER(WHERE g."level"='LEVEL_1'),count(*) FILTER(WHERE g."level"='LEVEL_2') FROM "GroupMember" gm JOIN "Group" g ON g."id"=gm."groupId" WHERE gm."isActive" AND `+q, a...).Scan(&m1, &m2)
-	return map[string]any{"groups": map[string]int{"level1": g1, "level2": g2}, "pembina": map[string]int{"level1": p1, "level2": p2}, "anggota": map[string]int{"level1": m1, "level2": m2}}
+	var g0, g1, g2, p0, p1, p2, m0, m1, m2 int
+	_ = db.QueryRow(r.Context(), `SELECT count(*) FILTER(WHERE "level"='LEVEL_0'),count(*) FILTER(WHERE "level"='LEVEL_1'),count(*) FILTER(WHERE "level"='LEVEL_2'),count(DISTINCT "pembinaId") FILTER(WHERE "level"='LEVEL_0'),count(DISTINCT "pembinaId") FILTER(WHERE "level"='LEVEL_1'),count(DISTINCT "pembinaId") FILTER(WHERE "level"='LEVEL_2') FROM "Group" g WHERE `+q, a...).Scan(&g0, &g1, &g2, &p0, &p1, &p2)
+	_ = db.QueryRow(r.Context(), `SELECT count(*) FILTER(WHERE g."level"='LEVEL_0'),count(*) FILTER(WHERE g."level"='LEVEL_1'),count(*) FILTER(WHERE g."level"='LEVEL_2') FROM "GroupMember" gm JOIN "Group" g ON g."id"=gm."groupId" WHERE gm."isActive" AND `+q, a...).Scan(&m0, &m1, &m2)
+	return map[string]any{"groups": map[string]int{"level0": g0, "level1": g1, "level2": g2}, "pembina": map[string]int{"level0": p0, "level1": p1, "level2": p2}, "anggota": map[string]int{"level0": m0, "level1": m1, "level2": m2}}
 }
 func emptyLevel() map[string]any {
-	return map[string]any{"groups": map[string]int{"level1": 0, "level2": 0}, "pembina": map[string]int{"level1": 0, "level2": 0}, "anggota": map[string]int{"level1": 0, "level2": 0}}
+	return map[string]any{"groups": map[string]int{"level0": 0, "level1": 0, "level2": 0}, "pembina": map[string]int{"level0": 0, "level1": 0, "level2": 0}, "anggota": map[string]int{"level0": 0, "level1": 0, "level2": 0}}
 }
 func levelGender(db *pgxpool.Pool, r *http.Request, ids []string, city bool) map[string]any { // Same counts are intentionally grouped by group level and gender.
 	q, a := condition(ids, city)
 	result := map[string]any{}
 	for _, kind := range []string{"groups", "pembina", "anggota"} {
 		lv := map[string]any{}
-		for _, level := range []string{"LEVEL_1", "LEVEL_2"} {
+		for _, level := range []string{"LEVEL_0", "LEVEL_1", "LEVEL_2"} {
 			var i, k int
 			sql := `SELECT count(*) FILTER(WHERE g."gender"='IKHWAN'),count(*) FILTER(WHERE g."gender"='AKHWAT') FROM "Group" g WHERE ` + q + ` AND g."level"=$` + itoa(len(a)+1)
 			if kind == "pembina" {
@@ -149,7 +149,7 @@ func levelGender(db *pgxpool.Pool, r *http.Request, ids []string, city bool) map
 				sql = `SELECT count(*) FILTER(WHERE u."gender"='IKHWAN'),count(*) FILTER(WHERE u."gender"='AKHWAT') FROM "GroupMember" gm JOIN "Group" g ON g."id"=gm."groupId" JOIN "User" u ON u."id"=gm."userId" WHERE gm."isActive" AND ` + q + ` AND g."level"=$` + itoa(len(a)+1)
 			}
 			_ = db.QueryRow(r.Context(), sql, append(a, level)...).Scan(&i, &k)
-			lv[map[string]string{"LEVEL_1": "level1", "LEVEL_2": "level2"}[level]] = map[string]int{"ikhwan": i, "akhwat": k}
+			lv[map[string]string{"LEVEL_0": "level0", "LEVEL_1": "level1", "LEVEL_2": "level2"}[level]] = map[string]int{"ikhwan": i, "akhwat": k}
 		}
 		result[kind] = lv
 	}
@@ -158,7 +158,7 @@ func levelGender(db *pgxpool.Pool, r *http.Request, ids []string, city bool) map
 func emptyLevelGender() map[string]any {
 	cell := func() map[string]int { return map[string]int{"ikhwan": 0, "akhwat": 0} }
 	levels := func() map[string]any {
-		return map[string]any{"level1": cell(), "level2": cell()}
+		return map[string]any{"level0": cell(), "level1": cell(), "level2": cell()}
 	}
 	return map[string]any{"groups": levels(), "pembina": levels(), "anggota": levels()}
 }

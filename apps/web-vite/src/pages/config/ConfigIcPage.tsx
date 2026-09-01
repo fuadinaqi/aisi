@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import type { GroupLevel } from '@dakwah/shared';
 
 type FormState = {
   category: ICCategory;
@@ -33,7 +34,7 @@ type FormState = {
   sortOrder: string;
 };
 
-function emptyFormForLevel(level: 'LEVEL_1' | 'LEVEL_2'): FormState {
+function emptyFormForLevel(level: GroupLevel): FormState {
   return {
     category: getICCategoriesForLevel(level)[0]!,
     type: 'PRIMER',
@@ -49,7 +50,7 @@ export default function ICConfigPage() {
   const role = useActiveRole() || '';
   const canEdit = role === 'SUPERADMIN' || role === 'ADMIN';
 
-  const [level, setLevel] = useState<'LEVEL_1' | 'LEVEL_2'>('LEVEL_1');
+  const [level, setLevel] = useState<GroupLevel>('LEVEL_1');
   const [filterCategory, setFilterCategory] = useState<ICCategory | 'ALL'>('ALL');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(() => emptyFormForLevel('LEVEL_1'));
@@ -215,7 +216,7 @@ export default function ICConfigPage() {
               variant={level === cfg.level ? 'default' : 'outline'}
               className="rounded-xl"
               onClick={() => {
-                const next = cfg.level as 'LEVEL_1' | 'LEVEL_2';
+                const next = cfg.level as GroupLevel;
                 setLevel(next);
                 setFilterCategory('ALL');
                 setEditingId(null);

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
 )
@@ -34,7 +35,7 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 			Level string `json:"level"`
 			Label string `json:"label"`
 		}
-		if json.NewDecoder(req.Body).Decode(&in) != nil || (in.Level != "LEVEL_1" && in.Level != "LEVEL_2") || in.Label == "" {
+		if json.NewDecoder(req.Body).Decode(&in) != nil || !constants.ValidGroupLevel(in.Level) || in.Label == "" {
 			httpx.Error(w, 400, "level dan label tidak valid")
 			return
 		}

@@ -62,7 +62,7 @@ type itemInput struct {
 }
 
 func validItem(v itemInput) bool {
-	if !(v.Level == "LEVEL_1" || v.Level == "LEVEL_2") || v.Title == "" || v.Number <= 0 || !contains(constants.ICTypes, v.Type) {
+	if !constants.ValidGroupLevel(v.Level) || v.Title == "" || v.Number <= 0 || !contains(constants.ICTypes, v.Type) {
 		return false
 	}
 	return contains(constants.ICCategoriesForLevel(v.Level), v.Category)

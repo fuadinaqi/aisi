@@ -20,6 +20,7 @@ import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { pembinaSchoolHint } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import type { GroupLevel } from '@dakwah/shared';
 
 type PembinaOption = {
   id: string;
@@ -32,7 +33,7 @@ type PembinaOption = {
 
 type FormData = {
   name: string;
-  level: 'LEVEL_1' | 'LEVEL_2';
+  level: GroupLevel;
   gender: 'IKHWAN' | 'AKHWAT';
   pembinaMode: 'existing' | 'new';
   pembinaId: string;

@@ -129,6 +129,12 @@ var GenderLabels = map[string]string{
 	"AKHWAT": "Akhwat",
 }
 
+var GroupLevels = []string{"LEVEL_0", "LEVEL_1", "LEVEL_2"}
+
+func ValidGroupLevel(v string) bool {
+	return v == "LEVEL_0" || v == "LEVEL_1" || v == "LEVEL_2"
+}
+
 var ICCategories = []string{
 	"MANA_ASY_SYAHADAH",
 	"MARIFATULLAH",
@@ -149,6 +155,10 @@ var ICCategories = []string{
 
 // ICCategoriesByLevel — Bidang Studi per level kelompok.
 var ICCategoriesByLevel = map[string][]string{
+	"LEVEL_0": {
+		"MANA_ASY_SYAHADAH", "MARIFATULLAH", "MARIFATUR_RASUL", "MARIFATUL_ISLAM",
+		"MARIFATUL_INSAN", "MARIFATUL_QURAN", "FIQIH_USHUL_FIQIH", "KETATANEGARAAN", "LIFESKILLS",
+	},
 	"LEVEL_1": {
 		"MANA_ASY_SYAHADAH", "MARIFATULLAH", "MARIFATUR_RASUL", "MARIFATUL_ISLAM",
 		"MARIFATUL_INSAN", "MARIFATUL_QURAN", "FIQIH_USHUL_FIQIH", "KETATANEGARAAN", "LIFESKILLS",
@@ -181,6 +191,17 @@ var ICCategoryLabels = map[string]string{
 
 // ICCategoryLabelsByLevel — huruf/urutan sesuai kurikulum per level.
 var ICCategoryLabelsByLevel = map[string]map[string]string{
+	"LEVEL_0": {
+		"MANA_ASY_SYAHADAH": "A. Ma'na Asy-Syahadah",
+		"MARIFATULLAH":      "B. Ma'rifatullah",
+		"MARIFATUR_RASUL":   "C. Ma'rifatur Rasul",
+		"MARIFATUL_ISLAM":   "D. Ma'rifatul Islam",
+		"MARIFATUL_INSAN":   "E. Ma'rifatul Insan",
+		"MARIFATUL_QURAN":   "F. Ma'rifatul Qur'an",
+		"FIQIH_USHUL_FIQIH": "G. Fiqih dan Ushul Fiqih",
+		"KETATANEGARAAN":    "H. Ketatanegaraan",
+		"LIFESKILLS":        "I. Lifeskills",
+	},
 	"LEVEL_1": {
 		"MANA_ASY_SYAHADAH": "A. Ma'na Asy-Syahadah",
 		"MARIFATULLAH":      "B. Ma'rifatullah",

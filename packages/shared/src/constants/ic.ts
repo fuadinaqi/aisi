@@ -20,6 +20,19 @@ export type ICCategory = (typeof IC_CATEGORIES)[number];
 
 export const IC_TYPES = ['PRIMER', 'SEKUNDER'] as const;
 
+/** Bidang Studi — Level Pra Dasar (sementara sama dengan Dasar) */
+export const IC_CATEGORIES_LEVEL_0 = [
+  'MANA_ASY_SYAHADAH',
+  'MARIFATULLAH',
+  'MARIFATUR_RASUL',
+  'MARIFATUL_ISLAM',
+  'MARIFATUL_INSAN',
+  'MARIFATUL_QURAN',
+  'FIQIH_USHUL_FIQIH',
+  'KETATANEGARAAN',
+  'LIFESKILLS',
+] as const satisfies readonly ICCategory[];
+
 /** Bidang Studi — Level Muda (Marhalah Muhib / M1) */
 export const IC_CATEGORIES_LEVEL_1 = [
   'MANA_ASY_SYAHADAH',
@@ -46,7 +59,8 @@ export const IC_CATEGORIES_LEVEL_2 = [
   'LIFESKILLS',
 ] as const satisfies readonly ICCategory[];
 
-export const IC_CATEGORIES_BY_LEVEL: Record<'LEVEL_1' | 'LEVEL_2', readonly ICCategory[]> = {
+export const IC_CATEGORIES_BY_LEVEL: Record<'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2', readonly ICCategory[]> = {
+  LEVEL_0: IC_CATEGORIES_LEVEL_0,
   LEVEL_1: IC_CATEGORIES_LEVEL_1,
   LEVEL_2: IC_CATEGORIES_LEVEL_2,
 };
@@ -70,7 +84,18 @@ export const IC_CATEGORY_LABELS: Record<ICCategory, string> = {
 };
 
 /** Label berhuruf sesuai urutan Bidang Studi pada level tertentu */
-export const IC_CATEGORY_LABELS_BY_LEVEL: Record<'LEVEL_1' | 'LEVEL_2', Record<string, string>> = {
+export const IC_CATEGORY_LABELS_BY_LEVEL: Record<'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2', Record<string, string>> = {
+  LEVEL_0: {
+    MANA_ASY_SYAHADAH: "A. Ma'na Asy-Syahadah",
+    MARIFATULLAH: "B. Ma'rifatullah",
+    MARIFATUR_RASUL: "C. Ma'rifatur Rasul",
+    MARIFATUL_ISLAM: "D. Ma'rifatul Islam",
+    MARIFATUL_INSAN: "E. Ma'rifatul Insan",
+    MARIFATUL_QURAN: "F. Ma'rifatul Qur'an",
+    FIQIH_USHUL_FIQIH: 'G. Fiqih dan Ushul Fiqih',
+    KETATANEGARAAN: 'H. Ketatanegaraan',
+    LIFESKILLS: 'I. Lifeskills',
+  },
   LEVEL_1: {
     MANA_ASY_SYAHADAH: "A. Ma'na Asy-Syahadah",
     MARIFATULLAH: "B. Ma'rifatullah",
@@ -100,11 +125,11 @@ export const IC_TYPE_LABELS: Record<(typeof IC_TYPES)[number], string> = {
   SEKUNDER: 'IC Sekunder',
 };
 
-export function getICCategoriesForLevel(level: 'LEVEL_1' | 'LEVEL_2'): readonly ICCategory[] {
+export function getICCategoriesForLevel(level: 'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2'): readonly ICCategory[] {
   return IC_CATEGORIES_BY_LEVEL[level] ?? IC_CATEGORIES;
 }
 
-export function getICCategoryLabel(category: string, level?: 'LEVEL_1' | 'LEVEL_2'): string {
+export function getICCategoryLabel(category: string, level?: 'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2'): string {
   if (level && IC_CATEGORY_LABELS_BY_LEVEL[level]?.[category]) {
     return IC_CATEGORY_LABELS_BY_LEVEL[level][category]!;
   }

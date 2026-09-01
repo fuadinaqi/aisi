@@ -29,6 +29,7 @@ import {
   type MutabaahOptionsFormState,
 } from '@/components/mutabaah/MutabaahOptionsEditor';
 import { MUTABAAH_OTHER_DEFAULT_LABEL } from '@/lib/mutabaah';
+import type { GroupLevel } from '@dakwah/shared';
 
 type FormState = {
   title: string;
@@ -64,7 +65,7 @@ const emptyForm: FormState = {
 
 export default function MutabaahConfigPage() {
   const queryClient = useQueryClient();
-  const [level, setLevel] = useState<'LEVEL_1' | 'LEVEL_2'>('LEVEL_1');
+  const [level, setLevel] = useState<GroupLevel>('LEVEL_1');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState('');
@@ -185,7 +186,7 @@ export default function MutabaahConfigPage() {
               variant={level === cfg.level ? 'default' : 'outline'}
               className="rounded-xl"
               onClick={() => {
-                setLevel(cfg.level as 'LEVEL_1' | 'LEVEL_2');
+                setLevel(cfg.level as GroupLevel);
                 resetForm();
               }}
             >

@@ -21,6 +21,18 @@ export const IC_TYPES = ['PRIMER', 'SEKUNDER'] as const;
 export type ICCategory = (typeof IC_CATEGORIES)[number];
 export type ICType = (typeof IC_TYPES)[number];
 
+export const IC_CATEGORIES_LEVEL_0 = [
+  'MANA_ASY_SYAHADAH',
+  'MARIFATULLAH',
+  'MARIFATUR_RASUL',
+  'MARIFATUL_ISLAM',
+  'MARIFATUL_INSAN',
+  'MARIFATUL_QURAN',
+  'FIQIH_USHUL_FIQIH',
+  'KETATANEGARAAN',
+  'LIFESKILLS',
+] as const satisfies readonly ICCategory[];
+
 export const IC_CATEGORIES_LEVEL_1 = [
   'MANA_ASY_SYAHADAH',
   'MARIFATULLAH',
@@ -45,7 +57,8 @@ export const IC_CATEGORIES_LEVEL_2 = [
   'LIFESKILLS',
 ] as const satisfies readonly ICCategory[];
 
-export const IC_CATEGORIES_BY_LEVEL: Record<'LEVEL_1' | 'LEVEL_2', readonly ICCategory[]> = {
+export const IC_CATEGORIES_BY_LEVEL: Record<'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2', readonly ICCategory[]> = {
+  LEVEL_0: IC_CATEGORIES_LEVEL_0,
   LEVEL_1: IC_CATEGORIES_LEVEL_1,
   LEVEL_2: IC_CATEGORIES_LEVEL_2,
 };
@@ -68,7 +81,18 @@ export const IC_CATEGORY_LABELS: Record<ICCategory, string> = {
   DAKWAH_FIKRAH: 'G. Dakwah dan Fikrah',
 };
 
-export const IC_CATEGORY_LABELS_BY_LEVEL: Record<'LEVEL_1' | 'LEVEL_2', Partial<Record<ICCategory, string>>> = {
+export const IC_CATEGORY_LABELS_BY_LEVEL: Record<'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2', Partial<Record<ICCategory, string>>> = {
+  LEVEL_0: {
+    MANA_ASY_SYAHADAH: "A. Ma'na Asy-Syahadah",
+    MARIFATULLAH: "B. Ma'rifatullah",
+    MARIFATUR_RASUL: "C. Ma'rifatur Rasul",
+    MARIFATUL_ISLAM: "D. Ma'rifatul Islam",
+    MARIFATUL_INSAN: "E. Ma'rifatul Insan",
+    MARIFATUL_QURAN: "F. Ma'rifatul Qur'an",
+    FIQIH_USHUL_FIQIH: 'G. Fiqih dan Ushul Fiqih',
+    KETATANEGARAAN: 'H. Ketatanegaraan',
+    LIFESKILLS: 'I. Lifeskills',
+  },
   LEVEL_1: {
     MANA_ASY_SYAHADAH: "A. Ma'na Asy-Syahadah",
     MARIFATULLAH: "B. Ma'rifatullah",
@@ -98,11 +122,11 @@ export const IC_TYPE_LABELS: Record<ICType, string> = {
   SEKUNDER: 'IC Sekunder',
 };
 
-export function getICCategoriesForLevel(level: 'LEVEL_1' | 'LEVEL_2'): readonly ICCategory[] {
+export function getICCategoriesForLevel(level: 'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2'): readonly ICCategory[] {
   return IC_CATEGORIES_BY_LEVEL[level] ?? IC_CATEGORIES;
 }
 
-export function getICCategoryLabel(category: string, level?: 'LEVEL_1' | 'LEVEL_2'): string {
+export function getICCategoryLabel(category: string, level?: 'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2'): string {
   if (level && IC_CATEGORY_LABELS_BY_LEVEL[level]?.[category as ICCategory]) {
     return IC_CATEGORY_LABELS_BY_LEVEL[level][category as ICCategory]!;
   }
@@ -111,7 +135,7 @@ export function getICCategoryLabel(category: string, level?: 'LEVEL_1' | 'LEVEL_
 
 export type IndikatorCapaianMaster = {
   id: string;
-  level: 'LEVEL_1' | 'LEVEL_2';
+  level: 'LEVEL_0' | 'LEVEL_1' | 'LEVEL_2';
   category: ICCategory;
   type: ICType;
   number: number;
