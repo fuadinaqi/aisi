@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/db"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/notify"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
@@ -131,7 +132,7 @@ func (h Handler) publicList(w http.ResponseWriter, r *http.Request) {
 		FROM "MentorNeed" mn
 		INNER JOIN "School" s ON s."id"=mn."schoolId"
 		WHERE mn."isPublished"=true AND s."isActive"=true
-		ORDER BY s."name"`)
+		ORDER BY ` + db.NaturalName(`s."name"`))
 	if e != nil {
 		httpx.Error(w, 500, "Gagal mengambil daftar kebutuhan mentor")
 		return
@@ -308,7 +309,7 @@ func (h Handler) listNeeds(w http.ResponseWriter, r *http.Request) {
 		q += ` AND EXISTS(SELECT 1 FROM "UserSchool" us WHERE us."schoolId"=s."id" AND us."userId"=$1)`
 		args = append(args, c.UserID)
 	}
-	q += ` ORDER BY s."name"`
+	q += ` ORDER BY ` + db.NaturalName(`s."name"`)
 	rows, e := h.DB.Query(r.Context(), q, args...)
 	if e != nil {
 		httpx.Error(w, 500, "Gagal mengambil kebutuhan mentor")

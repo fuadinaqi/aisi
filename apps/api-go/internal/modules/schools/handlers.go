@@ -9,6 +9,7 @@ import (
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/auth"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/db"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
@@ -102,7 +103,7 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 		q = `SELECT s."id",s."name",s."city",s."address",s."mapsUrl",s."isActive",s."createdAt",s."updatedAt" FROM "School" s JOIN "UserSchool" us ON us."schoolId"=s."id" WHERE s."isActive" AND us."userId"=$1`
 		args = append(args, c.UserID)
 	}
-	q += ` ORDER BY "name"`
+	q += ` ORDER BY ` + db.NaturalName(`"name"`)
 	rows, e := h.DB.Query(r.Context(), q, args...)
 	if e != nil {
 		httpx.Error(w, 500, "Gagal mengambil sekolah")
