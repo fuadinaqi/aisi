@@ -17,14 +17,14 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 | ----- | --------------- |
 | **Superadmin / Admin** | Kelola sekolah, PJ Sekolah, kelompok, undangan admin, konfigurasi label level, master mutabaah & indikator capaian, inbox KKS, analitik kota (termasuk breakdown gender), hubungi PJ via WhatsApp |
 | **PJ Sekolah** | Kelola kelompok & pembina di sekolahnya, daftar pembina, lihat evaluasi sekolah, lihat master IC (read-only), pantau progress IC anggota, analitik sekolah, buat agenda, kirim KKS |
-| **Pembina** | Isi evaluasi mingguan anggota, checklist indikator capaian anggota, lihat mutabaah anggota per pekan, lihat master IC (read-only), kelola agenda & persetujuan check-in, kirim KKS |
+| **Pembina** | Isi evaluasi mingguan anggota, checklist indikator capaian anggota, isi mutabaah & data pribadi anggota di kelompoknya, lihat master IC (read-only), kelola agenda & persetujuan check-in, kirim KKS |
 | **Anggota** | Isi mutabaah yaumiyah per pekan, lihat agenda sesuai level kelompok, check-in event dengan foto, lihat poin & profil, kirim KKS |
 
 ### Modul
 
 - **Sekolah & Kelompok** — CRUD sekolah, PJ Sekolah (multi-PJ), kelompok dengan level (`LEVEL_1` / `LEVEL_2`) dan jenis **Ikhwan / Akhwat**, undangan pembina & anggota; validasi gender pembina/anggota harus sesuai kelompok
 - **Evaluasi Mingguan** — Pembina mengisi kehadiran per pekan (satu evaluasi per kelompok per pekan); create-only (409 jika sudah ada), edit via PUT; tampilan mutabaah anggota per pekan evaluasi
-- **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina lihat di detail evaluasi & detail anggota
+- **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina/PJ/admin dapat mengisi mutabaah atas nama anggota di kelompoknya (poin +2 tetap ke anggota) di detail evaluasi & detail anggota
 - **Indikator Capaian (IC)** — Master kurikulum per level kelompok dikelompokkan per **Bidang Studi** (mis. Ma'na Asy-Syahadah, Ma'rifatullah, …); **29 IC Level Muda** (Marhalah Muhib / M1), **38 IC Level Pratama** (Marhalah Muayyid / M2); pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
 - **Agenda & Check-in** — Event dengan target level (semua level jika kosong); anggota check-in berfoto; pembina menyetujui/menolak
 - **Materi** — Upload file, link eksternal, atau rich text

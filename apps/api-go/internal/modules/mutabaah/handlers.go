@@ -27,6 +27,8 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 	r.With(middleware.RequireRole("ANGGOTA")).Put("/my", save(db, false))
 	r.With(middleware.RequireRole("ANGGOTA")).Post("/my/submit", save(db, true))
 	r.Get("/member/{userId}", member(db))
+	r.With(middleware.RequireRole("PEMBINA", "PJ_SEKOLAH", "ADMIN", "SUPERADMIN")).Put("/member/{userId}", saveForMember(db, false))
+	r.With(middleware.RequireRole("PEMBINA", "PJ_SEKOLAH", "ADMIN", "SUPERADMIN")).Post("/member/{userId}/submit", saveForMember(db, true))
 	r.Get("/group/{groupId}", group(db))
 	return r
 }
@@ -236,92 +238,128 @@ func memberGroup(db *pgxpool.Pool, r *http.Request, uid, gid string) (time.Time,
 func save(db *pgxpool.Pool, submit bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c, _ := middleware.Claims(r)
-		var in entryInput
-		if json.NewDecoder(r.Body).Decode(&in) != nil || in.GroupID == "" {
-			httpx.Error(w, 400, "Data mutabaah tidak valid")
+		upsertEntry(w, r, db, c.UserID, submit, false)
+	}
+}
+
+func saveForMember(db *pgxpool.Pool, submit bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid := chi.URLParam(r, "userId")
+		if uid == "" {
+			httpx.Error(w, 400, "userId wajib diisi")
 			return
 		}
-		week, e := monday(in.WeekDate)
-		if e != nil {
-			httpx.Error(w, 400, "weekDate tidak valid")
-			return
-		}
-		joined, level, e := memberGroup(db, r, c.UserID, in.GroupID)
-		if e != nil {
+		upsertEntry(w, r, db, uid, submit, true)
+	}
+}
+
+func upsertEntry(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, targetID string, submit, onBehalf bool) {
+	var in entryInput
+	if json.NewDecoder(r.Body).Decode(&in) != nil || in.GroupID == "" {
+		httpx.Error(w, 400, "Data mutabaah tidak valid")
+		return
+	}
+	if onBehalf && !groupAccess(db, r, in.GroupID, targetID) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
+	week, e := monday(in.WeekDate)
+	if e != nil {
+		httpx.Error(w, 400, "weekDate tidak valid")
+		return
+	}
+	joined, level, e := memberGroup(db, r, targetID, in.GroupID)
+	if e != nil {
+		if onBehalf {
+			httpx.Error(w, 404, "Anggota tidak ditemukan di kelompok ini")
+		} else {
 			httpx.Error(w, 403, "Anda bukan anggota kelompok ini")
-			return
 		}
-		jweek, _ := monday(joined.Format("2006-01-02"))
-		if week.Before(jweek) {
+		return
+	}
+	jweek, _ := monday(joined.Format("2006-01-02"))
+	if week.Before(jweek) {
+		if onBehalf {
+			httpx.Error(w, 400, "Mutabaah hanya bisa diisi sejak pekan anggota bergabung ke kelompok ini")
+		} else {
 			httpx.Error(w, 400, "Mutabaah hanya bisa diisi sejak pekan Anda bergabung ke kelompok ini")
+		}
+		return
+	}
+	tx, e := db.Begin(r.Context())
+	if e != nil {
+		httpx.Error(w, 500, "Gagal menyimpan mutabaah")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	var id string
+	var sent bool
+	e = tx.QueryRow(r.Context(), `SELECT "id","isSubmitted" FROM "MutabaahEntry" WHERE "userId"=$1 AND "groupId"=$2 AND "weekDate"=$3`, targetID, in.GroupID, week).Scan(&id, &sent)
+	if e == pgx.ErrNoRows {
+		id = uuid.NewString()
+		_, e = tx.Exec(r.Context(), `INSERT INTO "MutabaahEntry" ("id","userId","groupId","weekDate","updatedAt") VALUES($1,$2,$3,$4,NOW())`, id, targetID, in.GroupID, week)
+	}
+	if e != nil {
+		httpx.Error(w, 500, "Gagal menyimpan mutabaah")
+		return
+	}
+	if sent {
+		httpx.Error(w, 400, "Mutabaah pekan ini sudah dikirim")
+		return
+	}
+	var total, provided, required int
+	_ = tx.QueryRow(r.Context(), `SELECT count(*),count(*) FILTER(WHERE "isRequired") FROM "MutabaahItem" WHERE "level"=$1::"GroupLevel" AND "isActive"`, level).Scan(&total, &required)
+	for _, a := range in.Answers {
+		var ok bool
+		_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "MutabaahItem" WHERE "id"=$1 AND "level"=$2::"GroupLevel" AND "isActive")`, a.ItemID, level).Scan(&ok)
+		if !ok {
+			httpx.Error(w, 400, "Poin mutabaah tidak valid")
 			return
 		}
-		tx, e := db.Begin(r.Context())
+		provided++
+		_, e = tx.Exec(r.Context(), `INSERT INTO "MutabaahAnswer" ("id","entryId","itemId","value") VALUES($1,$2,$3,$4) ON CONFLICT ("entryId","itemId") DO UPDATE SET "value"=EXCLUDED."value"`, uuid.NewString(), id, a.ItemID, a.Value)
 		if e != nil {
-			httpx.Error(w, 500, "Gagal menyimpan mutabaah")
+			httpx.Error(w, 400, "Jawaban mutabaah tidak valid")
 			return
 		}
-		defer tx.Rollback(r.Context())
-		var id string
-		var sent bool
-		e = tx.QueryRow(r.Context(), `SELECT "id","isSubmitted" FROM "MutabaahEntry" WHERE "userId"=$1 AND "groupId"=$2 AND "weekDate"=$3`, c.UserID, in.GroupID, week).Scan(&id, &sent)
-		if e == pgx.ErrNoRows {
-			id = uuid.NewString()
-			_, e = tx.Exec(r.Context(), `INSERT INTO "MutabaahEntry" ("id","userId","groupId","weekDate","updatedAt") VALUES($1,$2,$3,$4,NOW())`, id, c.UserID, in.GroupID, week)
-		}
-		if e != nil {
-			httpx.Error(w, 500, "Gagal menyimpan mutabaah")
-			return
-		}
-		if sent {
-			httpx.Error(w, 400, "Mutabaah pekan ini sudah dikirim")
-			return
-		}
-		var total, provided, required int
-		_ = tx.QueryRow(r.Context(), `SELECT count(*),count(*) FILTER(WHERE "isRequired") FROM "MutabaahItem" WHERE "level"=$1::"GroupLevel" AND "isActive"`, level).Scan(&total, &required)
-		for _, a := range in.Answers {
-			var ok bool
-			_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "MutabaahItem" WHERE "id"=$1 AND "level"=$2::"GroupLevel" AND "isActive")`, a.ItemID, level).Scan(&ok)
-			if !ok {
-				httpx.Error(w, 400, "Poin mutabaah tidak valid")
-				return
-			}
-			provided++
-			_, e = tx.Exec(r.Context(), `INSERT INTO "MutabaahAnswer" ("id","entryId","itemId","value") VALUES($1,$2,$3,$4) ON CONFLICT ("entryId","itemId") DO UPDATE SET "value"=EXCLUDED."value"`, uuid.NewString(), id, a.ItemID, a.Value)
-			if e != nil {
-				httpx.Error(w, 400, "Jawaban mutabaah tidak valid")
-				return
+	}
+	if provided < required {
+		httpx.Error(w, 400, "Semua poin mutabaah wajib diisi")
+		return
+	}
+	awardedPoints := false
+	if submit {
+		_, e = tx.Exec(r.Context(), `UPDATE "MutabaahEntry" SET "isSubmitted"=true,"submittedAt"=NOW(),"updatedAt"=NOW() WHERE "id"=$1`, id)
+		pointEligible := false
+		if e == nil {
+			if onBehalf {
+				_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserRole" WHERE "userId"=$1 AND "role" IN ('ANGGOTA'::"Role",'PEMBINA'::"Role"))`, targetID).Scan(&pointEligible)
+			} else {
+				c, _ := middleware.Claims(r)
+				pointEligible = constants.IsPointEligible(c.Roles)
 			}
 		}
-		if provided < required {
-			httpx.Error(w, 400, "Semua poin mutabaah wajib diisi")
-			return
-		}
-		awardedPoints := false
-		if submit {
-			_, e = tx.Exec(r.Context(), `UPDATE "MutabaahEntry" SET "isSubmitted"=true,"submittedAt"=NOW(),"updatedAt"=NOW() WHERE "id"=$1`, id)
-			if e == nil && constants.IsPointEligible(c.Roles) {
-				var exists bool
-				_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "PointLog" WHERE "userId"=$1 AND "refType"='MUTABAAH' AND "refId"=$2)`, c.UserID, id).Scan(&exists)
-				if !exists {
-					_, e = tx.Exec(r.Context(), `INSERT INTO "PointLog" ("id","userId","points","description","refType","refId") VALUES($1,$2,$3,'Mengirim mutabaah yaumiyah','MUTABAAH',$4)`, uuid.NewString(), c.UserID, constants.PointAnggotaSubmitMutabaah, id)
-					if e == nil {
-						_, e = tx.Exec(r.Context(), `UPDATE "User" SET "totalPoints"="totalPoints"+$1,"updatedAt"=NOW() WHERE "id"=$2`, constants.PointAnggotaSubmitMutabaah, c.UserID)
-						awardedPoints = e == nil
-					}
+		if e == nil && pointEligible {
+			var exists bool
+			_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "PointLog" WHERE "userId"=$1 AND "refType"='MUTABAAH' AND "refId"=$2)`, targetID, id).Scan(&exists)
+			if !exists {
+				_, e = tx.Exec(r.Context(), `INSERT INTO "PointLog" ("id","userId","points","description","refType","refId") VALUES($1,$2,$3,'Mengirim mutabaah yaumiyah','MUTABAAH',$4)`, uuid.NewString(), targetID, constants.PointAnggotaSubmitMutabaah, id)
+				if e == nil {
+					_, e = tx.Exec(r.Context(), `UPDATE "User" SET "totalPoints"="totalPoints"+$1,"updatedAt"=NOW() WHERE "id"=$2`, constants.PointAnggotaSubmitMutabaah, targetID)
+					awardedPoints = e == nil
 				}
 			}
 		}
-		if e != nil || tx.Commit(r.Context()) != nil {
-			httpx.Error(w, 500, "Gagal menyimpan mutabaah")
-			return
-		}
-		if awardedPoints {
-			ref := id
-			notify.PointEarned(r.Context(), db, c.UserID, constants.PointAnggotaSubmitMutabaah, "Mengirim mutabaah yaumiyah", &ref)
-		}
-		entryResponse(w, r, db, c.UserID, in.GroupID, week, map[bool]string{true: "Mutabaah berhasil dikirim", false: "Mutabaah berhasil disimpan"}[submit])
 	}
+	if e != nil || tx.Commit(r.Context()) != nil {
+		httpx.Error(w, 500, "Gagal menyimpan mutabaah")
+		return
+	}
+	if awardedPoints {
+		ref := id
+		notify.PointEarned(r.Context(), db, targetID, constants.PointAnggotaSubmitMutabaah, "Mengirim mutabaah yaumiyah", &ref)
+	}
+	entryResponse(w, r, db, targetID, in.GroupID, week, map[bool]string{true: "Mutabaah berhasil dikirim", false: "Mutabaah berhasil disimpan"}[submit])
 }
 func mine(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

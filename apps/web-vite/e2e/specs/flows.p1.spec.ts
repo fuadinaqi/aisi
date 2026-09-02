@@ -10,6 +10,7 @@ import {
   createOngoingEvent,
   findSchoolId,
   apiGet,
+  apiPut,
 } from '../helpers/api';
 
 const stamp = () => Date.now();
@@ -122,9 +123,48 @@ test.describe('P1 write flows @p1', () => {
     await expect(page.getByText(/Indikator capaian|Mutabaah/i).first()).toBeVisible({
       timeout: 20_000,
     });
+    await expect(
+      page.getByRole('button', { name: /simpan draft|kirim mutabaah/i }).or(
+        page.getByText(/sudah dikirim|terkirim/i),
+      ).first(),
+    ).toBeVisible({ timeout: 15_000 });
     const category = page.getByRole('button').filter({ hasText: /.+/ }).first();
     void category;
     done();
+  });
+
+  test('F09b pembina isi profil & mutabaah anggota via API', async () => {
+    const token = await apiLogin(USERS.pembina.email, USERS.pembina.password);
+    const groups = await apiGet<{ id: string }[]>(token, '/groups');
+    expect(groups.length).toBeGreaterThan(0);
+    const groupId = groups[0].id;
+    const members = await apiGet<{ user: { id: string } }[]>(token, `/groups/${groupId}/members`);
+    expect(members.length).toBeGreaterThan(0);
+    const userId = members[0].user.id;
+
+    await apiPut(token, `/groups/${groupId}/members/${userId}`, {
+      birthPlace: 'Depok',
+      hobby: 'Membaca',
+    });
+    const member = await apiGet<{ user: { birthPlace?: string | null; hobby?: string | null } }>(
+      token,
+      `/groups/${groupId}/members/${userId}`,
+    );
+    expect(member.user.birthPlace).toBe('Depok');
+    expect(member.user.hobby).toBe('Membaca');
+
+    const weekDate = new Date().toISOString().slice(0, 10);
+    const entry = await apiGet<{
+      isSubmitted: boolean;
+      items: { id: string; value: unknown }[];
+    }>(token, `/mutabaah/member/${userId}?groupId=${groupId}&weekDate=${weekDate}`);
+    if (!entry.isSubmitted && entry.items?.length) {
+      await apiPut(token, `/mutabaah/member/${userId}`, {
+        groupId,
+        weekDate,
+        answers: entry.items.map((item) => ({ itemId: item.id, value: item.value })),
+      });
+    }
   });
 
   test('F10 create event via UI', async ({ page }) => {

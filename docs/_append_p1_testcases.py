@@ -257,13 +257,13 @@ def build_p1_cases() -> list[tuple]:
         "Pekan yang belum di-submit",
     )
     add_case(
-        cases, "MUT-03", "MUTABAAH", "Pembina lihat mutabaah anggota (read-only)", "Happy", "P1",
+        cases, "MUT-03", "MUTABAAH", "Pembina isi mutabaah anggota di kelompoknya", "Happy", "P1",
         "PEMBINA",
-        "Anggota sudah isi mutabaah",
+        "Anggota di kelompok pembina; pekan belum dikirim",
         "1. Login Pembina\n2. Buka detail kelompok → detail anggota\n"
-        "3. Buka panel/section Mutabaah per pekan",
-        "Data mutabaah tampil read-only; tidak bisa edit sebagai pembina di panel ini",
-        "—",
+        "3. Isi mutabaah pekan ini → Simpan draft / Kirim",
+        "Form mutabaah dapat diisi; draft tersimpan atau terkirim; poin +2 ke anggota saat dikirim",
+        "Pekan yang belum di-submit",
     )
     add_case(
         cases, "MUT-N01", "MUTABAAH", "Non-anggota ditolak /mutabaah", "Negatif", "P1",

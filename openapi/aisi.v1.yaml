@@ -901,6 +901,33 @@ paths:
       responses:
         '200':
           description: OK
+    put:
+      operationId: upsertMemberMutabaah
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /mutabaah/member/{userId}/submit:
+    post:
+      operationId: submitMemberMutabaah
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
   /mutabaah/group/{groupId}:
     get:
       operationId: getGroupMutabaah

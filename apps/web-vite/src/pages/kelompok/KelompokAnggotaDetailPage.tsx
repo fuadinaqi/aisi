@@ -14,7 +14,7 @@ import { LoadingSkeleton, PointBadge, RoleBadge } from '@/components/shared/Badg
 import { getGroupGenderTheme } from '@/components/shared/GenderField';
 import { ProfileDetailsCard } from '@/components/shared/ProfileDetailsCard';
 import { Button } from '@/components/ui/button';
-import { formatDate, formatWeekRange, toDateInputValue } from '@/lib/utils';
+import { formatDate, formatWeekRange, toDateInputValue, toWeekDateParam } from '@/lib/utils';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import { ICMemberPanel } from '@/components/ic/ICMemberPanel';
 import type { GroupMemberDetail } from '@/lib/types';
@@ -167,12 +167,15 @@ export default function AnggotaDetailPage() {
           <div>
             <p className={cardLabelClass}>Mutabaah yaumiyah</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Laporan ibadah harian anggota per pekan · {formatWeekRange(mutabaahWeek)}
+              {canEdit
+                ? `Isi atau lihat laporan ibadah harian anggota · ${formatWeekRange(mutabaahWeek)}`
+                : `Laporan ibadah harian anggota per pekan · ${formatWeekRange(mutabaahWeek)}`}
             </p>
           </div>
           <input
             type="date"
             value={mutabaahWeek}
+            min={toWeekDateParam(member.joinedAt)}
             max={toDateInputValue()}
             onChange={(e) => setMutabaahWeek(e.target.value)}
             className="h-9 rounded-xl border border-input bg-background px-3 text-sm"
@@ -183,6 +186,7 @@ export default function AnggotaDetailPage() {
           groupId={id}
           weekDate={mutabaahWeek}
           userName={memberUser.name}
+          canEdit={canEdit}
         />
       </ListGroup>
 

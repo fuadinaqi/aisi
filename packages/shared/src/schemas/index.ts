@@ -158,6 +158,22 @@ export const updateGroupMemberSchema = z.object({
   email: emailSchema.optional(),
   phone: z.string().optional().nullable(),
   gender: genderSchema.optional(),
+  birthPlace: optionalText,
+  birthDate: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Format tanggal tidak valid'),
+  address: optionalText,
+  tiktok: optionalText,
+  instagram: optionalText,
+  facebook: optionalText,
+  socialX: optionalText,
+  fatherName: optionalText,
+  fatherPhone: optionalText,
+  motherName: optionalText,
+  motherPhone: optionalText,
+  hobby: optionalText,
 });
 
 const pembinaInputSchema = z.object({

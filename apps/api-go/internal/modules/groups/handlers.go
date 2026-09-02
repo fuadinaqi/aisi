@@ -622,15 +622,34 @@ func (h Handler) updateMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Name, Email string
+		Name        string
+		Email       string
 		Phone       *string
 		Gender      *string
+		BirthPlace  *string
+		BirthDate   *string
+		Address     *string
+		Tiktok      *string
+		Instagram   *string
+		Facebook    *string
+		SocialX     *string
+		FatherName  *string
+		FatherPhone *string
+		MotherName  *string
+		MotherPhone *string
+		Hobby       *string
 	}
 	if !decode(r, &in) {
 		httpx.Error(w, 400, "Body tidak valid")
 		return
 	}
 	in.Email = validate.NormalizeEmail(in.Email)
+	if in.BirthDate != nil && *in.BirthDate != "" {
+		if _, err := time.Parse("2006-01-02", *in.BirthDate); err != nil {
+			httpx.Error(w, 400, "Format tanggal lahir tidak valid (YYYY-MM-DD)")
+			return
+		}
+	}
 	if in.Gender != nil {
 		var gg string
 		_ = h.DB.QueryRow(r.Context(), `SELECT "gender"::text FROM "Group" WHERE "id"=$1`, id).Scan(&gg)
@@ -639,8 +658,45 @@ func (h Handler) updateMember(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	tag, e := h.DB.Exec(r.Context(), `UPDATE "User" SET "name"=COALESCE(NULLIF($1,''),"name"),"email"=COALESCE(NULLIF($2,''),"email"),"phone"=COALESCE($3,"phone"),"gender"=COALESCE($4::"Gender","gender"),"updatedAt"=NOW() WHERE "id"=$5 AND EXISTS(SELECT 1 FROM "GroupMember" WHERE "groupId"=$6 AND "userId"=$5 AND "isActive")`, in.Name, in.Email, in.Phone, in.Gender, uid, id)
-	if e != nil || tag.RowsAffected() == 0 {
+	tag, e := h.DB.Exec(r.Context(), `
+		UPDATE "User" SET
+			"name"=COALESCE(NULLIF($1,''),"name"),
+			"email"=COALESCE(NULLIF($2,''),"email"),
+			"phone"=CASE WHEN $3::text IS NULL THEN "phone" WHEN $3='' THEN NULL ELSE $3 END,
+			"gender"=COALESCE($4::"Gender","gender"),
+			"birthPlace"=CASE WHEN $5::text IS NULL THEN "birthPlace" WHEN $5='' THEN NULL ELSE $5 END,
+			"birthDate"=CASE
+				WHEN $6::text IS NULL THEN "birthDate"
+				WHEN $6='' THEN NULL
+				ELSE $6::date
+			END,
+			"address"=CASE WHEN $7::text IS NULL THEN "address" WHEN $7='' THEN NULL ELSE $7 END,
+			"tiktok"=CASE WHEN $8::text IS NULL THEN "tiktok" WHEN $8='' THEN NULL ELSE $8 END,
+			"instagram"=CASE WHEN $9::text IS NULL THEN "instagram" WHEN $9='' THEN NULL ELSE $9 END,
+			"facebook"=CASE WHEN $10::text IS NULL THEN "facebook" WHEN $10='' THEN NULL ELSE $10 END,
+			"socialX"=CASE WHEN $11::text IS NULL THEN "socialX" WHEN $11='' THEN NULL ELSE $11 END,
+			"fatherName"=CASE WHEN $12::text IS NULL THEN "fatherName" WHEN $12='' THEN NULL ELSE $12 END,
+			"fatherPhone"=CASE WHEN $13::text IS NULL THEN "fatherPhone" WHEN $13='' THEN NULL ELSE $13 END,
+			"motherName"=CASE WHEN $14::text IS NULL THEN "motherName" WHEN $14='' THEN NULL ELSE $14 END,
+			"motherPhone"=CASE WHEN $15::text IS NULL THEN "motherPhone" WHEN $15='' THEN NULL ELSE $15 END,
+			"hobby"=CASE WHEN $16::text IS NULL THEN "hobby" WHEN $16='' THEN NULL ELSE $16 END,
+			"updatedAt"=NOW()
+		WHERE "id"=$17 AND EXISTS(SELECT 1 FROM "GroupMember" WHERE "groupId"=$18 AND "userId"=$17 AND "isActive")`,
+		in.Name, in.Email, in.Phone, in.Gender,
+		in.BirthPlace, in.BirthDate, in.Address,
+		in.Tiktok, in.Instagram, in.Facebook, in.SocialX,
+		in.FatherName, in.FatherPhone, in.MotherName, in.MotherPhone, in.Hobby,
+		uid, id,
+	)
+	if e != nil {
+		if strings.Contains(e.Error(), "User_email_key") || strings.Contains(strings.ToLower(e.Error()), "duplicate key") {
+			httpx.Error(w, 400, "Email sudah digunakan")
+			return
+		}
+		httpx.Error(w, 400, "Gagal memperbarui anggota")
+		return
+	}
+	if tag.RowsAffected() == 0 {
 		httpx.Error(w, 400, "Gagal memperbarui anggota")
 		return
 	}

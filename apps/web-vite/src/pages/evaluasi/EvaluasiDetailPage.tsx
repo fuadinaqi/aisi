@@ -7,6 +7,7 @@ import { api, type ApiResponse } from '@/lib/api';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import { formatWeekRange, toWeekDateParam } from '@/lib/utils';
 import type { EvaluationItem } from '@/lib/types';
@@ -21,6 +22,9 @@ const statusLabel: Record<string, string> = {
 export default function EvaluasiDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const role = useActiveRole() || '';
+  const canEditMutabaah =
+    role === 'PEMBINA' || role === 'PJ_SEKOLAH' || role === 'ADMIN' || role === 'SUPERADMIN';
 
   const { data, isLoading, isError, error } = useQuery<EvaluationItem>({
     queryKey: ['evaluation', id],
@@ -93,6 +97,7 @@ export default function EvaluasiDetailPage() {
                         weekDate={data.weekDate}
                         userName={userName}
                         compact
+                        canEdit={canEditMutabaah}
                       />
                       <Link
                         to={`/kelompok/${group.id}/anggota/${att.userId}?weekDate=${toWeekDateParam(data.weekDate)}`}
