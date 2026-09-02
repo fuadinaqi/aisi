@@ -124,9 +124,7 @@ test.describe('P1 write flows @p1', () => {
       timeout: 20_000,
     });
     await expect(
-      page.getByRole('button', { name: /simpan draft|kirim mutabaah/i }).or(
-        page.getByText(/sudah dikirim|terkirim/i),
-      ).first(),
+      page.getByRole('button', { name: /simpan draft|kirim mutabaah|simpan perubahan/i }).first(),
     ).toBeVisible({ timeout: 15_000 });
     const category = page.getByRole('button').filter({ hasText: /.+/ }).first();
     void category;

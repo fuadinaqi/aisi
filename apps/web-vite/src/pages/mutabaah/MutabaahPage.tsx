@@ -118,7 +118,7 @@ export default function MutabaahPage() {
         toastSuccess('Mutabaah berhasil dikirim');
       } else {
         await api.put('/mutabaah/my', payload);
-        toastSuccess('Berhasil disimpan');
+        toastSuccess(isSubmitted ? 'Mutabaah berhasil diperbarui' : 'Berhasil disimpan');
       }
       await invalidateMutabaahQueries(queryClient);
       await refetch();
@@ -195,7 +195,7 @@ export default function MutabaahPage() {
           </div>
           {isSubmitted && (
             <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-              Mutabaah pekan ini sudah dikirim
+              Mutabaah pekan ini sudah dikirim. Anda masih bisa memperbaiki isian jika ada yang salah.
             </p>
           )}
         </ListGroup>
@@ -212,7 +212,6 @@ export default function MutabaahPage() {
                 <MutabaahFieldInput
                   item={item}
                   value={answers[item.id] ?? item.value}
-                  disabled={isSubmitted}
                   onChange={(value) => setAnswers((prev) => ({ ...prev, [item.id]: value }))}
                 />
               </div>
@@ -222,16 +221,21 @@ export default function MutabaahPage() {
 
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
-        {!isSubmitted && items.length > 0 && (
-          <div className={cn('mt-4 flex gap-2')}>
-            <Button variant="outline" className="flex-1 rounded-xl" disabled={loading} onClick={() => save(false)}>
-              Simpan draft
+        {items.length > 0 &&
+          (isSubmitted ? (
+            <Button className="mt-4 w-full rounded-xl" disabled={loading} onClick={() => save(false)}>
+              Simpan perubahan
             </Button>
-            <Button className="flex-1 rounded-xl" disabled={loading} onClick={() => save(true)}>
-              Kirim mutabaah
-            </Button>
-          </div>
-        )}
+          ) : (
+            <div className={cn('mt-4 flex gap-2')}>
+              <Button variant="outline" className="flex-1 rounded-xl" disabled={loading} onClick={() => save(false)}>
+                Simpan draft
+              </Button>
+              <Button className="flex-1 rounded-xl" disabled={loading} onClick={() => save(true)}>
+                Kirim mutabaah
+              </Button>
+            </div>
+          ))}
       </PageContainer>
     </RoleGuard>
   );

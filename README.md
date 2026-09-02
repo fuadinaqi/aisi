@@ -24,7 +24,7 @@ Monorepo full-stack untuk pendataan, monitoring, dan evaluasi pembinaan dakwah d
 
 - **Sekolah & Kelompok** — CRUD sekolah, PJ Sekolah (multi-PJ), kelompok dengan level (`LEVEL_1` / `LEVEL_2`) dan jenis **Ikhwan / Akhwat**, undangan pembina & anggota; validasi gender pembina/anggota harus sesuai kelompok
 - **Evaluasi Mingguan** — Pembina mengisi kehadiran per pekan (satu evaluasi per kelompok per pekan); create-only (409 jika sudah ada), edit via PUT; tampilan mutabaah anggota per pekan evaluasi
-- **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina/PJ/admin dapat mengisi mutabaah atas nama anggota di kelompoknya (poin +2 tetap ke anggota) di detail evaluasi & detail anggota
+- **Mutabaah Yaumiyah** — Anggota mengisi laporan ibadah per pekan; master dinamis per level (checkbox, angka, teks, pilihan; cakupan mingguan/harian); admin kelola master; pembina/PJ/admin dapat mengisi mutabaah atas nama anggota di kelompoknya (poin +2 tetap ke anggota) di detail evaluasi & detail anggota; isian yang sudah dikirim masih bisa diperbaiki tanpa menambah poin ulang
 - **Indikator Capaian (IC)** — Master kurikulum per level kelompok dikelompokkan per **Bidang Studi** (mis. Ma'na Asy-Syahadah, Ma'rifatullah, …); **29 IC Level Muda** (Marhalah Muhib / M1), **38 IC Level Pratama** (Marhalah Muayyid / M2); pembina menandai capaian kumulatif per anggota; admin CRUD master; PJ Sekolah & pembina lihat daftar master (read-only)
 - **Agenda & Check-in** — Event dengan target level (semua level jika kosong); anggota check-in berfoto; pembina menyetujui/menolak
 - **Materi** — Upload file, link eksternal, atau rich text

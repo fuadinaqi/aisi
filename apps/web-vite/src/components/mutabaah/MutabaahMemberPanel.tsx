@@ -120,7 +120,7 @@ export function MutabaahMemberPanel({
         toastSuccess('Mutabaah berhasil dikirim');
       } else {
         await api.put(`/mutabaah/member/${userId}`, payload);
-        toastSuccess('Berhasil disimpan');
+        toastSuccess(data?.isSubmitted ? 'Mutabaah berhasil diperbarui' : 'Berhasil disimpan');
       }
       await invalidateMutabaahQueries(queryClient);
       await refetch();
@@ -139,10 +139,17 @@ export function MutabaahMemberPanel({
 
   const isSubmitted = data?.isSubmitted ?? false;
   const hasContent = items.length ? hasMutabaahContent(items) : false;
-  const showEditor = canEdit && !isSubmitted;
+  const showEditor = canEdit;
   const showEmpty = !showEditor && !isSubmitted && (!data?.id || !hasContent);
 
   if (showEditor) {
+    const helperText = isSubmitted
+      ? userName
+        ? `Mutabaah ${userName} sudah dikirim. Perbaiki isian jika ada yang salah. Poin tidak ditambah lagi.`
+        : 'Mutabaah sudah dikirim. Perbaiki isian jika ada yang salah. Poin tidak ditambah lagi.'
+      : userName
+        ? `Isi mutabaah atas nama ${userName}. Poin +2 tetap masuk ke anggota saat dikirim.`
+        : 'Isi mutabaah atas nama anggota. Poin +2 tetap masuk ke anggota saat dikirim.';
     return (
       <MutabaahEntryForm
         items={items}
@@ -151,11 +158,8 @@ export function MutabaahMemberPanel({
         loading={loading}
         error={error}
         compact={compact}
-        helperText={
-          userName
-            ? `Isi mutabaah atas nama ${userName}. Poin +2 tetap masuk ke anggota saat dikirim.`
-            : 'Isi mutabaah atas nama anggota. Poin +2 tetap masuk ke anggota saat dikirim.'
-        }
+        isSubmitted={isSubmitted}
+        helperText={helperText}
         onSaveDraft={() => void save(false)}
         onSubmit={() => void save(true)}
       />

@@ -11,6 +11,7 @@ type Props = {
   error?: string;
   compact?: boolean;
   helperText?: string;
+  isSubmitted?: boolean;
   onSaveDraft: () => void;
   onSubmit: () => void;
 };
@@ -23,6 +24,7 @@ export function MutabaahEntryForm({
   error,
   compact,
   helperText,
+  isSubmitted,
   onSaveDraft,
   onSubmit,
 }: Props) {
@@ -50,14 +52,20 @@ export function MutabaahEntryForm({
         ))}
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <div className="flex gap-2">
-        <Button variant="outline" className="flex-1 rounded-xl" disabled={loading} onClick={onSaveDraft}>
-          Simpan draft
+      {isSubmitted ? (
+        <Button className="w-full rounded-xl" disabled={loading} onClick={onSaveDraft}>
+          Simpan perubahan
         </Button>
-        <Button className="flex-1 rounded-xl" disabled={loading} onClick={onSubmit}>
-          Kirim mutabaah
-        </Button>
-      </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1 rounded-xl" disabled={loading} onClick={onSaveDraft}>
+            Simpan draft
+          </Button>
+          <Button className="flex-1 rounded-xl" disabled={loading} onClick={onSubmit}>
+            Kirim mutabaah
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -200,9 +200,8 @@ test('Manual P1 — full suite @manual-p1', async ({ page }) => {
     await expect(member).toBeVisible({ timeout: 15_000 });
     await member.click();
     await expect(page.getByText(/Mutabaah|Indikator/i).first()).toBeVisible({ timeout: 20_000 });
-    const fillBtn = page.getByRole('button', { name: /simpan draft|kirim mutabaah/i }).first();
-    const alreadySent = page.getByText(/sudah dikirim|terkirim/i).first();
-    await expect(fillBtn.or(alreadySent)).toBeVisible({ timeout: 15_000 });
+    const fillBtn = page.getByRole('button', { name: /simpan draft|kirim mutabaah|simpan perubahan/i }).first();
+    await expect(fillBtn).toBeVisible({ timeout: 15_000 });
   });
 
   await safe('MUT-N01', async () => {
@@ -216,10 +215,9 @@ test('Manual P1 — full suite @manual-p1', async ({ page }) => {
     await loginAs(page, USERS.anggota);
     await page.goto('/mutabaah');
     await assertMainContentVisible(page);
-    // If already submitted, fields disabled = pass signal
-    const disabled = await page.locator('input:disabled, textarea:disabled').count();
-    if (disabled > 0) return;
-    throw new Error('skip: tidak ada state submit ulang / pekan diblok yang terobservasi');
+    const saveChanges = page.getByRole('button', { name: /simpan perubahan/i }).first();
+    if (await saveChanges.isVisible().catch(() => false)) return;
+    throw new Error('skip: pekan ini belum dikirim (tidak ada state edit setelah submit)');
   });
 
   // ----- IC -----

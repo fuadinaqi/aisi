@@ -253,7 +253,7 @@ def build_p1_cases() -> list[tuple]:
         "Draft siap / form terisi",
         "1. Lengkapi field wajib\n2. Klik Kirim mutabaah\n"
         "3. Amati banner sudah dikirim\n4. Cek poin bertambah +2",
-        "Submitted; field disabled; poin +2",
+        "Submitted; field tetap bisa diedit; tombol Simpan perubahan; poin +2",
         "Pekan yang belum di-submit",
     )
     add_case(
@@ -274,12 +274,12 @@ def build_p1_cases() -> list[tuple]:
         "—",
     )
     add_case(
-        cases, "MUT-N02", "MUTABAAH", "Pekan sebelum bergabung / submit ulang", "Negatif", "P1",
+        cases, "MUT-N02", "MUTABAAH", "Pekan sebelum bergabung / edit setelah kirim", "Negatif", "P1",
         "ANGGOTA",
         "Sudah submit satu pekan",
         "1. Coba pilih pekan sebelum minWeekDate (bergabung) — harus diblok\n"
-        "2. Buka pekan sudah submit — field disabled; submit ulang gagal",
-        "Validasi pekan & submit sekali saja dihormati",
+        "2. Buka pekan sudah submit — field tetap bisa diedit; Simpan perubahan tidak menambah poin",
+        "Validasi pekan dihormati; koreksi isian diizinkan tanpa poin ganda",
         "—",
     )
 

@@ -303,10 +303,6 @@ func upsertEntry(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, targe
 		httpx.Error(w, 500, "Gagal menyimpan mutabaah")
 		return
 	}
-	if sent {
-		httpx.Error(w, 400, "Mutabaah pekan ini sudah dikirim")
-		return
-	}
 	var total, provided, required int
 	_ = tx.QueryRow(r.Context(), `SELECT count(*),count(*) FILTER(WHERE "isRequired") FROM "MutabaahItem" WHERE "level"=$1::"GroupLevel" AND "isActive"`, level).Scan(&total, &required)
 	for _, a := range in.Answers {
@@ -328,7 +324,8 @@ func upsertEntry(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, targe
 		return
 	}
 	awardedPoints := false
-	if submit {
+	firstSubmit := submit && !sent
+	if firstSubmit {
 		_, e = tx.Exec(r.Context(), `UPDATE "MutabaahEntry" SET "isSubmitted"=true,"submittedAt"=NOW(),"updatedAt"=NOW() WHERE "id"=$1`, id)
 		pointEligible := false
 		if e == nil {
@@ -350,6 +347,8 @@ func upsertEntry(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, targe
 				}
 			}
 		}
+	} else {
+		_, e = tx.Exec(r.Context(), `UPDATE "MutabaahEntry" SET "updatedAt"=NOW() WHERE "id"=$1`, id)
 	}
 	if e != nil || tx.Commit(r.Context()) != nil {
 		httpx.Error(w, 500, "Gagal menyimpan mutabaah")
@@ -359,7 +358,13 @@ func upsertEntry(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, targe
 		ref := id
 		notify.PointEarned(r.Context(), db, targetID, constants.PointAnggotaSubmitMutabaah, "Mengirim mutabaah yaumiyah", &ref)
 	}
-	entryResponse(w, r, db, targetID, in.GroupID, week, map[bool]string{true: "Mutabaah berhasil dikirim", false: "Mutabaah berhasil disimpan"}[submit])
+	msg := "Mutabaah berhasil disimpan"
+	if firstSubmit {
+		msg = "Mutabaah berhasil dikirim"
+	} else if sent {
+		msg = "Mutabaah berhasil diperbarui"
+	}
+	entryResponse(w, r, db, targetID, in.GroupID, week, msg)
 }
 func mine(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
