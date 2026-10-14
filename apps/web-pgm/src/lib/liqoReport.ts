@@ -10,6 +10,7 @@ const SECTIONS = [
 export type LiqoReportAttendance = {
   name: string;
   status: string;
+  note?: string | null;
 };
 
 export type LiqoReportInput = {
@@ -25,13 +26,13 @@ export function buildLiqoReportText(input: LiqoReportInput): string {
   const lines = [input.groupName.trim() || 'Kelompok', weekLabel, monthLabel, ''];
 
   for (const section of SECTIONS) {
-    const names = input.attendances
+    const people = input.attendances
       .filter((item) => item.status === section.status)
-      .map((item) => item.name.trim())
+      .map((item) => formatAttendanceName(item))
       .filter((name) => name.length > 0);
     lines.push(`${section.label}:`);
-    if (names.length) {
-      names.forEach((name, index) => lines.push(`${index + 1}. ${name}`));
+    if (people.length) {
+      people.forEach((name, index) => lines.push(`${index + 1}. ${name}`));
     } else {
       lines.push('-');
     }
@@ -45,6 +46,12 @@ export function buildLiqoReportText(input: LiqoReportInput): string {
 
   lines.push('✅ Sudah mengisi evaluasi di web');
   return lines.join('\n').trimEnd();
+}
+
+function formatAttendanceName(item: LiqoReportAttendance): string {
+  const name = item.name.trim();
+  const reason = item.status === 'IZIN' ? item.note?.trim() : '';
+  return reason ? `${name} (${reason})` : name;
 }
 
 export async function sharePlainText(text: string): Promise<'shared' | 'copied'> {

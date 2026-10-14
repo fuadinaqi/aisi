@@ -176,7 +176,11 @@ export default function IsiEvaluasiPage() {
         groupId,
         weekDate,
         notes,
-        attendances: attendances.map(({ userId, status, note }) => ({ userId, status, note })),
+        attendances: attendances.map(({ userId, status, note }) => ({
+          userId,
+          status,
+          note: status === 'IZIN' ? note?.trim() || undefined : undefined,
+        })),
       };
       let id = evalId;
       if (id) {
@@ -326,6 +330,19 @@ export default function IsiEvaluasiPage() {
                         </button>
                       ))}
                     </div>
+                    {att.status === 'IZIN' && (
+                      <Input
+                        className="mt-3"
+                        value={att.note ?? ''}
+                        placeholder="Keterangan izin"
+                        aria-label={`Keterangan izin ${att.name}`}
+                        onChange={(e) =>
+                          setAttendances((prev) =>
+                            prev.map((a, j) => (j === i ? { ...a, note: e.target.value } : a)),
+                          )
+                        }
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -392,7 +409,7 @@ export default function IsiEvaluasiPage() {
                 groupName={groupName}
                 weekDate={weekDate}
                 notes={notes}
-                attendances={attendances.map(({ name, status }) => ({ name, status }))}
+                attendances={attendances.map(({ name, status, note }) => ({ name, status, note }))}
               />
               <Button onClick={() => save(false)} disabled={loading || evalLoading} variant="outline" className="w-full">
                 Simpan perubahan

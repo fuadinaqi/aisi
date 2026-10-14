@@ -135,6 +135,7 @@ export default function EvaluasiDetailPage() {
           attendances={attendances.map((att) => ({
             name: att.user?.name ?? '',
             status: att.status,
+            note: att.note,
           }))}
         />
       )}
@@ -205,8 +206,11 @@ export default function EvaluasiDetailPage() {
                     onClick={() => setExpandedUserId(isOpen ? null : att.userId)}
                   >
                     <span className="text-sm font-medium">{userName}</span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="ml-3 max-w-[60%] text-right text-sm text-muted-foreground">
                       {statusLabel[att.status] || att.status}
+                      {att.status === 'IZIN' && att.note?.trim() ? (
+                        <span className="mt-0.5 block text-xs">{att.note.trim()}</span>
+                      ) : null}
                     </span>
                   </button>
                   {isOpen && (

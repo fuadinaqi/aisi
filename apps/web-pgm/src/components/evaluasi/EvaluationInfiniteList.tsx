@@ -118,6 +118,7 @@ export function EvaluationInfiniteList({
                       attendances={(e.attendances ?? []).map((att) => ({
                         name: att.user?.name ?? '',
                         status: att.status,
+                        note: att.note,
                       }))}
                     />
                   )}
