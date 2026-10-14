@@ -40,6 +40,7 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 	r.Post("/", create(db))
 	r.Get("/{id}", detail(db))
 	r.Put("/{id}", update(db))
+	r.Delete("/{id}", remove(db, c))
 	r.Post("/{id}/submit", submit(db))
 	r.Post("/{id}/photos", photos(db, c))
 	return r
@@ -324,6 +325,89 @@ func update(db *pgxpool.Pool) http.HandlerFunc {
 		}
 		detailByID(w, r, db, id, 200, "Evaluasi berhasil diperbarui")
 	}
+}
+func remove(db *pgxpool.Pool, c config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var gid string
+		var urls []string
+		err := db.QueryRow(r.Context(), `SELECT "groupId", COALESCE("photoUrls",'{}') FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &urls)
+		if err == pgx.ErrNoRows {
+			httpx.Error(w, 404, "Evaluasi tidak ditemukan")
+			return
+		}
+		if err != nil {
+			httpx.Error(w, 500, "Gagal memuat evaluasi")
+			return
+		}
+		if !canPembina(r, db, gid) {
+			httpx.Error(w, 403, "Akses ditolak")
+			return
+		}
+		tx, err := db.Begin(r.Context())
+		if err != nil {
+			httpx.Error(w, 500, "Gagal menghapus evaluasi")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		if err = revokeEvaluationPoints(tx, r, id); err != nil {
+			log.Printf("hapus evaluasi poin %s: %v", id, err)
+			httpx.Error(w, 500, "Gagal menghapus evaluasi")
+			return
+		}
+		if _, err = tx.Exec(r.Context(), `DELETE FROM "WeeklyEvaluation" WHERE "id"=$1`, id); err != nil {
+			log.Printf("hapus evaluasi %s: %v", id, err)
+			httpx.Error(w, 500, "Gagal menghapus evaluasi")
+			return
+		}
+		if err = tx.Commit(r.Context()); err != nil {
+			httpx.Error(w, 500, "Gagal menghapus evaluasi")
+			return
+		}
+		if s, e := storage.New(c); e == nil {
+			for _, u := range urls {
+				if strings.TrimSpace(u) != "" {
+					s.DeleteBestEffort(r.Context(), u)
+				}
+			}
+		}
+		httpx.Success(w, 200, nil, "Evaluasi berhasil dihapus")
+	}
+}
+func revokeEvaluationPoints(tx pgx.Tx, r *http.Request, id string) error {
+	rows, err := tx.Query(r.Context(), `SELECT "userId", COALESCE(SUM("points"),0) FROM "PointLog" WHERE "refType"='EVALUATION' AND "refId"=$1 GROUP BY "userId"`, id)
+	if err != nil {
+		return err
+	}
+	type grant struct {
+		uid string
+		pts int
+	}
+	grants := []grant{}
+	for rows.Next() {
+		var g grant
+		if err = rows.Scan(&g.uid, &g.pts); err != nil {
+			rows.Close()
+			return err
+		}
+		grants = append(grants, g)
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(r.Context(), `DELETE FROM "PointLog" WHERE "refType"='EVALUATION' AND "refId"=$1`, id); err != nil {
+		return err
+	}
+	for _, g := range grants {
+		if g.uid == "" || g.pts == 0 {
+			continue
+		}
+		if _, err = tx.Exec(r.Context(), `UPDATE "User" SET "totalPoints"=GREATEST("totalPoints"-$1,0),"updatedAt"=NOW() WHERE "id"=$2`, g.pts, g.uid); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func submit(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

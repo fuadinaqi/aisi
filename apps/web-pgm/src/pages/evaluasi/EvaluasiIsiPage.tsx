@@ -16,6 +16,7 @@ import { compressImage, isImageFile } from '@/lib/compressImage';
 import type { EvaluationItem, GroupItem } from '@/lib/types';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 const STATUSES = ['HADIR', 'IZIN', 'SAKIT', 'TIDAK_HADIR'] as const;
 const statusLabels: Record<string, string> = {
@@ -41,6 +42,7 @@ export default function IsiEvaluasiPage() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
@@ -218,6 +220,14 @@ export default function IsiEvaluasiPage() {
     }
   };
 
+  const removeEvaluation = async () => {
+    if (!evalId) return;
+    await api.delete(`/evaluations/${evalId}`);
+    await invalidateEvaluationQueries(queryClient);
+    toastSuccess('Evaluasi berhasil dihapus');
+    navigate('/evaluasi');
+  };
+
   const isEditing = !!evalId && !isSubmitted;
 
   return (
@@ -383,8 +393,32 @@ export default function IsiEvaluasiPage() {
               </Button>
             </div>
           )}
+          {evalId && !evalLoading && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-destructive hover:text-destructive"
+              disabled={loading}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Hapus evaluasi
+            </Button>
+          )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Hapus evaluasi?"
+        description={
+          isSubmitted
+            ? `Evaluasi pekan ${formatWeekRange(weekDate)} akan dihapus beserta kehadiran dan fotonya. Poin yang sudah diberikan dari evaluasi ini ikut ditarik.`
+            : `Draft evaluasi pekan ${formatWeekRange(weekDate)} akan dihapus.`
+        }
+        confirmLabel="Hapus"
+        destructive
+        onConfirm={removeEvaluation}
+      />
     </PageContainer>
   );
 }

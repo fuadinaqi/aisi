@@ -1,8 +1,7 @@
 
 import { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, type ApiResponse } from '@/lib/api';
 import { invalidateEvaluationQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
@@ -14,6 +13,7 @@ import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import { compressImage, isImageFile } from '@/lib/compressImage';
 import { formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
 import { toastError, toastSuccess } from '@/lib/toast';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import type { EvaluationItem } from '@/lib/types';
 
 const statusLabel: Record<string, string> = {
@@ -25,7 +25,9 @@ const statusLabel: Record<string, string> = {
 
 export default function EvaluasiDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const role = useActiveRole() || '';
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -101,11 +103,22 @@ export default function EvaluasiDetailPage() {
         description={`Pekan ${formatWeekRange(data.weekDate)}`}
         action={
           role === 'PEMBINA' ? (
-            <Button asChild size="sm" variant="outline">
-              <Link to={`/evaluasi/isi?groupId=${group.id}&weekDate=${toWeekDateParam(data.weekDate)}`}>
-                Edit evaluasi
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link to={`/evaluasi/isi?groupId=${group.id}&weekDate=${toWeekDateParam(data.weekDate)}`}>
+                  Edit
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setConfirmDelete(true)}
+              >
+                Hapus
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -208,6 +221,24 @@ export default function EvaluasiDetailPage() {
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Hapus evaluasi?"
+        description={
+          data.isSubmitted
+            ? `Evaluasi pekan ${formatWeekRange(data.weekDate)} akan dihapus beserta kehadiran dan fotonya. Poin yang sudah diberikan dari evaluasi ini ikut ditarik.`
+            : `Draft evaluasi pekan ${formatWeekRange(data.weekDate)} akan dihapus.`
+        }
+        confirmLabel="Hapus"
+        destructive
+        onConfirm={async () => {
+          await api.delete(`/evaluations/${id}`);
+          await invalidateEvaluationQueries(queryClient);
+          toastSuccess('Evaluasi berhasil dihapus');
+          navigate('/evaluasi');
+        }}
+      />
     </PageContainer>
   );
 }

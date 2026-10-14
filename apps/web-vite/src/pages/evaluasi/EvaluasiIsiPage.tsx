@@ -14,6 +14,7 @@ import { cn, formatWeekRange, toDateInputValue, toWeekDateParam } from '@/lib/ut
 import type { EvaluationItem, GroupItem } from '@/lib/types';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 const STATUSES = ['HADIR', 'IZIN', 'SAKIT', 'TIDAK_HADIR'] as const;
 const statusLabels: Record<string, string> = {
@@ -39,6 +40,7 @@ export default function IsiEvaluasiPage() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: groups } = useQuery<GroupItem[]>({
     queryKey: ['groups'],
@@ -162,6 +164,14 @@ export default function IsiEvaluasiPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const removeEvaluation = async () => {
+    if (!evalId) return;
+    await api.delete(`/evaluations/${evalId}`);
+    await invalidateEvaluationQueries(queryClient);
+    toastSuccess('Evaluasi berhasil dihapus');
+    navigate('/evaluasi');
   };
 
   const isEditing = !!evalId && !isSubmitted;
@@ -294,8 +304,32 @@ export default function IsiEvaluasiPage() {
               </Button>
             </div>
           )}
+          {evalId && !evalLoading && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-destructive hover:text-destructive"
+              disabled={loading}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Hapus evaluasi
+            </Button>
+          )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Hapus evaluasi?"
+        description={
+          isSubmitted
+            ? `Evaluasi pekan ${formatWeekRange(weekDate)} akan dihapus beserta kehadirannya. Poin yang sudah diberikan dari evaluasi ini ikut ditarik.`
+            : `Draft evaluasi pekan ${formatWeekRange(weekDate)} akan dihapus.`
+        }
+        confirmLabel="Hapus"
+        destructive
+        onConfirm={removeEvaluation}
+      />
     </PageContainer>
   );
 }
