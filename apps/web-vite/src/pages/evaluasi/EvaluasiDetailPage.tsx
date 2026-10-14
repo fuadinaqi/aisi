@@ -125,7 +125,7 @@ export default function EvaluasiDetailPage() {
             {data.notes && (
               <div>
                 <p className="text-muted-foreground">Catatan pembina</p>
-                <p>{data.notes}</p>
+                <p className="whitespace-pre-wrap">{data.notes}</p>
               </div>
             )}
           </CardContent>

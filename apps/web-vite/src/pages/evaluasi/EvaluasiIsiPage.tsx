@@ -260,12 +260,15 @@ export default function IsiEvaluasiPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Catatan umum</Label>
-                <Input
+                <Label htmlFor="notes">Catatan umum</Label>
+                <textarea
+                  id="notes"
                   value={notes}
                   disabled={isSubmitted}
+                  rows={4}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Opsional"
+                  className="flex min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
             </>
