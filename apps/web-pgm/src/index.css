@@ -1,4 +1,6 @@
 @import '@fontsource/inter';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/alex-brush';
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';

@@ -23,6 +23,7 @@ const (
 	PrefixEvents      = "events/"
 	PrefixCheckins    = "checkins/"
 	PrefixEvaluations = "evaluations/"
+	PrefixTemplates   = "templates/"
 	PrefixMateri      = "materi/"
 )
 
@@ -139,6 +140,55 @@ func (s *Storage) DeleteBestEffort(ctx context.Context, urlOrKey string) {
 	}
 	if err := s.Delete(ctx, urlOrKey); err != nil {
 		log.Printf("storage: gagal hapus %s: %v", urlOrKey, err)
+	}
+}
+
+// Open reads an evaluation photo previously stored by Put. Keys outside evaluations/ are rejected.
+func (s *Storage) Open(ctx context.Context, urlOrKey string) (io.ReadCloser, string, error) {
+	return s.openPrefixed(ctx, urlOrKey, PrefixEvaluations)
+}
+
+// OpenTemplate reads a poster template previously stored by Put. Keys outside templates/ are rejected.
+func (s *Storage) OpenTemplate(ctx context.Context, urlOrKey string) (io.ReadCloser, string, error) {
+	return s.openPrefixed(ctx, urlOrKey, PrefixTemplates)
+}
+
+func (s *Storage) openPrefixed(ctx context.Context, urlOrKey, prefix string) (io.ReadCloser, string, error) {
+	key, ok := resolveKey(urlOrKey, s.publicURL)
+	if !ok || !strings.HasPrefix(key, prefix) {
+		return nil, "", fmt.Errorf("berkas tidak valid")
+	}
+	ct := contentTypeForKey(key)
+	if s.client == nil {
+		f, err := os.Open(filepath.Join(s.localDir, filepath.FromSlash(key)))
+		if err != nil {
+			return nil, "", err
+		}
+		return f, ct, nil
+	}
+	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &s.bucket,
+		Key:    &key,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	if out.ContentType != nil && *out.ContentType != "" && *out.ContentType != "application/octet-stream" {
+		ct = *out.ContentType
+	}
+	return out.Body, ct, nil
+}
+
+func contentTypeForKey(key string) string {
+	switch strings.ToLower(filepath.Ext(key)) {
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	default:
+		return "image/jpeg"
 	}
 }
 

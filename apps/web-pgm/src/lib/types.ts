@@ -97,6 +97,7 @@ export interface EvaluationItem {
   weekDate: string;
   isSubmitted: boolean;
   notes?: string;
+  photoUrls?: string[];
   group?: { id: string; name: string };
   groupId?: string;
   attendances?: { userId: string; status: string; note?: string; user?: { name: string } }[];

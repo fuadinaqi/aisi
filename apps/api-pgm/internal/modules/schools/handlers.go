@@ -40,6 +40,10 @@ func (h Handler) Routes() chi.Router {
 	r.Get("/{id}/pembina", h.pembina)
 	r.Post("/{id}/groups", h.createGroup)
 	r.Get("/{id}/stats", h.stats)
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Get("/{id}/template-info", h.templateInfo)
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Get("/{id}/template", h.templateFile)
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Post("/{id}/template", h.uploadTemplate)
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Delete("/{id}/template", h.deleteTemplate)
 	r.Get("/{id}", h.detail)
 	return r
 }

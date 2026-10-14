@@ -2,9 +2,11 @@ package evaluations
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -37,7 +39,9 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireAuth(c))
 	r.Get("/", list(db))
+	r.Get("/laporan", laporan(db))
 	r.Post("/", create(db))
+	r.Get("/{id}/agenda-photo", agendaPhoto(db, c))
 	r.Get("/{id}", detail(db))
 	r.Put("/{id}", update(db))
 	r.Post("/{id}/submit", submit(db))
@@ -332,7 +336,8 @@ func submit(db *pgxpool.Pool) http.HandlerFunc {
 		var gid, createdBy string
 		var wd time.Time
 		var submitted bool
-		err := db.QueryRow(r.Context(), `SELECT "groupId","createdById","weekDate","isSubmitted" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &createdBy, &wd, &submitted)
+		var urls []string
+		err := db.QueryRow(r.Context(), `SELECT "groupId","createdById","weekDate","isSubmitted",COALESCE("photoUrls",'{}') FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &createdBy, &wd, &submitted, &urls)
 		if err == pgx.ErrNoRows {
 			httpx.Error(w, 404, "Evaluasi tidak ditemukan")
 			return
@@ -343,6 +348,10 @@ func submit(db *pgxpool.Pool) http.HandlerFunc {
 		}
 		if !canPembina(r, db, gid) {
 			httpx.Error(w, 403, "Akses ditolak")
+			return
+		}
+		if len(urls) == 0 {
+			httpx.Error(w, 400, "Foto agenda liqo wajib diunggah")
 			return
 		}
 		tx, err := db.Begin(r.Context())
@@ -428,13 +437,12 @@ func photos(db *pgxpool.Pool, c config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		var gid string
-		var submitted bool
-		if err := db.QueryRow(r.Context(), `SELECT "groupId","isSubmitted" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &submitted); err == pgx.ErrNoRows {
-			httpx.Error(w, 404, "Evaluasi tidak ditemukan")
-			return
-		}
-		if submitted {
-			httpx.Error(w, 400, "Evaluasi sudah disubmit")
+		if err := db.QueryRow(r.Context(), `SELECT "groupId" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid); err != nil {
+			if err == pgx.ErrNoRows {
+				httpx.Error(w, 404, "Evaluasi tidak ditemukan")
+				return
+			}
+			httpx.Error(w, 500, "Gagal memuat evaluasi")
 			return
 		}
 		if !canPembina(r, db, gid) {
@@ -445,9 +453,10 @@ func photos(db *pgxpool.Pool, c config.Config) http.HandlerFunc {
 			httpx.Error(w, 400, "Upload foto tidak valid")
 			return
 		}
-		files := r.MultipartForm.File["photos"]
-		if len(files) == 0 || len(files) > 5 {
-			httpx.Error(w, 400, "Unggah 1 sampai 5 foto")
+		files := append([]*multipart.FileHeader{}, r.MultipartForm.File["photo"]...)
+		files = append(files, r.MultipartForm.File["photos"]...)
+		if len(files) != 1 {
+			httpx.Error(w, 400, "Unggah tepat 1 foto agenda liqo")
 			return
 		}
 		s, err := storage.New(c)
@@ -455,28 +464,202 @@ func photos(db *pgxpool.Pool, c config.Config) http.HandlerFunc {
 			httpx.Error(w, 500, "Storage tidak tersedia")
 			return
 		}
-		urls := []string{}
-		rollback := func() {
-			for _, u := range urls {
-				s.DeleteBestEffort(r.Context(), u)
-			}
+		u, e := putImage(r, s, files[0], storage.PrefixEvaluations)
+		if e != nil {
+			httpx.Error(w, 400, e.Error())
+			return
 		}
-		for _, f := range files {
-			u, e := putImage(r, s, f, storage.PrefixEvaluations)
-			if e != nil {
-				rollback()
-				httpx.Error(w, 400, e.Error())
-				return
-			}
-			urls = append(urls, u)
-		}
-		_, err = db.Exec(r.Context(), `UPDATE "WeeklyEvaluation" SET "photoUrls"=COALESCE("photoUrls",'{}') || $1::text[],"updatedAt"=NOW() WHERE "id"=$2`, urls, id)
-		if err != nil {
-			rollback()
+		var old []string
+		_ = db.QueryRow(r.Context(), `SELECT COALESCE("photoUrls",'{}') FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&old)
+		if _, err = db.Exec(r.Context(), `UPDATE "WeeklyEvaluation" SET "photoUrls"=$1,"updatedAt"=NOW() WHERE "id"=$2`, []string{u}, id); err != nil {
+			s.DeleteBestEffort(r.Context(), u)
 			httpx.Error(w, 500, "Gagal upload foto")
 			return
 		}
+		for _, prev := range old {
+			if prev != u {
+				s.DeleteBestEffort(r.Context(), prev)
+			}
+		}
 		detailByID(w, r, db, id, 200, "Foto berhasil diupload")
+	}
+}
+
+func canManageSchool(r *http.Request, db *pgxpool.Pool, schoolID string) bool {
+	c, _ := middleware.Claims(r)
+	if has(c.Roles, "SUPERADMIN") || has(c.Roles, "ADMIN") {
+		return true
+	}
+	if !has(c.Roles, "PJ_SEKOLAH") {
+		return false
+	}
+	var n int
+	_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "UserSchool" WHERE "schoolId"=$1 AND "userId"=$2`, schoolID, c.UserID).Scan(&n)
+	return n > 0
+}
+
+func laporan(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		schoolID := strings.TrimSpace(r.URL.Query().Get("schoolId"))
+		if schoolID == "" {
+			httpx.Error(w, 400, "PGM wajib dipilih")
+			return
+		}
+		if !canManageSchool(r, db, schoolID) {
+			httpx.Error(w, 403, "Akses ditolak")
+			return
+		}
+		wd, err := monday(r.URL.Query().Get("weekDate"))
+		if err != nil {
+			httpx.Error(w, 400, "weekDate tidak valid")
+			return
+		}
+		var schoolName string
+		err = db.QueryRow(r.Context(), `SELECT "name" FROM "School" WHERE "id"=$1`, schoolID).Scan(&schoolName)
+		if err == pgx.ErrNoRows {
+			httpx.Error(w, 404, "PGM tidak ditemukan")
+			return
+		}
+		if err != nil {
+			httpx.Error(w, 500, "Gagal memuat laporan")
+			return
+		}
+		rows, err := db.Query(r.Context(), `
+			SELECT e."id", g."name", e."photoUrls"
+			FROM "WeeklyEvaluation" e
+			JOIN "Group" g ON g."id"=e."groupId"
+			WHERE g."schoolId"=$1 AND e."weekDate"=$2 AND e."isSubmitted" AND coalesce(cardinality(e."photoUrls"),0) > 0
+			ORDER BY g."name"`, schoolID, wd)
+		if err != nil {
+			httpx.Error(w, 500, "Gagal memuat laporan")
+			return
+		}
+		defer rows.Close()
+		photos := []map[string]any{}
+		for rows.Next() {
+			var id, name string
+			var urls []string
+			if err = rows.Scan(&id, &name, &urls); err != nil {
+				httpx.Error(w, 500, "Gagal membaca laporan")
+				return
+			}
+			for i, u := range urls {
+				if strings.TrimSpace(u) == "" {
+					continue
+				}
+				photos = append(photos, map[string]any{"evaluationId": id, "groupName": name, "index": i})
+			}
+		}
+		if err = rows.Err(); err != nil {
+			httpx.Error(w, 500, "Gagal membaca laporan")
+			return
+		}
+		missing := []string{}
+		mRows, err := db.Query(r.Context(), `
+			SELECT g."name"
+			FROM "WeeklyEvaluation" e
+			JOIN "Group" g ON g."id"=e."groupId"
+			WHERE g."schoolId"=$1 AND e."weekDate"=$2 AND e."isSubmitted" AND coalesce(cardinality(e."photoUrls"),0)=0
+			ORDER BY g."name"`, schoolID, wd)
+		if err != nil {
+			httpx.Error(w, 500, "Gagal memuat laporan")
+			return
+		}
+		defer mRows.Close()
+		for mRows.Next() {
+			var name string
+			if mRows.Scan(&name) == nil {
+				missing = append(missing, name)
+			}
+		}
+		if err = mRows.Err(); err != nil {
+			httpx.Error(w, 500, "Gagal membaca laporan")
+			return
+		}
+		pending := []string{}
+		pRows, err := db.Query(r.Context(), `
+			SELECT g."name"
+			FROM "Group" g
+			WHERE g."schoolId"=$1 AND g."isActive" AND NOT EXISTS (
+				SELECT 1 FROM "WeeklyEvaluation" e
+				WHERE e."groupId"=g."id" AND e."weekDate"=$2 AND e."isSubmitted"
+			)
+			ORDER BY g."name"`, schoolID, wd)
+		if err != nil {
+			httpx.Error(w, 500, "Gagal memuat laporan")
+			return
+		}
+		defer pRows.Close()
+		for pRows.Next() {
+			var name string
+			if pRows.Scan(&name) == nil {
+				pending = append(pending, name)
+			}
+		}
+		if err = pRows.Err(); err != nil {
+			httpx.Error(w, 500, "Gagal membaca laporan")
+			return
+		}
+		httpx.Success(w, 200, map[string]any{
+			"school":        map[string]string{"id": schoolID, "name": schoolName},
+			"weekDate":      wd,
+			"photos":        photos,
+			"missingPhotos": missing,
+			"pendingGroups": pending,
+		}, "")
+	}
+}
+
+func agendaPhoto(db *pgxpool.Pool, c config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var gid string
+		var urls []string
+		err := db.QueryRow(r.Context(), `SELECT "groupId",COALESCE("photoUrls",'{}') FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &urls)
+		if err == pgx.ErrNoRows {
+			httpx.Error(w, 404, "Evaluasi tidak ditemukan")
+			return
+		}
+		if err != nil {
+			httpx.Error(w, 500, "Gagal memuat foto")
+			return
+		}
+		if code, msg := allowedEvaluation(r, db, gid); code > 0 {
+			httpx.Error(w, code, msg)
+			return
+		}
+		idx := 0
+		if raw := r.URL.Query().Get("index"); raw != "" {
+			n, conv := strconv.Atoi(raw)
+			if conv != nil || n < 0 {
+				httpx.Error(w, 400, "Index foto tidak valid")
+				return
+			}
+			idx = n
+		}
+		if idx >= len(urls) || strings.TrimSpace(urls[idx]) == "" {
+			httpx.Error(w, 404, "Foto tidak ditemukan")
+			return
+		}
+		s, err := storage.New(c)
+		if err != nil {
+			httpx.Error(w, 500, "Storage tidak tersedia")
+			return
+		}
+		body, ct, err := s.Open(r.Context(), urls[idx])
+		if err != nil {
+			if os.IsNotExist(err) {
+				httpx.Error(w, 404, "Foto tidak ditemukan")
+				return
+			}
+			httpx.Error(w, 500, "Gagal memuat foto")
+			return
+		}
+		defer body.Close()
+		w.Header().Set("Content-Type", ct)
+		w.Header().Set("Cache-Control", "private, max-age=300")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		_, _ = io.Copy(w, body)
 	}
 }
 func putImage(r *http.Request, s *storage.Storage, f *multipart.FileHeader, prefix string) (string, error) {

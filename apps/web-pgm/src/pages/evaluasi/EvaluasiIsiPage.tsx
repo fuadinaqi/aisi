@@ -1,8 +1,9 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Camera } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
 import { invalidateEvaluationQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
@@ -10,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn, formatWeekRange, toDateInputValue, toWeekDateParam } from '@/lib/utils';
+import { cn, formatWeekRange, getMediaUrl, toDateInputValue, toWeekDateParam } from '@/lib/utils';
+import { compressImage, isImageFile } from '@/lib/compressImage';
 import type { EvaluationItem, GroupItem } from '@/lib/types';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -39,6 +41,11 @@ export default function IsiEvaluasiPage() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<string | null>(null);
 
   const { data: groups } = useQuery<GroupItem[]>({
     queryKey: ['groups'],
@@ -48,6 +55,33 @@ export default function IsiEvaluasiPage() {
   useEffect(() => {
     if (groups?.length && !groupId) setGroupId(groups[0].id);
   }, [groups, groupId]);
+
+  useEffect(() => {
+    return () => {
+      if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    };
+  }, []);
+
+  const clearSelectedPhoto = useCallback(() => {
+    setPhotoFile(null);
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    previewRef.current = null;
+    setPhotoPreview(null);
+    if (fileRef.current) fileRef.current.value = '';
+  }, []);
+
+  const pickPhoto = (file: File | null) => {
+    if (file && !isImageFile(file)) {
+      setError('File harus berupa gambar');
+      return;
+    }
+    setError('');
+    setPhotoFile(file);
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    const next = file ? URL.createObjectURL(file) : null;
+    previewRef.current = next;
+    setPhotoPreview(next);
+  };
 
   const loadGroupMembers = useCallback(async (gid: string) => {
     const res = await api.get<ApiResponse<GroupItem>>(`/groups/${gid}`);
@@ -68,11 +102,13 @@ export default function IsiEvaluasiPage() {
         params: { groupId: gid, weekDate: toWeekDateParam(week), limit: 1 },
       });
       const ev = res.data.data?.[0];
+      clearSelectedPhoto();
       if (ev) {
         setEvalId(ev.id);
         setIsSubmitted(ev.isSubmitted);
         setWeekDate(toWeekDateParam(ev.weekDate));
         setNotes(ev.notes || '');
+        setExistingPhotoUrl(ev.photoUrls?.[0] ? getMediaUrl(ev.photoUrls[0]) : null);
         setAttendances(
           (ev.attendances ?? []).map((a) => ({
             userId: a.userId,
@@ -85,17 +121,19 @@ export default function IsiEvaluasiPage() {
         setEvalId('');
         setIsSubmitted(false);
         setNotes('');
+        setExistingPhotoUrl(null);
         await loadGroupMembers(gid);
       }
     } catch {
       setEvalId('');
       setIsSubmitted(false);
       setNotes('');
+      setExistingPhotoUrl(null);
       await loadGroupMembers(gid);
     } finally {
       setEvalLoading(false);
     }
-  }, [loadGroupMembers]);
+  }, [clearSelectedPhoto, loadGroupMembers]);
 
   useEffect(() => {
     if (!groupId || !weekDate) return;
@@ -113,6 +151,11 @@ export default function IsiEvaluasiPage() {
 
   const save = async (submit = false) => {
     if (isSubmitted) return;
+    if (submit && !photoFile && !existingPhotoUrl) {
+      setError('Foto agenda liqo wajib diunggah');
+      toastError(new Error('Foto agenda liqo wajib diunggah'));
+      return;
+    }
 
     try {
       setLoading(true);
@@ -143,6 +186,17 @@ export default function IsiEvaluasiPage() {
           throw err;
         }
       }
+      if (photoFile) {
+        const optimized = await compressImage(photoFile);
+        const formData = new FormData();
+        formData.append('photo', optimized);
+        const uploaded = await api.post<ApiResponse<EvaluationItem>>(`/evaluations/${id}/photos`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        const url = uploaded.data.data.photoUrls?.[0];
+        setExistingPhotoUrl(url ? getMediaUrl(url) : null);
+        clearSelectedPhoto();
+      }
       if (submit) {
         await api.post(`/evaluations/${id}/submit`);
         await invalidateEvaluationQueries(queryClient);
@@ -159,6 +213,34 @@ export default function IsiEvaluasiPage() {
           'Gagal menyimpan',
       );
       toastError(err, 'Gagal menyimpan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const replaceSubmittedPhoto = async () => {
+    if (!evalId || !photoFile) return;
+    try {
+      setLoading(true);
+      setError('');
+      const optimized = await compressImage(photoFile);
+      const formData = new FormData();
+      formData.append('photo', optimized);
+      const uploaded = await api.post<ApiResponse<EvaluationItem>>(`/evaluations/${evalId}/photos`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const url = uploaded.data.data.photoUrls?.[0];
+      setExistingPhotoUrl(url ? getMediaUrl(url) : null);
+      clearSelectedPhoto();
+      await invalidateEvaluationQueries(queryClient);
+      toastSuccess('Foto agenda berhasil diperbarui');
+    } catch (err: unknown) {
+      setError(
+        (err as Error)?.message ||
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Gagal memperbarui foto',
+      );
+      toastError(err, 'Gagal memperbarui foto');
     } finally {
       setLoading(false);
     }
@@ -186,7 +268,7 @@ export default function IsiEvaluasiPage() {
             Lihat detail
           </Link>
           <p className="mt-2 text-emerald-900/80">
-            Untuk isi pekan berikutnya, ubah tanggal pekan di bawah (mis. pekan {formatWeekRange(todayMax)}).
+            Kehadiran dan catatan tidak bisa diubah. Foto agenda liqo masih bisa diganti di bawah.
           </p>
         </div>
       )}
@@ -267,6 +349,48 @@ export default function IsiEvaluasiPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Opsional"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Foto agenda liqo</Label>
+                <p className="text-xs text-muted-foreground">
+                  Wajib 1 foto saat evaluasi dikirim. Foto tetap bisa diganti setelah terkirim, dan dipakai untuk poster laporan kegiatan.
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+                />
+                {photoPreview || existingPhotoUrl ? (
+                  <img
+                    src={photoPreview || existingPhotoUrl || ''}
+                    alt="Foto agenda liqo"
+                    className="max-h-64 w-full rounded-2xl object-cover"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-10 text-muted-foreground"
+                  >
+                    <Camera className="h-8 w-8" />
+                    <span className="text-sm font-medium">Pilih 1 foto</span>
+                  </button>
+                )}
+                {(photoPreview || existingPhotoUrl) && (
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button type="button" variant="outline" className="flex-1" onClick={() => fileRef.current?.click()}>
+                      Ganti foto
+                    </Button>
+                    {isSubmitted && photoFile && (
+                      <Button type="button" className="flex-1" disabled={loading} onClick={replaceSubmittedPhoto}>
+                        Simpan foto
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

@@ -281,7 +281,14 @@ export default function SchoolDetailPage() {
         </section>
 
         <section className="space-y-3">
-          <AppSectionHeader title="Riwayat evaluasi PGM" />
+          <AppSectionHeader
+            title="Riwayat evaluasi PGM"
+            action={
+              <Link to={`/laporan?schoolId=${school.id}`} className="text-xs font-medium text-primary hover:underline">
+                Poster A4
+              </Link>
+            }
+          />
           <EvaluationInfiniteList
             queryKey={['evaluations', 'school', id]}
             params={{ schoolId: id }}

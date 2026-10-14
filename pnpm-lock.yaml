@@ -26,6 +26,9 @@ importers:
       '@dakwah/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@fontsource/alex-brush':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource/inter':
         specifier: ^5.2.5
         version: 5.3.0
@@ -768,6 +771,9 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
+
+  '@fontsource/alex-brush@5.3.0':
+    resolution: {integrity: sha512-n3m2aZxsc8r748fBiYqfiVJ5l5iJe7ui5KPh2oBz07jsbr7zKynZ6F5MgXbR1iV8J0hPetmp6g5OwKYRZCDUcw==}
 
   '@fontsource/inter@5.3.0':
     resolution: {integrity: sha512-RofMylZmjlJEfELXeNHFWBRcSs75rGU/6bV2S2jfnvv/3rPXPGe0LgUJTklcHZ9lM4OZmAVFhcJPnACfb91A3g==}
@@ -3007,6 +3013,8 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
 
   '@floating-ui/utils@0.2.11': {}
+
+  '@fontsource/alex-brush@5.3.0': {}
 
   '@fontsource/inter@5.3.0': {}
 

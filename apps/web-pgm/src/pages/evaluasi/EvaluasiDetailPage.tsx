@@ -1,15 +1,19 @@
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import { api, type ApiResponse } from '@/lib/api';
+import { invalidateEvaluationQueries } from '@/lib/queryInvalidation';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
-import { formatWeekRange, toWeekDateParam } from '@/lib/utils';
+import { compressImage, isImageFile } from '@/lib/compressImage';
+import { formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
+import { toastError, toastSuccess } from '@/lib/toast';
 import type { EvaluationItem } from '@/lib/types';
 
 const statusLabel: Record<string, string> = {
@@ -23,8 +27,12 @@ export default function EvaluasiDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const role = useActiveRole() || '';
+  const queryClient = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [replacingPhoto, setReplacingPhoto] = useState(false);
   const canEditMutabaah =
     role === 'PEMBINA' || role === 'PJ_SEKOLAH' || role === 'ADMIN' || role === 'SUPERADMIN';
+  const canReplacePhoto = role === 'PEMBINA';
 
   const { data, isLoading, isError, error } = useQuery<EvaluationItem>({
     queryKey: ['evaluation', id],
@@ -60,10 +68,67 @@ export default function EvaluasiDetailPage() {
 
   const group = data.group ?? { id: '', name: 'Evaluasi' };
   const attendances = data.attendances ?? [];
+  const photos = (data.photoUrls ?? []).map((url) => getMediaUrl(url)).filter((url): url is string => !!url);
+
+  const replacePhoto = async (file: File | null) => {
+    if (!id || !file) return;
+    if (!isImageFile(file)) {
+      toastError(new Error('File harus berupa gambar'));
+      return;
+    }
+    try {
+      setReplacingPhoto(true);
+      const optimized = await compressImage(file);
+      const formData = new FormData();
+      formData.append('photo', optimized);
+      await api.post(`/evaluations/${id}/photos`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      await invalidateEvaluationQueries(queryClient);
+      toastSuccess('Foto agenda berhasil diperbarui');
+    } catch (err) {
+      toastError(err, 'Gagal memperbarui foto');
+    } finally {
+      setReplacingPhoto(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
 
   return (
     <PageContainer>
       <PageHeader title={group.name} description={`Pekan ${formatWeekRange(data.weekDate)}`} />
+
+      <div className="mb-4 space-y-2">
+        <p className="text-sm font-medium">Foto agenda liqo</p>
+        {photos.length > 0 ? (
+          <div className={photos.length > 1 ? 'grid grid-cols-2 gap-2' : ''}>
+            {photos.map((src) => (
+              <img key={src} src={src} alt="Foto agenda liqo" className="max-h-80 w-full rounded-2xl object-cover" />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Belum ada foto agenda.</p>
+        )}
+        {canReplacePhoto && (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => replacePhoto(e.target.files?.[0] ?? null)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={replacingPhoto}
+              onClick={() => fileRef.current?.click()}
+            >
+              {replacingPhoto ? 'Menyimpan foto...' : photos.length ? 'Ganti foto' : 'Unggah foto'}
+            </Button>
+          </>
+        )}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

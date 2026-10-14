@@ -15,6 +15,7 @@ import {
   User,
   BarChart3,
   LayoutGrid,
+  Images,
   BookHeart,
   ListChecks,
   MessageSquareText,
@@ -40,6 +41,7 @@ const navByRole: Record<string, NavItem[]> = {
   SUPERADMIN: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
     { href: '/schools', label: 'PGM', icon: School },
+    { href: '/laporan', label: 'Laporan', icon: Images },
     { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
     { href: '/users', label: 'Pengguna', icon: Users },
     { href: '/invitations', label: 'Undangan', icon: Mail },
@@ -54,6 +56,7 @@ const navByRole: Record<string, NavItem[]> = {
   ADMIN: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
     { href: '/schools', label: 'PGM', icon: School },
+    { href: '/laporan', label: 'Laporan', icon: Images },
     { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
     { href: '/events', label: 'Agenda', icon: Calendar },
     { href: '/materi', label: 'Materi', icon: BookOpen },
@@ -66,6 +69,7 @@ const navByRole: Record<string, NavItem[]> = {
   PJ_SEKOLAH: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
     { href: '/schools', label: 'PGM', icon: School },
+    { href: '/laporan', label: 'Laporan', icon: Images },
     { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
     { href: '/pembina', label: 'Pembina', icon: Users },
     { href: '/config/ic', label: 'Indikator Capaian', icon: ListChecks },

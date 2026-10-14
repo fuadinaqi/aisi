@@ -109,6 +109,62 @@ func TestPutDeleteLocal(t *testing.T) {
 	}
 }
 
+func TestOpenEvaluationPhoto(t *testing.T) {
+	dir := t.TempDir()
+	s := &Storage{localDir: dir}
+	path := filepath.Join(dir, "evaluations")
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte("foto-agenda")
+	if err := os.WriteFile(filepath.Join(path, "photo.jpg"), body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rc, ct, err := s.Open(context.Background(), "/uploads/evaluations/photo.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rc.Close()
+	if ct != "image/jpeg" {
+		t.Fatalf("content type %s", ct)
+	}
+	got, err := ioReadAll(rc)
+	if err != nil || string(got) != string(body) {
+		t.Fatalf("body %q err %v", got, err)
+	}
+	if _, _, err := s.Open(context.Background(), "/uploads/events/a.jpg"); err == nil {
+		t.Fatal("expected reject outside evaluations/")
+	}
+	if _, _, err := s.OpenTemplate(context.Background(), "/uploads/evaluations/photo.jpg"); err == nil {
+		t.Fatal("expected template opener to reject evaluations/")
+	}
+}
+
+func TestOpenTemplate(t *testing.T) {
+	dir := t.TempDir()
+	s := &Storage{localDir: dir}
+	path := filepath.Join(dir, "templates")
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte("template-pgm")
+	if err := os.WriteFile(filepath.Join(path, "a4.png"), body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rc, ct, err := s.OpenTemplate(context.Background(), "/uploads/templates/a4.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rc.Close()
+	if ct != "image/png" {
+		t.Fatalf("content type %s", ct)
+	}
+	got, err := ioReadAll(rc)
+	if err != nil || string(got) != string(body) {
+		t.Fatalf("body %q err %v", got, err)
+	}
+}
+
 func ioReadAll(r interface{ Read([]byte) (int, error) }) ([]byte, error) {
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r)

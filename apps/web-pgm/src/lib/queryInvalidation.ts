@@ -11,6 +11,7 @@ export async function invalidateDashboardQueries(queryClient: QueryClient) {
 /** Invalidate daftar & turunan evaluasi setelah create/update/submit. */
 export async function invalidateEvaluationQueries(queryClient: QueryClient) {
   await queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+  await queryClient.invalidateQueries({ queryKey: ['evaluation'] });
   await invalidateDashboardQueries(queryClient);
 }
 

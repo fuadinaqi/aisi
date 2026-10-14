@@ -119,11 +119,12 @@ model School {
   id        String   @id @default(cuid())
   name      String   @unique
   city      String   @default("Depok")
-  address   String?
-  mapsUrl   String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  address     String?
+  mapsUrl     String?
+  templateUrl String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   users      UserSchool[]
   groups     Group[]
