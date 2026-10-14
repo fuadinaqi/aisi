@@ -17,6 +17,7 @@ import type { EvaluationItem, GroupItem } from '@/lib/types';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
 
 const STATUSES = ['HADIR', 'IZIN', 'SAKIT', 'TIDAK_HADIR'] as const;
 const statusLabels: Record<string, string> = {
@@ -201,9 +202,9 @@ export default function IsiEvaluasiPage() {
       }
       if (submit && !alreadySubmitted) {
         await api.post(`/evaluations/${id}/submit`);
+        setIsSubmitted(true);
         await invalidateEvaluationQueries(queryClient);
-        toastSuccess('Evaluasi berhasil dikirim');
-        navigate('/evaluasi');
+        toastSuccess('Evaluasi berhasil dikirim', 'Bagikan laporan ke grup.');
       } else {
         await invalidateEvaluationQueries(queryClient);
         toastSuccess(alreadySubmitted ? 'Evaluasi berhasil diperbarui' : 'Berhasil disimpan');
@@ -229,6 +230,7 @@ export default function IsiEvaluasiPage() {
   };
 
   const isEditing = !!evalId && !isSubmitted;
+  const groupName = groups?.find((group) => group.id === groupId)?.name ?? 'Kelompok';
 
   return (
     <PageContainer className="max-w-2xl">
@@ -375,9 +377,18 @@ export default function IsiEvaluasiPage() {
           )}
 
           {isSubmitted ? (
-            <Button onClick={() => save(false)} disabled={loading || evalLoading} className="w-full">
-              Simpan perubahan
-            </Button>
+            <div className="flex flex-col gap-2">
+              <ShareLiqoReportButton
+                className="w-full"
+                groupName={groupName}
+                weekDate={weekDate}
+                notes={notes}
+                attendances={attendances.map(({ name, status }) => ({ name, status }))}
+              />
+              <Button onClick={() => save(false)} disabled={loading || evalLoading} variant="outline" className="w-full">
+                Simpan perubahan
+              </Button>
+            </div>
           ) : (
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button

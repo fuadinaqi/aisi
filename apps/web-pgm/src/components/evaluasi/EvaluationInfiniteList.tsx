@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api, type ApiResponse } from '@/lib/api';
+import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Card } from '@/components/ui/card';
 import { formatDate, toDateInputValue } from '@/lib/utils';
@@ -100,27 +101,38 @@ export function EvaluationInfiniteList({
             const href = `/evaluasi/isi?groupId=${e.group?.id ?? ''}&weekDate=${toDateInputValue(new Date(e.weekDate))}`;
 
             return (
-              <Link
-                key={e.id}
-                to={href}
-                className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-muted/30"
-              >
-                <div>
+              <div key={e.id} className="flex items-center justify-between gap-3 px-5 py-4">
+                <Link to={href} className="min-w-0 flex-1 transition-colors hover:opacity-80">
                   {showGroupName && <p className="font-medium">{e.group?.name ?? '-'}</p>}
                   <p className={`text-sm text-muted-foreground ${showGroupName ? '' : 'font-medium text-foreground'}`}>
                     Pekan {formatDate(e.weekDate)}
                   </p>
+                </Link>
+                <div className="flex shrink-0 items-center gap-2">
+                  {e.isSubmitted && (
+                    <ShareLiqoReportButton
+                      compact
+                      groupName={e.group?.name ?? 'Kelompok'}
+                      weekDate={e.weekDate}
+                      notes={e.notes}
+                      attendances={(e.attendances ?? []).map((att) => ({
+                        name: att.user?.name ?? '',
+                        status: att.status,
+                      }))}
+                    />
+                  )}
+                  <Link
+                    to={href}
+                    className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                      e.isSubmitted
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-amber-50 text-amber-800'
+                    }`}
+                  >
+                    {e.isSubmitted ? 'Terkirim · Edit' : 'Draft · Edit'}
+                  </Link>
                 </div>
-                <span
-                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${
-                    e.isSubmitted
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-amber-50 text-amber-800'
-                  }`}
-                >
-                  {e.isSubmitted ? 'Terkirim · Edit' : 'Draft · Edit'}
-                </span>
-              </Link>
+              </div>
             );
           })}
         </div>

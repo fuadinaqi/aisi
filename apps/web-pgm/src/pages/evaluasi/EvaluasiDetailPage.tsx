@@ -14,6 +14,7 @@ import { compressImage, isImageFile } from '@/lib/compressImage';
 import { formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
 import type { EvaluationItem } from '@/lib/types';
 
 const statusLabel: Record<string, string> = {
@@ -122,6 +123,19 @@ export default function EvaluasiDetailPage() {
           ) : undefined
         }
       />
+
+      {data.isSubmitted && (
+        <ShareLiqoReportButton
+          className="w-full sm:w-auto"
+          groupName={group.name}
+          weekDate={data.weekDate}
+          notes={data.notes}
+          attendances={attendances.map((att) => ({
+            name: att.user?.name ?? '',
+            status: att.status,
+          }))}
+        />
+      )}
 
       <div className="mb-4 space-y-2">
         <p className="text-sm font-medium">Foto agenda liqo</p>
