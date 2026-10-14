@@ -18,6 +18,7 @@ import { toastError, toastSuccess } from '@/lib/toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
+import { SquarePhotoCropDialog } from '@/components/evaluasi/SquarePhotoCropDialog';
 
 const STATUSES = ['HADIR', 'IZIN', 'SAKIT', 'TIDAK_HADIR'] as const;
 const statusLabels: Record<string, string> = {
@@ -46,6 +47,7 @@ export default function IsiEvaluasiPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [cropSource, setCropSource] = useState<File | null>(null);
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<string | null>(null);
@@ -73,15 +75,22 @@ export default function IsiEvaluasiPage() {
     if (fileRef.current) fileRef.current.value = '';
   }, []);
 
-  const pickPhoto = (file: File | null) => {
-    if (file && !isImageFile(file)) {
+  const openCrop = (file: File | null) => {
+    if (fileRef.current) fileRef.current.value = '';
+    if (!file) return;
+    if (!isImageFile(file)) {
       setError('File harus berupa gambar');
       return;
     }
     setError('');
+    setCropSource(file);
+  };
+
+  const applyCroppedPhoto = (file: File) => {
+    setCropSource(null);
     setPhotoFile(file);
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-    const next = file ? URL.createObjectURL(file) : null;
+    const next = URL.createObjectURL(file);
     previewRef.current = next;
     setPhotoPreview(next);
   };
@@ -336,20 +345,20 @@ export default function IsiEvaluasiPage() {
               <div className="space-y-2">
                 <Label>Foto agenda liqo</Label>
                 <p className="text-xs text-muted-foreground">
-                  Wajib 1 foto saat evaluasi dikirim. Foto bisa diganti kapan saja, dan dipakai untuk poster laporan kegiatan.
+                  Wajib 1 foto saat evaluasi dikirim. Foto dipotong persegi supaya rapi di poster laporan, dan bisa diganti kapan saja.
                 </p>
                 <input
                   ref={fileRef}
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+                  onChange={(e) => openCrop(e.target.files?.[0] ?? null)}
                 />
                 {photoPreview || existingPhotoUrl ? (
                   <img
                     src={photoPreview || existingPhotoUrl || ''}
                     alt="Foto agenda liqo"
-                    className="max-h-64 w-full rounded-2xl object-cover"
+                    className="mx-auto aspect-square w-full max-w-xs rounded-2xl bg-muted object-contain"
                   />
                 ) : (
                   <button
@@ -417,6 +426,13 @@ export default function IsiEvaluasiPage() {
           )}
         </CardContent>
       </Card>
+      {cropSource && (
+        <SquarePhotoCropDialog
+          file={cropSource}
+          onCancel={() => setCropSource(null)}
+          onConfirm={applyCroppedPhoto}
+        />
+      )}
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}

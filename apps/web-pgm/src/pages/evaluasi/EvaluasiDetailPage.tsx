@@ -15,6 +15,7 @@ import { formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
+import { SquarePhotoCropDialog } from '@/components/evaluasi/SquarePhotoCropDialog';
 import type { EvaluationItem } from '@/lib/types';
 
 const statusLabel: Record<string, string> = {
@@ -33,6 +34,7 @@ export default function EvaluasiDetailPage() {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [replacingPhoto, setReplacingPhoto] = useState(false);
+  const [cropSource, setCropSource] = useState<File | null>(null);
   const canEditMutabaah =
     role === 'PEMBINA' || role === 'PJ_SEKOLAH' || role === 'ADMIN' || role === 'SUPERADMIN';
   const canReplacePhoto = role === 'PEMBINA';
@@ -142,7 +144,12 @@ export default function EvaluasiDetailPage() {
         {photos.length > 0 ? (
           <div className={photos.length > 1 ? 'grid grid-cols-2 gap-2' : ''}>
             {photos.map((src) => (
-              <img key={src} src={src} alt="Foto agenda liqo" className="max-h-80 w-full rounded-2xl object-cover" />
+              <img
+                key={src}
+                src={src}
+                alt="Foto agenda liqo"
+                className="aspect-square w-full rounded-2xl bg-muted object-contain"
+              />
             ))}
           </div>
         ) : (
@@ -155,7 +162,16 @@ export default function EvaluasiDetailPage() {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => replacePhoto(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (fileRef.current) fileRef.current.value = '';
+                if (!file) return;
+                if (!isImageFile(file)) {
+                  toastError(new Error('File harus berupa gambar'));
+                  return;
+                }
+                setCropSource(file);
+              }}
             />
             <Button
               type="button"
@@ -235,6 +251,16 @@ export default function EvaluasiDetailPage() {
           </CardContent>
         </Card>
       </div>
+      {cropSource && (
+        <SquarePhotoCropDialog
+          file={cropSource}
+          onCancel={() => setCropSource(null)}
+          onConfirm={(cropped) => {
+            setCropSource(null);
+            void replacePhoto(cropped);
+          }}
+        />
+      )}
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
