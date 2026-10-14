@@ -7,6 +7,7 @@ import { api, type ApiResponse } from '@/lib/api';
 import { PageContainer, PageHeader } from '@/components/layout/PageShell';
 import { LoadingSkeleton } from '@/components/shared/Badges';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import { formatWeekRange, toWeekDateParam } from '@/lib/utils';
@@ -63,7 +64,19 @@ export default function EvaluasiDetailPage() {
 
   return (
     <PageContainer>
-      <PageHeader title={group.name} description={`Pekan ${formatWeekRange(data.weekDate)}`} />
+      <PageHeader
+        title={group.name}
+        description={`Pekan ${formatWeekRange(data.weekDate)}`}
+        action={
+          role === 'PEMBINA' ? (
+            <Button asChild size="sm" variant="outline">
+              <Link to={`/evaluasi/isi?groupId=${group.id}&weekDate=${toWeekDateParam(data.weekDate)}`}>
+                Edit evaluasi
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

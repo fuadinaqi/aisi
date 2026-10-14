@@ -96,7 +96,19 @@ export default function EvaluasiDetailPage() {
 
   return (
     <PageContainer>
-      <PageHeader title={group.name} description={`Pekan ${formatWeekRange(data.weekDate)}`} />
+      <PageHeader
+        title={group.name}
+        description={`Pekan ${formatWeekRange(data.weekDate)}`}
+        action={
+          role === 'PEMBINA' ? (
+            <Button asChild size="sm" variant="outline">
+              <Link to={`/evaluasi/isi?groupId=${group.id}&weekDate=${toWeekDateParam(data.weekDate)}`}>
+                Edit evaluasi
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
       <div className="mb-4 space-y-2">
         <p className="text-sm font-medium">Foto agenda liqo</p>

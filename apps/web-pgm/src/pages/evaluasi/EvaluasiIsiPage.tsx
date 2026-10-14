@@ -150,8 +150,8 @@ export default function IsiEvaluasiPage() {
   };
 
   const save = async (submit = false) => {
-    if (isSubmitted) return;
-    if (submit && !photoFile && !existingPhotoUrl) {
+    const alreadySubmitted = isSubmitted;
+    if (submit && !alreadySubmitted && !photoFile && !existingPhotoUrl) {
       setError('Foto agenda liqo wajib diunggah');
       toastError(new Error('Foto agenda liqo wajib diunggah'));
       return;
@@ -197,14 +197,14 @@ export default function IsiEvaluasiPage() {
         setExistingPhotoUrl(url ? getMediaUrl(url) : null);
         clearSelectedPhoto();
       }
-      if (submit) {
+      if (submit && !alreadySubmitted) {
         await api.post(`/evaluations/${id}/submit`);
         await invalidateEvaluationQueries(queryClient);
         toastSuccess('Evaluasi berhasil dikirim');
         navigate('/evaluasi');
       } else {
         await invalidateEvaluationQueries(queryClient);
-        toastSuccess('Berhasil disimpan');
+        toastSuccess(alreadySubmitted ? 'Evaluasi berhasil diperbarui' : 'Berhasil disimpan');
       }
     } catch (err: unknown) {
       setError(
@@ -218,43 +218,15 @@ export default function IsiEvaluasiPage() {
     }
   };
 
-  const replaceSubmittedPhoto = async () => {
-    if (!evalId || !photoFile) return;
-    try {
-      setLoading(true);
-      setError('');
-      const optimized = await compressImage(photoFile);
-      const formData = new FormData();
-      formData.append('photo', optimized);
-      const uploaded = await api.post<ApiResponse<EvaluationItem>>(`/evaluations/${evalId}/photos`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      const url = uploaded.data.data.photoUrls?.[0];
-      setExistingPhotoUrl(url ? getMediaUrl(url) : null);
-      clearSelectedPhoto();
-      await invalidateEvaluationQueries(queryClient);
-      toastSuccess('Foto agenda berhasil diperbarui');
-    } catch (err: unknown) {
-      setError(
-        (err as Error)?.message ||
-          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-          'Gagal memperbarui foto',
-      );
-      toastError(err, 'Gagal memperbarui foto');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const isEditing = !!evalId && !isSubmitted;
 
   return (
     <PageContainer className="max-w-2xl">
       <PageHeader
-        title={isSubmitted ? 'Evaluasi pekan ini' : isEditing ? 'Edit evaluasi' : 'Isi evaluasi'}
+        title={evalId ? 'Edit evaluasi' : 'Isi evaluasi'}
         description={
           isSubmitted
-            ? 'Evaluasi pekan ini sudah dikirim'
+            ? 'Perbaiki kehadiran, catatan, dan foto yang sudah dikirim'
             : isEditing
               ? 'Perbarui draft evaluasi pekan yang sama'
               : 'Catat kehadiran anggota untuk pekan ini'
@@ -263,13 +235,10 @@ export default function IsiEvaluasiPage() {
 
       {isSubmitted && (
         <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Evaluasi pekan {formatWeekRange(weekDate)} sudah dikirim dan tidak bisa diubah.{' '}
+          Evaluasi pekan {formatWeekRange(weekDate)} sudah dikirim. Kehadiran, catatan, dan foto masih bisa diperbaiki.{' '}
           <Link to={`/evaluasi/${evalId}`} className="font-medium underline">
             Lihat detail
           </Link>
-          <p className="mt-2 text-emerald-900/80">
-            Kehadiran dan catatan tidak bisa diubah. Foto agenda liqo masih bisa diganti di bawah.
-          </p>
         </div>
       )}
 
@@ -320,7 +289,6 @@ export default function IsiEvaluasiPage() {
                         <button
                           key={s}
                           type="button"
-                          disabled={isSubmitted}
                           onClick={() =>
                             setAttendances((prev) =>
                               prev.map((a, j) => (j === i ? { ...a, status: s } : a)),
@@ -346,7 +314,6 @@ export default function IsiEvaluasiPage() {
                 <textarea
                   id="notes"
                   value={notes}
-                  disabled={isSubmitted}
                   rows={4}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Opsional"
@@ -357,7 +324,7 @@ export default function IsiEvaluasiPage() {
               <div className="space-y-2">
                 <Label>Foto agenda liqo</Label>
                 <p className="text-xs text-muted-foreground">
-                  Wajib 1 foto saat evaluasi dikirim. Foto tetap bisa diganti setelah terkirim, dan dipakai untuk poster laporan kegiatan.
+                  Wajib 1 foto saat evaluasi dikirim. Foto bisa diganti kapan saja, dan dipakai untuk poster laporan kegiatan.
                 </p>
                 <input
                   ref={fileRef}
@@ -383,16 +350,9 @@ export default function IsiEvaluasiPage() {
                   </button>
                 )}
                 {(photoPreview || existingPhotoUrl) && (
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button type="button" variant="outline" className="flex-1" onClick={() => fileRef.current?.click()}>
-                      Ganti foto
-                    </Button>
-                    {isSubmitted && photoFile && (
-                      <Button type="button" className="flex-1" disabled={loading} onClick={replaceSubmittedPhoto}>
-                        Simpan foto
-                      </Button>
-                    )}
-                  </div>
+                  <Button type="button" variant="outline" className="w-full" onClick={() => fileRef.current?.click()}>
+                    Ganti foto
+                  </Button>
                 )}
               </div>
             </>
@@ -404,7 +364,11 @@ export default function IsiEvaluasiPage() {
             </div>
           )}
 
-          {!isSubmitted && (
+          {isSubmitted ? (
+            <Button onClick={() => save(false)} disabled={loading || evalLoading} className="w-full">
+              Simpan perubahan
+            </Button>
+          ) : (
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 onClick={() => save(false)}

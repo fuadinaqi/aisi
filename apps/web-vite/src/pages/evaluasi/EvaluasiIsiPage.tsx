@@ -112,7 +112,7 @@ export default function IsiEvaluasiPage() {
   };
 
   const save = async (submit = false) => {
-    if (isSubmitted) return;
+    const alreadySubmitted = isSubmitted;
 
     try {
       setLoading(true);
@@ -143,14 +143,14 @@ export default function IsiEvaluasiPage() {
           throw err;
         }
       }
-      if (submit) {
+      if (submit && !alreadySubmitted) {
         await api.post(`/evaluations/${id}/submit`);
         await invalidateEvaluationQueries(queryClient);
         toastSuccess('Evaluasi berhasil dikirim');
         navigate('/evaluasi');
       } else {
         await invalidateEvaluationQueries(queryClient);
-        toastSuccess('Berhasil disimpan');
+        toastSuccess(alreadySubmitted ? 'Evaluasi berhasil diperbarui' : 'Berhasil disimpan');
       }
     } catch (err: unknown) {
       setError(
@@ -169,10 +169,10 @@ export default function IsiEvaluasiPage() {
   return (
     <PageContainer className="max-w-2xl">
       <PageHeader
-        title={isSubmitted ? 'Evaluasi pekan ini' : isEditing ? 'Edit evaluasi' : 'Isi evaluasi'}
+        title={evalId ? 'Edit evaluasi' : 'Isi evaluasi'}
         description={
           isSubmitted
-            ? 'Evaluasi pekan ini sudah dikirim'
+            ? 'Perbaiki kehadiran dan catatan yang sudah dikirim'
             : isEditing
               ? 'Perbarui draft evaluasi pekan yang sama'
               : 'Catat kehadiran anggota untuk pekan ini'
@@ -181,13 +181,10 @@ export default function IsiEvaluasiPage() {
 
       {isSubmitted && (
         <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Evaluasi pekan {formatWeekRange(weekDate)} sudah dikirim dan tidak bisa diubah.{' '}
+          Evaluasi pekan {formatWeekRange(weekDate)} sudah dikirim. Kehadiran dan catatan masih bisa diperbaiki.{' '}
           <Link to={`/evaluasi/${evalId}`} className="font-medium underline">
             Lihat detail
           </Link>
-          <p className="mt-2 text-emerald-900/80">
-            Untuk isi pekan berikutnya, ubah tanggal pekan di bawah (mis. pekan {formatWeekRange(todayMax)}).
-          </p>
         </div>
       )}
 
@@ -238,7 +235,6 @@ export default function IsiEvaluasiPage() {
                         <button
                           key={s}
                           type="button"
-                          disabled={isSubmitted}
                           onClick={() =>
                             setAttendances((prev) =>
                               prev.map((a, j) => (j === i ? { ...a, status: s } : a)),
@@ -264,7 +260,6 @@ export default function IsiEvaluasiPage() {
                 <textarea
                   id="notes"
                   value={notes}
-                  disabled={isSubmitted}
                   rows={4}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Opsional"
@@ -280,7 +275,11 @@ export default function IsiEvaluasiPage() {
             </div>
           )}
 
-          {!isSubmitted && (
+          {isSubmitted ? (
+            <Button onClick={() => save(false)} disabled={loading || evalLoading} className="w-full">
+              Simpan perubahan
+            </Button>
+          ) : (
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 onClick={() => save(false)}

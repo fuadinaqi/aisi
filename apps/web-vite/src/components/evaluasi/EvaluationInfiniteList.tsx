@@ -97,9 +97,7 @@ export function EvaluationInfiniteList({
       <Card className="overflow-hidden">
         <div className="divide-y">
           {evaluations.map((e) => {
-            const href = e.isSubmitted
-              ? `/evaluasi/${e.id}`
-              : `/evaluasi/isi?groupId=${e.group?.id ?? ''}&weekDate=${toDateInputValue(new Date(e.weekDate))}`;
+            const href = `/evaluasi/isi?groupId=${e.group?.id ?? ''}&weekDate=${toDateInputValue(new Date(e.weekDate))}`;
 
             return (
               <Link
@@ -120,7 +118,7 @@ export function EvaluationInfiniteList({
                       : 'bg-amber-50 text-amber-800'
                   }`}
                 >
-                  {e.isSubmitted ? 'Terkirim' : 'Draft · Edit'}
+                  {e.isSubmitted ? 'Terkirim · Edit' : 'Draft · Edit'}
                 </span>
               </Link>
             );

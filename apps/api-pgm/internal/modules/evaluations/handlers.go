@@ -280,14 +280,13 @@ func update(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		var gid string
-		var submitted bool
-		err := db.QueryRow(r.Context(), `SELECT "groupId","isSubmitted" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &submitted)
+		err := db.QueryRow(r.Context(), `SELECT "groupId" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid)
 		if err == pgx.ErrNoRows {
 			httpx.Error(w, 404, "Evaluasi tidak ditemukan")
 			return
 		}
-		if submitted {
-			httpx.Error(w, 400, "Evaluasi sudah disubmit, tidak bisa diubah")
+		if err != nil {
+			httpx.Error(w, 500, "Gagal memuat evaluasi")
 			return
 		}
 		if !canPembina(r, db, gid) {
