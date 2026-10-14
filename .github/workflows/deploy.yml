@@ -12,7 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Versi pnpm diambil dari package.json#packageManager (jangan set "version" di sini)
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -23,7 +22,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-          cache-dependency-path: apps/api-go/go.sum
+          cache-dependency-path: apps/**/go.sum
 
       - run: pnpm install
 
@@ -31,14 +30,23 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
 
+      - name: Generate Prisma client PGM
+        run: pnpm --filter @dakwah/shared-pgm db:generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/pgm_db
+
       - name: Build shared
         run: pnpm --filter @dakwah/shared build
 
       - name: Build Vite SPA
         run: pnpm --filter @dakwah/web-vite build
         env:
-          # CI compile-only; nilai produksi di-set di apps/web-vite/.env di VPS
           VITE_API_URL: https://api.binaisi.xyz/api/v1
+
+      - name: Build Vite PGM
+        run: pnpm --filter @dakwah/web-pgm build
+        env:
+          VITE_API_URL: https://api-pgm.binaisi.xyz/api/v1
 
       - name: Build Go API
         working-directory: apps/api-go
@@ -46,12 +54,48 @@ jobs:
           mkdir -p bin
           go build -o bin/aisi-api ./cmd/server
 
+      - name: Build Go API PGM
+        working-directory: apps/api-pgm
+        run: |
+          mkdir -p bin
+          go build -o bin/pgm-api ./cmd/server
+
   deploy:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to VPS
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            aisi:
+              - 'apps/api-go/**'
+              - 'apps/web-vite/**'
+              - 'packages/shared/**'
+              - 'deploy/deploy.sh'
+              - 'deploy/nginx.conf'
+              - 'deploy/backup-db.sh'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/workflows/deploy.yml'
+            pgm:
+              - 'apps/api-pgm/**'
+              - 'apps/web-pgm/**'
+              - 'packages/shared-pgm/**'
+              - 'packages/shared/src/**'
+              - 'deploy/deploy-pgm.sh'
+              - 'deploy/nginx-pgm.conf'
+              - 'ecosystem.pgm.config.js'
+              - 'pnpm-lock.yaml'
+
+      - name: Deploy AISI to VPS
+        if: steps.filter.outputs.aisi == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -61,7 +105,6 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/aisi
-            # Pastikan .git writable (clone sebagai root sering sisakan file milik root)
             if ! touch .git/objects/.ci_write_test 2>/dev/null; then
               echo "ERROR: $(whoami) tidak bisa menulis .git/objects"
               echo "Di VPS (sebagai root) jalankan:"
@@ -78,3 +121,35 @@ jobs:
             set +a
             bash deploy/deploy.sh
             curl -sf http://127.0.0.1:4000/health
+
+      - name: Deploy PGM to VPS
+        if: steps.filter.outputs.pgm == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            cd /opt/aisi
+            if ! touch .git/objects/.ci_write_test 2>/dev/null; then
+              echo "ERROR: $(whoami) tidak bisa menulis .git/objects"
+              echo "Di VPS (sebagai root) jalankan:"
+              echo "  chown -R deploy:deploy /opt/aisi"
+              ls -la .git .git/objects | head -20 || true
+              exit 1
+            fi
+            rm -f .git/objects/.ci_write_test
+            git fetch origin main
+            git reset --hard origin/main
+            if [[ ! -f apps/api-pgm/.env ]]; then
+              echo "SKIP: apps/api-pgm/.env belum ada. Pasang env dan nginx sekali, lalu jalankan deploy/deploy-pgm.sh."
+              exit 0
+            fi
+            set -a
+            # shellcheck disable=SC1091
+            source apps/api-pgm/.env
+            set +a
+            bash deploy/deploy-pgm.sh
+            curl -sf http://127.0.0.1:4001/health

@@ -14,5 +14,10 @@ test-results
 blob-report
 .playwright
 apps/api-go/bin/
+apps/api-pgm/bin/
+apps/api-pgm/*.err
+apps/api-pgm/*.out
+apps/web-pgm/*.tsbuildinfo
+packages/shared-pgm/src/generated
 *.exe
 

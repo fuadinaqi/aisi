@@ -1,0 +1,302 @@
+package invitations
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/config"
+	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/domain/constants"
+	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/email"
+	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/middleware"
+	httpx "github.com/dakwah-depok/aisi/apps/api-pgm/internal/response"
+	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/validate"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type Handler struct {
+	DB     *pgxpool.Pool
+	Config config.Config
+}
+type request struct {
+	Name, Email, Role         string
+	Gender, SchoolID, GroupID *string
+	Phone                     *string `json:"phone"`
+	AlsoAsPembina             *bool   `json:"alsoAsPembina"`
+}
+
+func optionalPhone(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*v)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func alsoAsPembina(v *bool) bool {
+	if v == nil {
+		return true
+	}
+	return *v
+}
+
+func (h Handler) Routes() chi.Router {
+	r := chi.NewRouter()
+	r.Use(middleware.RequireAuth(h.Config))
+	r.Post("/", h.create)
+	r.Get("/", h.list)
+	r.Post("/{id}/resend", h.resend)
+	r.Delete("/{id}", h.cancel)
+	return r
+}
+
+func admin(roles []string) bool {
+	for _, r := range roles {
+		if r == "ADMIN" || r == "SUPERADMIN" {
+			return true
+		}
+	}
+	return false
+}
+
+func (h Handler) assertSchoolAccess(r *http.Request, schoolID string) bool {
+	claims, _ := middleware.Claims(r)
+	if admin(claims.Roles) {
+		return true
+	}
+	var ok bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, claims.UserID, schoolID).Scan(&ok)
+	return ok
+}
+
+func (h Handler) assertGroupAccess(r *http.Request, groupID string) bool {
+	claims, _ := middleware.Claims(r)
+	if admin(claims.Roles) {
+		return true
+	}
+	var owner, school string
+	if h.DB.QueryRow(r.Context(), `SELECT "pembinaId","schoolId" FROM "Group" WHERE "id"=$1`, groupID).Scan(&owner, &school) != nil {
+		return false
+	}
+	if owner == claims.UserID {
+		return true
+	}
+	var ok bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, claims.UserID, school).Scan(&ok)
+	return ok
+}
+
+func (h Handler) create(w http.ResponseWriter, r *http.Request) {
+	var in request
+	if json.NewDecoder(r.Body).Decode(&in) != nil || len(in.Name) < 2 || !validRole(in.Role) {
+		httpx.Error(w, 400, "Data undangan tidak valid")
+		return
+	}
+	in.Email = validate.NormalizeEmail(in.Email)
+	if in.Email == "" {
+		httpx.Error(w, 400, "Data undangan tidak valid")
+		return
+	}
+	claims, _ := middleware.Claims(r)
+	if !constants.CanInvite(claims.Roles, in.Role) {
+		httpx.Error(w, 403, "Anda tidak berhak mengundang role ini")
+		return
+	}
+	if in.SchoolID != nil && *in.SchoolID != "" && !h.assertSchoolAccess(r, *in.SchoolID) {
+		httpx.Error(w, 403, "Akses PGM ditolak")
+		return
+	}
+	// Undangan anggota ke kelompok: gender diisi otomatis dari jenis kelompok.
+	if in.GroupID != nil && in.Role == "ANGGOTA" {
+		if !h.assertGroupAccess(r, *in.GroupID) {
+			httpx.Error(w, 403, "Akses kelompok ditolak")
+			return
+		}
+		var gender string
+		var active bool
+		if h.DB.QueryRow(r.Context(), `SELECT "gender"::text,"isActive" FROM "Group" WHERE "id"=$1`, *in.GroupID).Scan(&gender, &active) != nil || !active {
+			httpx.Error(w, 404, "Kelompok tidak ditemukan")
+			return
+		}
+		if in.Gender == nil || *in.Gender == "" {
+			in.Gender = &gender
+		}
+		if *in.Gender != gender {
+			httpx.Error(w, 400, "Jenis kelamin Anggota harus sesuai kelompok")
+			return
+		}
+	}
+	withPembina := (in.Role == "ADMIN" || in.Role == "PJ_SEKOLAH") && alsoAsPembina(in.AlsoAsPembina)
+	needsGender := in.Role == "PEMBINA" || in.Role == "ANGGOTA" || in.Role == "PJ_SEKOLAH" || withPembina
+	if needsGender && (in.Gender == nil || !validGender(*in.Gender)) {
+		httpx.Error(w, 400, "Jenis kelamin wajib dipilih")
+		return
+	}
+	if in.Role == "PJ_SEKOLAH" && (in.SchoolID == nil || *in.SchoolID == "") {
+		httpx.Error(w, 400, "PGM wajib dipilih untuk undangan ini")
+		return
+	}
+	if h.pendingInvitation(r, in.Email) {
+		httpx.Error(w, 400, "Email sudah memiliki undangan aktif")
+		return
+	}
+	existingUser := h.activeUser(r, in.Email)
+	schoolAttachOnly := false
+	if existingUser && h.userHasRole(r, in.Email, in.Role) {
+		// Pembina boleh di beberapa PGM: undang ulang = tautkan PGM baru.
+		if in.Role == "PEMBINA" && in.SchoolID != nil && *in.SchoolID != "" {
+			if h.userInSchool(r, in.Email, *in.SchoolID) {
+				httpx.Error(w, 400, "Pembina sudah terdaftar di PGM ini")
+				return
+			}
+			schoolAttachOnly = true
+		} else {
+			httpx.Error(w, 400, "User sudah memiliki role ini")
+			return
+		}
+	}
+	id, token := uuid.NewString(), uuid.NewString()
+	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
+	phone := optionalPhone(in.Phone)
+	_, err := h.DB.Exec(r.Context(), `INSERT INTO "UserInvitation" ("id","name","email","phone","role","alsoAsPembina","gender","schoolId","groupId","token","invitedById","expiresAt") VALUES ($1,$2,$3,$4,$5::"Role",$6,$7::"Gender",$8,$9,$10,$11,$12)`, id, in.Name, in.Email, phone, in.Role, withPembina, in.Gender, in.SchoolID, in.GroupID, token, claims.UserID, expires)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal membuat undangan")
+		return
+	}
+	link := h.Config.AppURL + "/set-password?token=" + token
+	if existingUser {
+		link = h.Config.AppURL + "/accept-role?token=" + token
+	}
+	if err := email.New(h.Config).SendInvitationWithKind(r.Context(), in.Email, in.Name, link, existingUser); err != nil {
+		httpx.Error(w, 502, "Undangan dibuat, namun email gagal dikirim")
+		return
+	}
+	msg := "Undangan berhasil dikirim"
+	if schoolAttachOnly {
+		msg = "Undangan penugasan pembina ke PGM berhasil dikirim"
+	} else if existingUser {
+		msg = "Undangan peran tambahan berhasil dikirim"
+	}
+	httpx.Success(w, 201, map[string]any{"id": id, "name": in.Name, "email": in.Email, "role": in.Role, "alsoAsPembina": withPembina, "gender": in.Gender, "schoolId": in.SchoolID, "groupId": in.GroupID, "status": "PENDING", "expiresAt": expires, "existingUser": existingUser, "schoolAttachOnly": schoolAttachOnly}, msg)
+}
+
+func (h Handler) list(w http.ResponseWriter, r *http.Request) {
+	claims, _ := middleware.Claims(r)
+	page, limit := pagination(r)
+	var total int
+	if h.DB.QueryRow(r.Context(), `SELECT count(*) FROM "UserInvitation" WHERE "invitedById"=$1`, claims.UserID).Scan(&total) != nil {
+		httpx.Error(w, 500, "Gagal mengambil undangan")
+		return
+	}
+	rows, err := h.DB.Query(r.Context(), `SELECT "id","name","email","role"::text,"alsoAsPembina","gender"::text,"schoolId","groupId","status"::text,"expiresAt","createdAt" FROM "UserInvitation" WHERE "invitedById"=$1 ORDER BY "createdAt" DESC OFFSET $2 LIMIT $3`, claims.UserID, (page-1)*limit, limit)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal mengambil undangan")
+		return
+	}
+	defer rows.Close()
+	items := []map[string]any{}
+	for rows.Next() {
+		var id, name, mail, role, status string
+		var alsoAsPembina bool
+		var gender, school, group *string
+		var expires, created time.Time
+		if rows.Scan(&id, &name, &mail, &role, &alsoAsPembina, &gender, &school, &group, &status, &expires, &created) == nil {
+			items = append(items, map[string]any{"id": id, "name": name, "email": mail, "role": role, "alsoAsPembina": alsoAsPembina, "gender": gender, "schoolId": school, "groupId": group, "status": status, "expiresAt": expires, "createdAt": created})
+		}
+	}
+	httpx.Paginated(w, items, page, limit, total)
+}
+
+func (h Handler) resend(w http.ResponseWriter, r *http.Request) {
+	claims, _ := middleware.Claims(r)
+	id := chi.URLParam(r, "id")
+	var name, mail, token string
+	err := h.DB.QueryRow(r.Context(), `SELECT "name","email","token" FROM "UserInvitation" WHERE "id"=$1 AND "invitedById"=$2`, id, claims.UserID).Scan(&name, &mail, &token)
+	if err == pgx.ErrNoRows {
+		httpx.Error(w, 404, "Undangan tidak ditemukan")
+		return
+	}
+	if err != nil {
+		httpx.Error(w, 500, "Gagal mengirim ulang undangan")
+		return
+	}
+	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
+	if _, err = h.DB.Exec(r.Context(), `UPDATE "UserInvitation" SET "status"='PENDING',"expiresAt"=$1 WHERE "id"=$2`, expires, id); err != nil {
+		httpx.Error(w, 500, "Gagal mengirim ulang undangan")
+		return
+	}
+	existingUser := h.activeUser(r, mail)
+	link := h.Config.AppURL + "/set-password?token=" + token
+	if existingUser {
+		link = h.Config.AppURL + "/accept-role?token=" + token
+	}
+	if err = email.New(h.Config).SendInvitationWithKind(r.Context(), mail, name, link, existingUser); err != nil {
+		httpx.Error(w, 502, "Undangan diperbarui, namun email gagal dikirim")
+		return
+	}
+	httpx.Success(w, 200, map[string]any{"id": id, "expiresAt": expires}, "Undangan berhasil dikirim ulang")
+}
+func (h Handler) cancel(w http.ResponseWriter, r *http.Request) {
+	claims, _ := middleware.Claims(r)
+	tag, err := h.DB.Exec(r.Context(), `DELETE FROM "UserInvitation" WHERE "id"=$1 AND "invitedById"=$2 AND "status"='PENDING'`, chi.URLParam(r, "id"), claims.UserID)
+	if err != nil {
+		httpx.Error(w, 500, "Gagal membatalkan undangan")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httpx.Error(w, 404, "Undangan tidak ditemukan")
+		return
+	}
+	httpx.Success(w, 200, nil, "Undangan dibatalkan")
+}
+func (h Handler) pendingInvitation(r *http.Request, email string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserInvitation" WHERE LOWER("email")=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, validate.NormalizeEmail(email)).Scan(&exists)
+	return exists
+}
+
+func (h Handler) activeUser(r *http.Request, email string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive")`, validate.NormalizeEmail(email)).Scan(&exists)
+	return exists
+}
+
+func (h Handler) userHasRole(r *http.Request, email, role string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserRole" ur ON ur."userId"=u."id" WHERE LOWER(u."email")=$1 AND ur."role"=$2::"Role")`, validate.NormalizeEmail(email), role).Scan(&exists)
+	return exists
+}
+
+func (h Handler) userInSchool(r *http.Request, email, schoolID string) bool {
+	var exists bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" u JOIN "UserSchool" us ON us."userId"=u."id" WHERE LOWER(u."email")=$1 AND us."schoolId"=$2)`, validate.NormalizeEmail(email), schoolID).Scan(&exists)
+	return exists
+}
+func validRole(v string) bool {
+	for _, x := range constants.Roles {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+func validGender(v string) bool { return v == "IKHWAN" || v == "AKHWAT" }
+func pagination(r *http.Request) (int, int) {
+	p, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	l, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if p < 1 {
+		p = 1
+	}
+	if l < 1 || l > 100 {
+		l = 20
+	}
+	return p, l
+}

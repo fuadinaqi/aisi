@@ -1,0 +1,27 @@
+{
+  "name": "@dakwah/shared-pgm",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "node scripts/with-pgm-db.mjs prisma migrate dev",
+    "db:deploy": "node scripts/with-pgm-db.mjs prisma migrate deploy",
+    "db:seed:prod": "node scripts/with-pgm-db.mjs tsx prisma/seed-production.ts",
+    "db:studio": "node scripts/with-pgm-db.mjs prisma studio"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "prisma": "^6.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "tsx prisma/seed-production.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
+  }
+}

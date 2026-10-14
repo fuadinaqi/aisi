@@ -25,10 +25,21 @@ if [[ -z "$CONTAINER" ]]; then
   exit 1
 fi
 
-BACKUP_FILE="$BACKUP_DIR/aisi_db_${TIMESTAMP}.sql.gz"
-docker exec "$CONTAINER" pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > "$BACKUP_FILE"
+dump_database() {
+  local dbname="$1"
+  local exists
+  exists="$(docker exec "$CONTAINER" psql -U "$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${dbname}'" | tr -d '[:space:]')"
+  if [[ "$exists" != "1" ]]; then
+    echo "WARN: database ${dbname} tidak ada, backup dilewati"
+    return 0
+  fi
+  local backup_file="$BACKUP_DIR/${dbname}_${TIMESTAMP}.sql.gz"
+  docker exec "$CONTAINER" pg_dump -U "$POSTGRES_USER" "$dbname" | gzip > "$backup_file"
+  echo "Backup: $backup_file ($(du -h "$backup_file" | cut -f1))"
+}
 
-echo "Backup: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
+dump_database "$POSTGRES_DB"
+dump_database "pgm_db"
 
-find "$BACKUP_DIR" -name 'aisi_db_*.sql.gz' -mtime +"$RETENTION_DAYS" -delete
+find "$BACKUP_DIR" -name '*_db_*.sql.gz' -mtime +"$RETENTION_DAYS" -delete
 echo "Retensi $RETENTION_DAYS hari diterapkan"

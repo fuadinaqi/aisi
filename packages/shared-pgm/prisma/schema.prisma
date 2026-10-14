@@ -1,0 +1,569 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  PJ_SEKOLAH
+  PEMBINA
+  ANGGOTA
+}
+
+enum AttendanceStatus {
+  HADIR
+  TIDAK_HADIR
+  IZIN
+  SAKIT
+}
+
+enum GroupLevel {
+  LEVEL_0
+  LEVEL_1
+  LEVEL_2
+}
+
+enum Gender {
+  IKHWAN
+  AKHWAT
+}
+
+enum NotifType {
+  REMINDER_FORM
+  NEW_EVENT
+  NEW_MATERI
+  POINT_EARNED
+  NEW_KKS
+  NEW_MENTOR_APPLICATION
+  GENERAL
+}
+
+enum FeedbackType {
+  KELUHAN
+  KRITIK
+  SARAN
+}
+
+enum FeedbackStatus {
+  PENDING
+  READ
+  RESOLVED
+}
+
+enum EventCheckInStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MateriContentType {
+  FILE
+  LINK
+  RICH_TEXT
+}
+
+enum InvitationStatus {
+  PENDING
+  USED
+  EXPIRED
+}
+
+enum MutabaahFieldType {
+  CHECKBOX
+  NUMBER
+  TEXT
+  SELECT
+}
+
+enum MutabaahInputScope {
+  WEEKLY
+  DAILY
+}
+
+enum ICCategory {
+  MANA_ASY_SYAHADAH
+  MARIFATULLAH
+  MARIFATUR_RASUL
+  MARIFATUL_ISLAM
+  MARIFATUL_INSAN
+  MARIFATUL_QURAN
+  FIQIH_USHUL_FIQIH
+  KETATANEGARAAN
+  LIFESKILLS
+  ALQURAN_ULUMUL_QURAN
+  HADITS_ULUMUL_HADITS
+  AQIDAH_AKHLAK
+  AL_HAQ_WAL_BATHIL
+  QADHAYA_TAKWINUL_UMMAH
+  DAKWAH_FIKRAH
+}
+
+enum ICType {
+  PRIMER
+  SEKUNDER
+}
+
+enum MentorApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  city      String   @default("Depok")
+  address   String?
+  mapsUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      UserSchool[]
+  groups     Group[]
+  events     Event[]
+  mentorNeed MentorNeed?
+  materi     WeeklyMateri[]
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  phone       String?
+  password    String
+  avatarUrl   String?
+  gender      Gender    @default(IKHWAN)
+  birthPlace  String?
+  birthDate   DateTime? @db.Date
+  address     String?
+  tiktok      String?
+  instagram   String?
+  facebook    String?
+  socialX     String?
+  fatherName  String?
+  fatherPhone String?
+  motherName  String?
+  motherPhone String?
+  hobby       String?
+  totalPoints Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
+  roles              UserRole[]
+  schools            UserSchool[]
+  groupsAsPembina    Group[]                @relation("PembinaGroups")
+  groupsAsAnggota    GroupMember[]
+  evaluationsCreated WeeklyEvaluation[]     @relation("EvaluationCreator")
+  attendances        EvaluationAttendance[]
+  pointLogs          PointLog[]
+  notifications      Notification[]
+  refreshTokens      RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  eventAttendances   EventAttendance[]
+  eventApprovals     EventAttendance[]      @relation("EventApprover")
+  invitationsSent    UserInvitation[]       @relation("InvitationCreator")
+  mutabaahEntries    MutabaahEntry[]
+  icProgressAsMember MemberICProgress[] @relation("ICMember")
+  icProgressChecked  MemberICProgress[] @relation("ICChecker")
+  feedbacks          Feedback[]
+  mentorNeedsCreated MentorNeed[]       @relation("MentorNeedCreator")
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  role   Role
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+model UserSchool {
+  id       String @id @default(cuid())
+  userId   String
+  schoolId String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, schoolId])
+}
+
+model GroupLevelConfig {
+  id        String     @id @default(cuid())
+  level     GroupLevel @unique
+  label     String
+  updatedAt DateTime   @updatedAt
+}
+
+model Group {
+  id        String     @id @default(cuid())
+  name      String
+  level     GroupLevel
+  gender    Gender
+  schoolId  String
+  pembinaId String
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  school      School             @relation(fields: [schoolId], references: [id])
+  pembina     User               @relation("PembinaGroups", fields: [pembinaId], references: [id])
+  members         GroupMember[]
+  evaluations     WeeklyEvaluation[]
+  eventAttendances EventAttendance[]
+  mutabaahEntries MutabaahEntry[]
+  icProgress      MemberICProgress[]
+
+  @@index([schoolId])
+  @@index([pembinaId])
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  userId   String
+  joinedAt DateTime @default(now())
+  isActive Boolean  @default(true)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+model WeeklyEvaluation {
+  id          String    @id @default(cuid())
+  groupId     String
+  createdById String
+  weekDate    DateTime
+  notes       String?
+  photoUrls   String[]
+  isSubmitted Boolean   @default(false)
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  group       Group                  @relation(fields: [groupId], references: [id])
+  createdBy   User                   @relation("EvaluationCreator", fields: [createdById], references: [id])
+  attendances EvaluationAttendance[]
+
+  @@unique([groupId, weekDate])
+  @@index([groupId])
+  @@index([weekDate])
+}
+
+model EvaluationAttendance {
+  id           String           @id @default(cuid())
+  evaluationId String
+  userId       String
+  status       AttendanceStatus @default(HADIR)
+  note         String?
+
+  evaluation WeeklyEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id])
+
+  @@unique([evaluationId, userId])
+}
+
+model PointLog {
+  id          String   @id @default(cuid())
+  userId      String
+  points      Int
+  description String
+  refType     String?
+  refId       String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  location    String?
+  startAt     DateTime
+  endAt       DateTime
+  pointValue  Int      @default(0)
+  imageUrl    String?
+  schoolId     String?
+  targetLevels GroupLevel[] @default([])
+  targetGender Gender?
+  isPublished  Boolean      @default(true)
+  createdById  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School?           @relation(fields: [schoolId], references: [id])
+  attendances EventAttendance[]
+
+  @@index([schoolId])
+  @@index([endAt])
+}
+
+model EventAttendance {
+  id            String             @id @default(cuid())
+  eventId       String
+  userId        String
+  groupId       String
+  photoUrl      String
+  status        EventCheckInStatus @default(PENDING)
+  checkedAt     DateTime           @default(now())
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectionNote String?
+
+  event      Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user       User  @relation(fields: [userId], references: [id])
+  group      Group @relation(fields: [groupId], references: [id])
+  approvedBy User? @relation("EventApprover", fields: [approvedById], references: [id])
+
+  @@unique([eventId, userId])
+  @@index([groupId, status])
+}
+
+model WeeklyMateri {
+  id           String            @id @default(cuid())
+  title        String
+  description  String?
+  weekDate     DateTime
+  contentType  MateriContentType @default(RICH_TEXT)
+  linkUrl      String?
+  contentHtml  String?           @db.Text
+  fileUrls     String[]
+  fileNames    String[]          @default([])
+  targetLevels GroupLevel[]      @default([])
+  schoolId     String?
+  createdById  String
+  isPublished  Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  school School? @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+
+  @@index([weekDate])
+  @@index([schoolId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      NotifType
+  title     String
+  body      String
+  refId     String?
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique @default(uuid())
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model UserInvitation {
+  id             String           @id @default(cuid())
+  email          String
+  name           String
+  phone          String?
+  role           Role
+  alsoAsPembina  Boolean          @default(false)
+  schoolId       String?
+  groupId        String?
+  gender         Gender?
+  token          String           @unique @default(uuid())
+  status         InvitationStatus @default(PENDING)
+  invitedById    String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  invitedBy User @relation("InvitationCreator", fields: [invitedById], references: [id])
+
+  @@index([token])
+  @@index([email])
+}
+
+model MutabaahItem {
+  id          String              @id @default(cuid())
+  level       GroupLevel
+  title       String
+  description String?
+  target      String?
+  fieldType   MutabaahFieldType
+  inputScope  MutabaahInputScope  @default(WEEKLY)
+  options     Json?
+  minValue    Int?
+  maxValue    Int?
+  sortOrder   Int                 @default(0)
+  isRequired  Boolean             @default(true)
+  isActive    Boolean             @default(true)
+  allowOther  Boolean             @default(false)
+  otherLabel  String              @default("Lainnya")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  answers MutabaahAnswer[]
+
+  @@index([level, isActive, sortOrder])
+}
+
+model MutabaahEntry {
+  id          String    @id @default(cuid())
+  userId      String
+  groupId     String
+  weekDate    DateTime
+  isSubmitted Boolean   @default(false)
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User             @relation(fields: [userId], references: [id])
+  group   Group            @relation(fields: [groupId], references: [id])
+  answers MutabaahAnswer[]
+
+  @@unique([userId, groupId, weekDate])
+  @@index([groupId, weekDate])
+}
+
+model MutabaahAnswer {
+  id      String @id @default(cuid())
+  entryId String
+  itemId  String
+  value   Json
+
+  entry MutabaahEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  item  MutabaahItem  @relation(fields: [itemId], references: [id])
+
+  @@unique([entryId, itemId])
+}
+
+model IndikatorCapaian {
+  id        String     @id @default(cuid())
+  level     GroupLevel
+  category  ICCategory
+  type      ICType
+  number    Int
+  title     String
+  materi    String?
+  sortOrder Int        @default(0)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  progress MemberICProgress[]
+
+  @@unique([level, category, type, number])
+  @@index([level, category, type, sortOrder])
+}
+
+model MemberICProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  groupId     String
+  indikatorId String
+  isAchieved  Boolean  @default(false)
+  checkedById String
+  checkedAt   DateTime @default(now())
+
+  user      User             @relation("ICMember", fields: [userId], references: [id])
+  group     Group            @relation(fields: [groupId], references: [id])
+  indikator IndikatorCapaian @relation(fields: [indikatorId], references: [id])
+  checkedBy User             @relation("ICChecker", fields: [checkedById], references: [id])
+
+  @@unique([userId, groupId, indikatorId])
+  @@index([groupId, userId])
+}
+
+model Feedback {
+  id          String         @id @default(cuid())
+  userId      String
+  type        FeedbackType
+  subject     String
+  message     String         @db.Text
+  status      FeedbackStatus @default(PENDING)
+  adminNotes  String?        @db.Text
+  schoolId    String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  readAt      DateTime?
+  resolvedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model MentorNeed {
+  id          String   @id @default(cuid())
+  schoolId    String   @unique
+  description String   @db.Text
+  needIkhwan  Int      @default(0)
+  needAkhwat  Int      @default(0)
+  isPublished Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school       School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy    User                @relation("MentorNeedCreator", fields: [createdById], references: [id])
+  applications MentorApplication[]
+}
+
+model MentorApplication {
+  id              String                  @id @default(cuid())
+  mentorNeedId    String
+  name            String
+  whatsapp        String
+  age             Int
+  gender          Gender
+  address         String                  @db.Text
+  asalSma         String
+  murobbiName     String
+  murobbiWhatsapp String
+  status          MentorApplicationStatus @default(PENDING)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  mentorNeed MentorNeed @relation(fields: [mentorNeedId], references: [id], onDelete: Cascade)
+
+  @@index([mentorNeedId])
+  @@index([mentorNeedId, gender, status])
+}

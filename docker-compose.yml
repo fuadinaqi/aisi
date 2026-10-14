@@ -12,6 +12,8 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Hanya jalan saat volume baru. Volume yang sudah ada: CREATE DATABASE pgm_db;
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U dakwah_user -d dakwah_db']
       interval: 5s
