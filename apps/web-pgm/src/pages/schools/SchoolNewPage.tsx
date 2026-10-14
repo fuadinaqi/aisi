@@ -143,7 +143,7 @@ export default function NewSchoolPage() {
               <Label htmlFor="name">Nama PGM</Label>
               <Input
                 id="name"
-                placeholder="SMAN 4 Depok"
+                placeholder="PGM Limo"
                 className="rounded-xl"
                 {...register('name', { required: true })}
               />

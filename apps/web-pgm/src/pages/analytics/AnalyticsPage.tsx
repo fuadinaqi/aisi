@@ -40,11 +40,11 @@ export default function AnalyticsPage() {
     <RoleGuard allowedRoles={['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH']}>
       <PageContainer tight>
         <PageHeader
-          title={isPj ? 'Analitik PGM' : 'Analitik Depok'}
+          title={isPj ? 'Analitik PGM' : 'Analitik'}
           description={
             isPj
               ? 'Gambaran umum PGM yang Anda pegang'
-              : 'Ringkasan pembinaan di seluruh Kota Depok'
+              : 'Ringkasan pembinaan di seluruh PGM'
           }
           compact
         />

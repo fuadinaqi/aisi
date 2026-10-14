@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
             Kami akan mengirim tautan reset ke email terdaftar jika akun Anda aktif.
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">Kota Depok</p>
+        <p className="text-xs text-muted-foreground">Pembinaan Generasi Muda</p>
       </div>
 
       <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-white to-[hsl(214,40%,95%)] px-5 pb-7 pt-[max(1.75rem,env(safe-area-inset-top))] text-foreground lg:hidden">

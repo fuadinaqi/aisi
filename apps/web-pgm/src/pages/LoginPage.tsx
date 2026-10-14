@@ -81,7 +81,7 @@ export default function LoginPage() {
             {LOGIN_QUOTE}
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">Kota Depok</p>
+        <p className="text-xs text-muted-foreground">Pembinaan Generasi Muda</p>
       </div>
 
       {/* Mobile — hero */}
@@ -136,7 +136,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-auto pt-8 text-center text-xs text-muted-foreground lg:hidden">Kota Depok</p>
+        <p className="mt-auto pt-8 text-center text-xs text-muted-foreground lg:hidden">Pembinaan Generasi Muda</p>
       </div>
     </div>
   );
