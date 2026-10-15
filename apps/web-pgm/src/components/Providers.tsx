@@ -63,7 +63,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
     if (previousRole.current !== activeRole) {
       previousRole.current = activeRole;
-      queryClient.removeQueries();
+      // resetQueries mengosongkan data lalu mengambil ulang query yang masih terpasang.
+      // removeQueries membatalkan fetch tanpa status selesai, sehingga isLoading tetap true sampai halaman di-refresh.
+      void queryClient.resetQueries();
     }
   }, [activeRole, hydrated, queryClient]);
 
