@@ -251,41 +251,34 @@ func where(r *http.Request) (string, []any) {
 	if role(c.Roles, "ADMIN") || role(c.Roles, "SUPERADMIN") {
 		return `1=1`, nil
 	}
-	return `(
-		(m."schoolId" IS NULL AND m."isPublished"=true AND (
-			EXISTS (SELECT 1 FROM "UserRole" ur WHERE ur."userId"=$1 AND ur."role"='PJ_SEKOLAH'::"Role")
-			OR EXISTS (
-				SELECT 1 FROM "User" u
-				WHERE u."id"=$1 AND u."isActive"=true AND (
-					EXISTS (SELECT 1 FROM "Group" g WHERE g."pembinaId"=u."id" AND g."isActive"=true)
-					OR (
-						EXISTS (SELECT 1 FROM "UserRole" ur WHERE ur."userId"=u."id" AND ur."role"='PEMBINA'::"Role")
-						AND EXISTS (SELECT 1 FROM "UserSchool" us WHERE us."userId"=u."id")
-					)
-				)
+	if role(c.Roles, "PJ_SEKOLAH") {
+		return `(
+			(m."schoolId" IS NULL AND m."isPublished"=true)
+			OR (
+				m."schoolId" IS NOT NULL
+				AND EXISTS (SELECT 1 FROM "UserSchool" us WHERE us."userId"=$1 AND us."schoolId"=m."schoolId")
 			)
-		))
-		OR (
-			m."schoolId" IS NOT NULL AND (
+		)`, []any{c.UserID}
+	}
+	if role(c.Roles, "PEMBINA") {
+		return `(
+			m."isPublished"=true AND (
 				(
-					EXISTS (SELECT 1 FROM "UserRole" ur WHERE ur."userId"=$1 AND ur."role"='PJ_SEKOLAH'::"Role")
-					AND EXISTS (SELECT 1 FROM "UserSchool" us WHERE us."userId"=$1 AND us."schoolId"=m."schoolId")
+					m."schoolId" IS NULL AND (
+						EXISTS (SELECT 1 FROM "Group" g WHERE g."pembinaId"=$1 AND g."isActive"=true)
+						OR EXISTS (SELECT 1 FROM "UserSchool" us WHERE us."userId"=$1)
+					)
 				)
 				OR (
-					m."isPublished"=true AND EXISTS (
-						SELECT 1 FROM "User" u
-						WHERE u."id"=$1 AND u."isActive"=true AND (
-							EXISTS (SELECT 1 FROM "Group" g WHERE g."pembinaId"=u."id" AND g."isActive"=true AND g."schoolId"=m."schoolId")
-							OR (
-								EXISTS (SELECT 1 FROM "UserRole" ur WHERE ur."userId"=u."id" AND ur."role"='PEMBINA'::"Role")
-								AND EXISTS (SELECT 1 FROM "UserSchool" us WHERE us."userId"=u."id" AND us."schoolId"=m."schoolId")
-							)
-						)
+					m."schoolId" IS NOT NULL AND (
+						EXISTS (SELECT 1 FROM "Group" g WHERE g."pembinaId"=$1 AND g."isActive"=true AND g."schoolId"=m."schoolId")
+						OR EXISTS (SELECT 1 FROM "UserSchool" us WHERE us."userId"=$1 AND us."schoolId"=m."schoolId")
 					)
 				)
 			)
-		)
-	)`, []any{c.UserID}
+		)`, []any{c.UserID}
+	}
+	return `1=0`, nil
 }
 func role(rs []string, v string) bool {
 	for _, x := range rs {

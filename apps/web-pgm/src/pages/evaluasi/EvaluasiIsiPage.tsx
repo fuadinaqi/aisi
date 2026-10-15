@@ -16,6 +16,7 @@ import { compressImage, isImageFile } from '@/lib/compressImage';
 import type { EvaluationItem, GroupItem } from '@/lib/types';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
 import { SquarePhotoCropDialog } from '@/components/evaluasi/SquarePhotoCropDialog';
@@ -29,6 +30,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function IsiEvaluasiPage() {
+  const role = useActiveRole() || '';
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -53,7 +55,7 @@ export default function IsiEvaluasiPage() {
   const previewRef = useRef<string | null>(null);
 
   const { data: groups } = useQuery<GroupItem[]>({
-    queryKey: ['groups'],
+    queryKey: ['groups', role],
     queryFn: async () => (await api.get<ApiResponse<GroupItem[]>>('/groups')).data.data,
   });
 

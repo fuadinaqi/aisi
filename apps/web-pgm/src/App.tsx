@@ -52,6 +52,7 @@ import KebutuhanMentorEditPage from '@/pages/kebutuhan-mentor/KebutuhanMentorEdi
 import KebutuhanMentorApplicationsPage from '@/pages/kebutuhan-mentor/KebutuhanMentorApplicationsPage';
 import CalonMentorPage from '@/pages/calon-mentor/CalonMentorPage';
 import CalonMentorApplyPage from '@/pages/calon-mentor/CalonMentorApplyPage';
+import { RoleGuard } from '@/components/layout/RoleGuard';
 
 export default function App() {
   return (
@@ -101,8 +102,22 @@ export default function App() {
           <Route path="/materi/:id" element={<MateriDetailPage />} />
           <Route path="/laporan" element={<LaporanKegiatanPage />} />
           <Route path="/evaluasi" element={<EvaluasiPage />} />
-          <Route path="/evaluasi/isi" element={<EvaluasiIsiPage />} />
-          <Route path="/evaluasi/:id" element={<EvaluasiDetailPage />} />
+          <Route
+            path="/evaluasi/isi"
+            element={
+              <RoleGuard allowedRoles={['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA']}>
+                <EvaluasiIsiPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/evaluasi/:id"
+            element={
+              <RoleGuard allowedRoles={['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA']}>
+                <EvaluasiDetailPage />
+              </RoleGuard>
+            }
+          />
           <Route path="/mutabaah" element={<MutabaahPage />} />
           <Route path="/pembina" element={<PembinaPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />

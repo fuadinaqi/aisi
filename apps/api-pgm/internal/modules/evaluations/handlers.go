@@ -72,13 +72,19 @@ func min(a, b int) int {
 	return b
 }
 func canPembina(r *http.Request, db *pgxpool.Pool, groupID string) bool {
-	c, _ := middleware.Claims(r)
+	c, ok := middleware.Claims(r)
+	if !ok || !has(c.Roles, "PEMBINA") {
+		return false
+	}
 	var n int
 	_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "Group" WHERE "id"=$1 AND "pembinaId"=$2`, groupID, c.UserID).Scan(&n)
 	return n > 0
 }
 func allowedEvaluation(r *http.Request, db *pgxpool.Pool, groupID string) (int, string) {
-	c, _ := middleware.Claims(r)
+	c, ok := middleware.Claims(r)
+	if !ok {
+		return 401, "Autentikasi diperlukan"
+	}
 	if has(c.Roles, "SUPERADMIN") || has(c.Roles, "ADMIN") {
 		return 0, ""
 	}
@@ -96,7 +102,7 @@ func allowedEvaluation(r *http.Request, db *pgxpool.Pool, groupID string) (int, 
 		}
 		return 403, "Akses ditolak"
 	}
-	return 0, ""
+	return 403, "Akses ditolak"
 }
 func decode(r *http.Request, v any) bool {
 	return json.NewDecoder(http.MaxBytesReader(nil, r.Body, 2<<20)).Decode(v) == nil
@@ -129,12 +135,16 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 			args = append(args, d)
 			where = append(where, `e."weekDate"=$`+strconv.Itoa(len(args)))
 		}
-		if has(c.Roles, "PEMBINA") && !has(c.Roles, "ADMIN") && !has(c.Roles, "SUPERADMIN") {
+		switch {
+		case has(c.Roles, "SUPERADMIN") || has(c.Roles, "ADMIN"):
+		case has(c.Roles, "PEMBINA"):
 			args = append(args, c.UserID)
 			where = append(where, `g."pembinaId"=$`+strconv.Itoa(len(args)))
-		} else if has(c.Roles, "PJ_SEKOLAH") && !has(c.Roles, "ADMIN") && !has(c.Roles, "SUPERADMIN") {
+		case has(c.Roles, "PJ_SEKOLAH"):
 			args = append(args, c.UserID)
 			where = append(where, `EXISTS(SELECT 1 FROM "UserSchool" us WHERE us."schoolId"=g."schoolId" AND us."userId"=$`+strconv.Itoa(len(args))+`)`)
+		default:
+			where = append(where, "FALSE")
 		}
 		if school := q.Get("schoolId"); school != "" {
 			args = append(args, school)

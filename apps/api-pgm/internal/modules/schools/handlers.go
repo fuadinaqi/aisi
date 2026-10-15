@@ -49,14 +49,14 @@ func (h Handler) Routes() chi.Router {
 }
 
 type pjInput struct {
-	UserID          *string `json:"userId"`
-	Name, Email     string
-	Phone           *string
-	Gender          string
-	Password        *string
-	AlsoAsPembina   *bool   `json:"alsoAsPembina"`
-	Replace         bool
-	ReplaceUserID   *string `json:"replaceUserId"`
+	UserID        *string `json:"userId"`
+	Name, Email   string
+	Phone         *string
+	Gender        string
+	Password      *string
+	AlsoAsPembina *bool `json:"alsoAsPembina"`
+	Replace       bool
+	ReplaceUserID *string `json:"replaceUserId"`
 }
 
 func ptrStr(p *string) string {
@@ -72,6 +72,7 @@ func alsoAsPembina(v *bool) bool {
 	}
 	return *v
 }
+
 type schoolInput struct {
 	Name     string
 	City     *string
@@ -85,6 +86,17 @@ func decode(r *http.Request, v any) bool { return json.NewDecoder(r.Body).Decode
 func admin(roles []string) bool {
 	for _, r := range roles {
 		if r == "ADMIN" || r == "SUPERADMIN" {
+			return true
+		}
+	}
+	return false
+}
+func schoolStaff(roles []string) bool {
+	if admin(roles) {
+		return true
+	}
+	for _, role := range roles {
+		if role == "PJ_SEKOLAH" {
 			return true
 		}
 	}
@@ -607,6 +619,11 @@ func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembin
 }
 
 func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
+	c, ok := middleware.Claims(r)
+	if !ok || !schoolStaff(c.Roles) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
 		httpx.Error(w, 403, "Akses ditolak")
@@ -646,6 +663,11 @@ func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, out, "")
 }
 func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
+	c, ok := middleware.Claims(r)
+	if !ok || !schoolStaff(c.Roles) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
 		httpx.Error(w, 403, "Akses ditolak")
@@ -755,7 +777,6 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasPassword := p.Password != nil && *p.Password != ""
-	c, _ := middleware.Claims(r)
 	tx, e := h.DB.Begin(r.Context())
 	if e != nil {
 		httpx.Error(w, 500, "Gagal membuat kelompok")
@@ -777,7 +798,7 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		httpx.Success(w, 201, map[string]any{
-			"mode": "invite",
+			"mode":       "invite",
 			"invitation": map[string]any{"id": iid, "email": p.Email, "status": "PENDING"},
 		}, "Undangan pembina berhasil dikirim")
 		return
@@ -815,6 +836,11 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 	}, "Kelompok dan akun pembina berhasil dibuat")
 }
 func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
+	c, ok := middleware.Claims(r)
+	if !ok || !schoolStaff(c.Roles) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
 		httpx.Error(w, 403, "Akses ditolak")
@@ -1046,6 +1072,11 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 	}, "")
 }
 func (h Handler) stats(w http.ResponseWriter, r *http.Request) {
+	c, ok := middleware.Claims(r)
+	if !ok || !schoolStaff(c.Roles) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
 		httpx.Error(w, 403, "Akses ditolak")

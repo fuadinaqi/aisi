@@ -51,7 +51,10 @@ func admin(roles []string) bool {
 	return false
 }
 func (h Handler) groupAccess(r *http.Request, id string, write bool) bool {
-	c, _ := middleware.Claims(r)
+	c, ok := middleware.Claims(r)
+	if !ok {
+		return false
+	}
 	if admin(c.Roles) {
 		return true
 	}
@@ -60,7 +63,7 @@ func (h Handler) groupAccess(r *http.Request, id string, write bool) bool {
 	if e != nil {
 		return false
 	}
-	if owner == c.UserID {
+	if has(c.Roles, "PEMBINA") && owner == c.UserID {
 		return true
 	}
 	if has(c.Roles, "PJ_SEKOLAH") {
@@ -567,7 +570,7 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 	// Monday of join week (WIB), same rule as Express getMonday
 	loc := time.FixedZone("WIB", 7*3600)
 	joinedLocal := joined.In(loc)
-	joinedMonday := joinedLocal.AddDate(0, 0, -((int(joinedLocal.Weekday())+6)%7))
+	joinedMonday := joinedLocal.AddDate(0, 0, -((int(joinedLocal.Weekday()) + 6) % 7))
 	joinedMonday = time.Date(joinedMonday.Year(), joinedMonday.Month(), joinedMonday.Day(), 0, 0, 0, 0, loc)
 
 	rows, e := h.DB.Query(r.Context(), `
@@ -716,7 +719,7 @@ func (h Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, nil, "Anggota berhasil dihapus")
 }
 func gender(v string) bool { return v == "IKHWAN" || v == "AKHWAT" }
-func level(v string) bool { return constants.ValidGroupLevel(v) }
+func level(v string) bool  { return constants.ValidGroupLevel(v) }
 func has(s []string, x string) bool {
 	for _, v := range s {
 		if v == x {
