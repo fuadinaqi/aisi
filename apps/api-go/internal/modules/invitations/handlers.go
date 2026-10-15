@@ -77,8 +77,20 @@ func (h Handler) assertSchoolAccess(r *http.Request, schoolID string) bool {
 	return ok
 }
 
+func hasRole(roles []string, role string) bool {
+	for _, item := range roles {
+		if item == role {
+			return true
+		}
+	}
+	return false
+}
+
 func (h Handler) assertGroupAccess(r *http.Request, groupID string) bool {
-	claims, _ := middleware.Claims(r)
+	claims, ok := middleware.Claims(r)
+	if !ok {
+		return false
+	}
 	if admin(claims.Roles) {
 		return true
 	}
@@ -86,12 +98,15 @@ func (h Handler) assertGroupAccess(r *http.Request, groupID string) bool {
 	if h.DB.QueryRow(r.Context(), `SELECT "pembinaId","schoolId" FROM "Group" WHERE "id"=$1`, groupID).Scan(&owner, &school) != nil {
 		return false
 	}
-	if owner == claims.UserID {
+	if hasRole(claims.Roles, "PEMBINA") && owner == claims.UserID {
 		return true
 	}
-	var ok bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, claims.UserID, school).Scan(&ok)
-	return ok
+	if !hasRole(claims.Roles, "PJ_SEKOLAH") {
+		return false
+	}
+	var inSchool bool
+	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, claims.UserID, school).Scan(&inSchool)
+	return inSchool
 }
 
 func (h Handler) create(w http.ResponseWriter, r *http.Request) {

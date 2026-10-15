@@ -20,6 +20,10 @@ func RequireAuth(c config.Config) func(http.Handler) http.Handler {
 			if raw == "" || raw == r.Header.Get("Authorization") { httpx.Error(w, http.StatusUnauthorized, "Token autentikasi tidak ditemukan"); return }
 			claims, err := auth.ParseAccess(c, raw)
 			if err != nil { httpx.Error(w, http.StatusUnauthorized, "Token autentikasi tidak valid"); return }
+			if err := applyActiveRole(claims, r.Header.Get(ActiveRoleHeader)); err != nil {
+				httpx.Error(w, http.StatusForbidden, "Peran aktif tidak valid")
+				return
+			}
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), claimsKey, claims)))
 		})
 	}

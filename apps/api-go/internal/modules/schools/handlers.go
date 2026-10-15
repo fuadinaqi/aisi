@@ -86,6 +86,17 @@ func admin(roles []string) bool {
 	}
 	return false
 }
+func schoolStaff(roles []string) bool {
+	if admin(roles) {
+		return true
+	}
+	for _, role := range roles {
+		if role == "PJ_SEKOLAH" {
+			return true
+		}
+	}
+	return false
+}
 func (h Handler) access(r *http.Request, id string) bool {
 	c, _ := middleware.Claims(r)
 	if admin(c.Roles) {
@@ -603,6 +614,11 @@ func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembin
 }
 
 func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
+	c, ok := middleware.Claims(r)
+	if !ok || !schoolStaff(c.Roles) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
 		httpx.Error(w, 403, "Akses ditolak")
@@ -642,6 +658,11 @@ func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, out, "")
 }
 func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
+	c, ok := middleware.Claims(r)
+	if !ok || !schoolStaff(c.Roles) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
 		httpx.Error(w, 403, "Akses ditolak")
@@ -751,7 +772,6 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasPassword := p.Password != nil && *p.Password != ""
-	c, _ := middleware.Claims(r)
 	tx, e := h.DB.Begin(r.Context())
 	if e != nil {
 		httpx.Error(w, 500, "Gagal membuat kelompok")
@@ -811,6 +831,11 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 	}, "Kelompok dan akun pembina berhasil dibuat")
 }
 func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
+	c, ok := middleware.Claims(r)
+	if !ok || !schoolStaff(c.Roles) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
 		httpx.Error(w, 403, "Akses ditolak")
@@ -1042,6 +1067,11 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 	}, "")
 }
 func (h Handler) stats(w http.ResponseWriter, r *http.Request) {
+	c, ok := middleware.Claims(r)
+	if !ok || !schoolStaff(c.Roles) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
 	sid := chi.URLParam(r, "id")
 	if !h.access(r, sid) {
 		httpx.Error(w, 403, "Akses ditolak")

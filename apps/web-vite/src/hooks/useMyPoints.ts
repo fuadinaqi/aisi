@@ -2,8 +2,8 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type ApiResponse } from '@/lib/api';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { useAuthStore } from '@/store/authStore';
-import { isPointEligibleRole } from '@/lib/utils';
 
 export type PointLogItem = {
   id: string;
@@ -20,11 +20,12 @@ type PointsMeData = {
 
 export function useMyPoints(enabled = true) {
   const user = useAuthStore((s) => s.user);
+  const role = useActiveRole();
   const updateTotalPoints = useAuthStore((s) => s.updateTotalPoints);
-  const showPoints = user ? isPointEligibleRole(user.roles) : false;
+  const showPoints = role === 'PEMBINA' || role === 'ANGGOTA';
 
   const query = useQuery<PointsMeData>({
-    queryKey: ['points-me'],
+    queryKey: ['points-me', role],
     queryFn: async () => (await api.get<ApiResponse<PointsMeData>>('/points/me')).data.data,
     enabled: enabled && showPoints && !!user,
   });

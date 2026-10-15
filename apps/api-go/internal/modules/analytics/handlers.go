@@ -199,6 +199,11 @@ func topSchools(db *pgxpool.Pool, r *http.Request) []map[string]any {
 }
 func school(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		c, ok := middleware.Claims(r)
+		if !ok || (!has(c.Roles, "SUPERADMIN") && !has(c.Roles, "ADMIN") && !has(c.Roles, "PJ_SEKOLAH")) {
+			httpx.Error(w, 403, "Akses ditolak")
+			return
+		}
 		id := chi.URLParam(r, "id")
 		if !accessibleSchool(db, r, id) {
 			httpx.Error(w, 403, "Akses ditolak")
@@ -220,8 +225,11 @@ func group(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 404, "Kelompok tidak ditemukan")
 			return
 		}
-		c, _ := middleware.Claims(r)
-		if !has(c.Roles, "SUPERADMIN") && !has(c.Roles, "ADMIN") && c.UserID != pembina && !accessibleSchool(db, r, school) {
+		c, ok := middleware.Claims(r)
+		allowed := ok && (has(c.Roles, "SUPERADMIN") || has(c.Roles, "ADMIN") ||
+			(has(c.Roles, "PJ_SEKOLAH") && accessibleSchool(db, r, school)) ||
+			(has(c.Roles, "PEMBINA") && c.UserID == pembina))
+		if !allowed {
 			httpx.Error(w, 403, "Akses ditolak")
 			return
 		}

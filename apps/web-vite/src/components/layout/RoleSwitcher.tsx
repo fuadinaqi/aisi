@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { getRoleLabel } from '@/lib/utils';
+import { getPrimaryRole, getRoleLabel } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 
@@ -23,7 +23,7 @@ export function RoleSwitcher({
 
   if (!user) return null;
 
-  const role = activeRole && user.roles.includes(activeRole) ? activeRole : user.roles[0];
+  const role = activeRole && user.roles.includes(activeRole) ? activeRole : getPrimaryRole(user.roles);
 
   if (user.roles.length <= 1) {
     return (

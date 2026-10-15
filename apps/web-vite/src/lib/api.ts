@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/store/authStore';
+import { getPrimaryRole } from '@/lib/utils';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
 
@@ -9,10 +10,20 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+function activeRoleHeader(): string | null {
+  const { user, activeRole } = useAuthStore.getState();
+  if (!user) return null;
+  const role =
+    activeRole && user.roles.includes(activeRole) ? activeRole : getPrimaryRole(user.roles);
+  return user.roles.includes(role) ? role : null;
+}
+
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('accessToken');
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    const role = activeRoleHeader();
+    if (role) config.headers['X-Active-Role'] = role;
   }
   return config;
 });

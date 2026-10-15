@@ -35,6 +35,7 @@ import MateriNewPage from '@/pages/materi/MateriNewPage';
 import MateriHistoryPage from '@/pages/materi/MateriHistoryPage';
 import MateriEditPage from '@/pages/materi/MateriEditPage';
 import MateriDetailPage from '@/pages/materi/MateriDetailPage';
+import { RoleGuard } from '@/components/layout/RoleGuard';
 import EvaluasiPage from '@/pages/evaluasi/EvaluasiPage';
 import EvaluasiIsiPage from '@/pages/evaluasi/EvaluasiIsiPage';
 import EvaluasiDetailPage from '@/pages/evaluasi/EvaluasiDetailPage';
@@ -99,8 +100,22 @@ export default function App() {
           <Route path="/materi/:id/edit" element={<MateriEditPage />} />
           <Route path="/materi/:id" element={<MateriDetailPage />} />
           <Route path="/evaluasi" element={<EvaluasiPage />} />
-          <Route path="/evaluasi/isi" element={<EvaluasiIsiPage />} />
-          <Route path="/evaluasi/:id" element={<EvaluasiDetailPage />} />
+          <Route
+            path="/evaluasi/isi"
+            element={
+              <RoleGuard allowedRoles={['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA']}>
+                <EvaluasiIsiPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/evaluasi/:id"
+            element={
+              <RoleGuard allowedRoles={['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA']}>
+                <EvaluasiDetailPage />
+              </RoleGuard>
+            }
+          />
           <Route path="/mutabaah" element={<MutabaahPage />} />
           <Route path="/pembina" element={<PembinaPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />

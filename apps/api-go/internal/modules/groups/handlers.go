@@ -51,7 +51,10 @@ func admin(roles []string) bool {
 	return false
 }
 func (h Handler) groupAccess(r *http.Request, id string, write bool) bool {
-	c, _ := middleware.Claims(r)
+	c, ok := middleware.Claims(r)
+	if !ok {
+		return false
+	}
 	if admin(c.Roles) {
 		return true
 	}
@@ -60,7 +63,7 @@ func (h Handler) groupAccess(r *http.Request, id string, write bool) bool {
 	if e != nil {
 		return false
 	}
-	if owner == c.UserID {
+	if has(c.Roles, "PEMBINA") && owner == c.UserID {
 		return true
 	}
 	if has(c.Roles, "PJ_SEKOLAH") {
