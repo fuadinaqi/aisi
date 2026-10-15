@@ -105,7 +105,7 @@ export default function App() {
           <Route
             path="/evaluasi/isi"
             element={
-              <RoleGuard allowedRoles={['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH', 'PEMBINA']}>
+              <RoleGuard allowedRoles={['PEMBINA']}>
                 <EvaluasiIsiPage />
               </RoleGuard>
             }

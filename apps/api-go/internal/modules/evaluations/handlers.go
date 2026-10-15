@@ -37,12 +37,12 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireAuth(c))
 	r.Get("/", list(db))
-	r.Post("/", create(db))
+	r.With(middleware.RequireRole("PEMBINA")).Post("/", create(db))
 	r.Get("/{id}", detail(db))
-	r.Put("/{id}", update(db))
-	r.Delete("/{id}", remove(db, c))
-	r.Post("/{id}/submit", submit(db))
-	r.Post("/{id}/photos", photos(db, c))
+	r.With(middleware.RequireRole("PEMBINA")).Put("/{id}", update(db))
+	r.With(middleware.RequireRole("PEMBINA")).Delete("/{id}", remove(db, c))
+	r.With(middleware.RequireRole("PEMBINA")).Post("/{id}/submit", submit(db))
+	r.With(middleware.RequireRole("PEMBINA")).Post("/{id}/photos", photos(db, c))
 	return r
 }
 func has(roles []string, role string) bool {

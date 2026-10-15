@@ -17,19 +17,25 @@ export default function EvaluasiPage() {
           title="Evaluasi mingguan"
           description="Riwayat form evaluasi kelompok"
           action={
-            <Button asChild size="sm">
-              <Link to="/evaluasi/isi">
-                <Plus className="mr-2 h-4 w-4" />
-                Isi evaluasi
-              </Link>
-            </Button>
+            role === 'PEMBINA' ? (
+              <Button asChild size="sm">
+                <Link to="/evaluasi/isi">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Isi evaluasi
+                </Link>
+              </Button>
+            ) : undefined
           }
         />
 
         <EvaluationInfiniteList
           queryKey={['evaluations', role]}
           emptyTitle="Belum ada evaluasi"
-          emptyDescription="Mulai isi evaluasi mingguan kelompok Anda."
+          emptyDescription={
+            role === 'PEMBINA'
+              ? 'Mulai isi evaluasi mingguan kelompok Anda.'
+              : 'Riwayat evaluasi kelompok akan muncul di sini.'
+          }
         />
       </PageContainer>
     </RoleGuard>

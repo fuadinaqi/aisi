@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api, type ApiResponse } from '@/lib/api';
+import { useActiveRole } from '@/components/layout/RoleGuard';
 import { EmptyState, LoadingSkeleton } from '@/components/shared/Badges';
 import { Card } from '@/components/ui/card';
 import { formatDate, toDateInputValue } from '@/lib/utils';
@@ -27,6 +28,7 @@ export function EvaluationInfiniteList({
   showGroupName = true,
   compact = false,
 }: EvaluationInfiniteListProps) {
+  const canManage = useActiveRole() === 'PEMBINA';
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -97,7 +99,16 @@ export function EvaluationInfiniteList({
       <Card className="overflow-hidden">
         <div className="divide-y">
           {evaluations.map((e) => {
-            const href = `/evaluasi/isi?groupId=${e.group?.id ?? ''}&weekDate=${toDateInputValue(new Date(e.weekDate))}`;
+            const href = canManage
+              ? `/evaluasi/isi?groupId=${e.group?.id ?? ''}&weekDate=${toDateInputValue(new Date(e.weekDate))}`
+              : `/evaluasi/${e.id}`;
+            const statusLabel = e.isSubmitted
+              ? canManage
+                ? 'Terkirim · Edit'
+                : 'Terkirim'
+              : canManage
+                ? 'Draft · Edit'
+                : 'Draft';
 
             return (
               <Link
@@ -118,7 +129,7 @@ export function EvaluationInfiniteList({
                       : 'bg-amber-50 text-amber-800'
                   }`}
                 >
-                  {e.isSubmitted ? 'Terkirim · Edit' : 'Draft · Edit'}
+                  {statusLabel}
                 </span>
               </Link>
             );
