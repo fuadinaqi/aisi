@@ -33,6 +33,7 @@ type evaluationInput struct {
 	WeekDate    string       `json:"weekDate"`
 	Notes       *string      `json:"notes"`
 	Location    *string      `json:"location"`
+	SessionDate *string      `json:"sessionDate"`
 	StartTime   *string      `json:"startTime"`
 	EndTime     *string      `json:"endTime"`
 	Attendances []attendance `json:"attendances"`
@@ -41,9 +42,50 @@ type evaluationInput struct {
 const maxEvaluationLocation = 200
 
 type evaluationMeta struct {
-	location *string
-	start    *time.Time
-	end      *time.Time
+	location    *string
+	sessionDate *time.Time
+	start       *time.Time
+	end         *time.Time
+}
+
+func parseCalendarDateWIB(s string) (time.Time, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, false
+	}
+	if len(s) > 10 {
+		s = s[:10]
+	}
+	t, err := time.ParseInLocation("2006-01-02", s, time.FixedZone("WIB", 7*3600))
+	return t, err == nil
+}
+
+func dateYYYYMMDD(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.In(time.FixedZone("WIB", 7*3600)).Format("2006-01-02")
+}
+
+func normalizeSessionDate(s *string) (*time.Time, int, string) {
+	if s == nil {
+		return nil, 0, ""
+	}
+	trimmed := strings.TrimSpace(*s)
+	if trimmed == "" {
+		return nil, 0, ""
+	}
+	d, ok := parseCalendarDateWIB(trimmed)
+	if !ok {
+		return nil, 400, "Tanggal tidak valid"
+	}
+	wib := time.FixedZone("WIB", 7*3600)
+	now := time.Now().In(wib)
+	todayCal := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, wib)
+	if d.After(todayCal) {
+		return nil, 400, "Tanggal tidak boleh setelah hari ini"
+	}
+	return &d, 0, ""
 }
 
 func parseTimeHHMM(s string) (time.Time, bool) {
@@ -62,8 +104,13 @@ func timeHHMMString(t *time.Time) any {
 	return t.Format("15:04")
 }
 
-func normalizeEvaluationMeta(loc, startStr, endStr *string) (evaluationMeta, int, string) {
+func normalizeEvaluationMeta(loc, sessionDate, startStr, endStr *string) (evaluationMeta, int, string) {
 	var meta evaluationMeta
+	sd, code, msg := normalizeSessionDate(sessionDate)
+	if code > 0 {
+		return meta, code, msg
+	}
+	meta.sessionDate = sd
 	if loc != nil {
 		trimmed := strings.TrimSpace(*loc)
 		if trimmed == "" {
@@ -219,7 +266,7 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		args = append(args, (page-1)*limit, limit)
-		rows, err := db.Query(r.Context(), `SELECT e."id",e."groupId",e."createdById",e."weekDate",e."notes",e."location",e."startTime",e."endTime",e."photoUrls",e."isSubmitted",e."submittedAt",e."createdAt",e."updatedAt",json_build_object('id',g."id",'name',g."name") FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE `+sqlWhere+` ORDER BY e."weekDate" DESC OFFSET $`+strconv.Itoa(len(args)-1)+` LIMIT $`+strconv.Itoa(len(args)), args...)
+		rows, err := db.Query(r.Context(), `SELECT e."id",e."groupId",e."createdById",e."weekDate",e."notes",e."location",e."sessionDate",e."startTime",e."endTime",e."photoUrls",e."isSubmitted",e."submittedAt",e."createdAt",e."updatedAt",json_build_object('id',g."id",'name',g."name") FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE `+sqlWhere+` ORDER BY e."weekDate" DESC OFFSET $`+strconv.Itoa(len(args)-1)+` LIMIT $`+strconv.Itoa(len(args)), args...)
 		if err != nil {
 			httpx.Error(w, 500, "Gagal memuat evaluasi")
 			return
@@ -231,12 +278,13 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 			var wd, created, updated time.Time
 			var notes *string
 			var loc *string
+			var sessionDate *time.Time
 			var startTime, endTime *time.Time
 			var urls []string
 			var submitted bool
 			var submittedAt *time.Time
 			var group json.RawMessage
-			if err = rows.Scan(&id, &gid, &cid, &wd, &notes, &loc, &startTime, &endTime, &urls, &submitted, &submittedAt, &created, &updated, &group); err != nil {
+			if err = rows.Scan(&id, &gid, &cid, &wd, &notes, &loc, &sessionDate, &startTime, &endTime, &urls, &submitted, &submittedAt, &created, &updated, &group); err != nil {
 				httpx.Error(w, 500, "Gagal membaca evaluasi")
 				return
 			}
@@ -254,7 +302,8 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 			}
 			items = append(items, map[string]any{
 				"id": id, "groupId": gid, "createdById": cid, "weekDate": wd, "notes": notes,
-				"location": loc, "startTime": timeHHMMString(startTime), "endTime": timeHHMMString(endTime),
+				"location": loc, "sessionDate": dateYYYYMMDD(sessionDate),
+				"startTime": timeHHMMString(startTime), "endTime": timeHHMMString(endTime),
 				"photoUrls": urls, "isSubmitted": submitted, "submittedAt": submittedAt,
 				"createdAt": created, "updatedAt": updated, "group": group, "attendances": atts,
 			})
@@ -278,7 +327,7 @@ func create(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 400, "Tanggal evaluasi tidak boleh setelah hari ini")
 			return
 		}
-		meta, code, msg := normalizeEvaluationMeta(in.Location, in.StartTime, in.EndTime)
+		meta, code, msg := normalizeEvaluationMeta(in.Location, in.SessionDate, in.StartTime, in.EndTime)
 		if code > 0 {
 			httpx.Error(w, code, msg)
 			return
@@ -291,7 +340,7 @@ func create(db *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 		id := uuid.NewString()
-		_, err = tx.Exec(r.Context(), `INSERT INTO "WeeklyEvaluation" ("id","groupId","createdById","weekDate","notes","location","startTime","endTime","updatedAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW())`, id, in.GroupID, c.UserID, wd, in.Notes, meta.location, meta.start, meta.end)
+		_, err = tx.Exec(r.Context(), `INSERT INTO "WeeklyEvaluation" ("id","groupId","createdById","weekDate","notes","location","sessionDate","startTime","endTime","updatedAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())`, id, in.GroupID, c.UserID, wd, in.Notes, meta.location, meta.sessionDate, meta.start, meta.end)
 		if err == nil {
 			for _, a := range in.Attendances {
 				_, err = tx.Exec(r.Context(), `INSERT INTO "EvaluationAttendance" ("id","evaluationId","userId","status","note") VALUES($1,$2,$3,$4::"AttendanceStatus",$5)`, uuid.NewString(), id, a.UserID, a.Status, a.Note)
@@ -323,11 +372,12 @@ func detailByID(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, id str
 	var wd, created, updated time.Time
 	var notes *string
 	var loc *string
+	var sessionDate *time.Time
 	var startTime, endTime *time.Time
 	var urls []string
 	var submitted bool
 	var submittedAt *time.Time
-	err := db.QueryRow(r.Context(), `SELECT "groupId","createdById","weekDate","notes","location","startTime","endTime","photoUrls","isSubmitted","submittedAt","createdAt","updatedAt" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &cid, &wd, &notes, &loc, &startTime, &endTime, &urls, &submitted, &submittedAt, &created, &updated)
+	err := db.QueryRow(r.Context(), `SELECT "groupId","createdById","weekDate","notes","location","sessionDate","startTime","endTime","photoUrls","isSubmitted","submittedAt","createdAt","updatedAt" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &cid, &wd, &notes, &loc, &sessionDate, &startTime, &endTime, &urls, &submitted, &submittedAt, &created, &updated)
 	if err == pgx.ErrNoRows {
 		httpx.Error(w, 404, "Evaluasi tidak ditemukan")
 		return
@@ -358,7 +408,8 @@ func detailByID(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, id str
 	_ = db.QueryRow(r.Context(), `SELECT "id","name" FROM "Group" WHERE "id"=$1`, gid).Scan(&groupID, &groupName)
 	httpx.Success(w, status, map[string]any{
 		"id": id, "groupId": gid, "createdById": cid, "weekDate": wd, "notes": notes,
-		"location": loc, "startTime": timeHHMMString(startTime), "endTime": timeHHMMString(endTime),
+		"location": loc, "sessionDate": dateYYYYMMDD(sessionDate),
+		"startTime": timeHHMMString(startTime), "endTime": timeHHMMString(endTime),
 		"photoUrls": urls, "isSubmitted": submitted, "submittedAt": submittedAt,
 		"createdAt": created, "updatedAt": updated, "attendances": as,
 		"group": map[string]string{"id": groupID, "name": groupName},
@@ -384,6 +435,7 @@ func update(db *pgxpool.Pool) http.HandlerFunc {
 		var raw struct {
 			Notes       *string      `json:"notes"`
 			Location    *string      `json:"location"`
+			SessionDate *string      `json:"sessionDate"`
 			StartTime   *string      `json:"startTime"`
 			EndTime     *string      `json:"endTime"`
 			Attendances []attendance `json:"attendances"`
@@ -392,7 +444,7 @@ func update(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 400, "Data evaluasi tidak valid")
 			return
 		}
-		meta, code, msg := normalizeEvaluationMeta(raw.Location, raw.StartTime, raw.EndTime)
+		meta, code, msg := normalizeEvaluationMeta(raw.Location, raw.SessionDate, raw.StartTime, raw.EndTime)
 		if code > 0 {
 			httpx.Error(w, code, msg)
 			return
@@ -403,7 +455,7 @@ func update(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
-		_, err = tx.Exec(r.Context(), `UPDATE "WeeklyEvaluation" SET "notes"=$1,"location"=$2,"startTime"=$3,"endTime"=$4,"updatedAt"=NOW() WHERE "id"=$5`, raw.Notes, meta.location, meta.start, meta.end, id)
+		_, err = tx.Exec(r.Context(), `UPDATE "WeeklyEvaluation" SET "notes"=$1,"location"=$2,"sessionDate"=$3,"startTime"=$4,"endTime"=$5,"updatedAt"=NOW() WHERE "id"=$6`, raw.Notes, meta.location, meta.sessionDate, meta.start, meta.end, id)
 		if err == nil && raw.Attendances != nil {
 			if !validAttendance(raw.Attendances) {
 				httpx.Error(w, 400, "Data kehadiran tidak valid")

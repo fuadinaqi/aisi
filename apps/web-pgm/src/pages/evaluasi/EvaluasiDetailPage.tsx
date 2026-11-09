@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import { compressImage, isImageFile } from '@/lib/compressImage';
-import { formatTimeRangeWib, formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
+import { formatDate, formatTimeRangeWib, formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
@@ -133,6 +133,7 @@ export default function EvaluasiDetailPage() {
           weekDate={data.weekDate}
           notes={data.notes}
           location={data.location}
+          sessionDate={data.sessionDate}
           startTime={data.startTime}
           endTime={data.endTime}
           attendances={attendances.map((att) => ({
@@ -249,6 +250,12 @@ export default function EvaluasiDetailPage() {
               <p className="text-muted-foreground">Status</p>
               <p className="font-medium">{data.isSubmitted ? 'Terkirim' : 'Draft'}</p>
             </div>
+            {data.sessionDate && (
+              <div>
+                <p className="text-muted-foreground">Tanggal liqo</p>
+                <p className="font-medium">{formatDate(data.sessionDate)}</p>
+              </div>
+            )}
             {data.location?.trim() && (
               <div>
                 <p className="text-muted-foreground">Tempat</p>

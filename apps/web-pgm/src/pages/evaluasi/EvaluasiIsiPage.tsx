@@ -39,6 +39,7 @@ export default function IsiEvaluasiPage() {
   const [weekDate, setWeekDate] = useState(searchParams.get('weekDate') || todayMax);
   const [notes, setNotes] = useState('');
   const [location, setLocation] = useState('');
+  const [sessionDate, setSessionDate] = useState(todayMax);
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [attendances, setAttendances] = useState<
@@ -126,6 +127,9 @@ export default function IsiEvaluasiPage() {
         setWeekDate(toWeekDateParam(ev.weekDate));
         setNotes(ev.notes || '');
         setLocation(ev.location?.trim() || '');
+        setSessionDate(
+          ev.sessionDate ? toDateInputValue(new Date(ev.sessionDate)) : todayMax,
+        );
         setStartTime(ev.startTime?.trim() || '');
         setEndTime(ev.endTime?.trim() || '');
         setExistingPhotoUrl(ev.photoUrls?.[0] ? getMediaUrl(ev.photoUrls[0]) : null);
@@ -142,6 +146,7 @@ export default function IsiEvaluasiPage() {
         setIsSubmitted(false);
         setNotes('');
         setLocation('');
+        setSessionDate(todayMax);
         setStartTime('');
         setEndTime('');
         setExistingPhotoUrl(null);
@@ -152,6 +157,7 @@ export default function IsiEvaluasiPage() {
       setIsSubmitted(false);
       setNotes('');
       setLocation('');
+      setSessionDate(todayMax);
       setStartTime('');
       setEndTime('');
       setExistingPhotoUrl(null);
@@ -178,6 +184,8 @@ export default function IsiEvaluasiPage() {
   const validateSessionMeta = (): string | null => {
     const place = location.trim();
     if (place.length > 200) return 'Tempat maksimal 200 karakter';
+    const day = sessionDate.trim();
+    if (day && day > todayMax) return 'Tanggal tidak boleh setelah hari ini';
     const hasStart = !!startTime.trim();
     const hasEnd = !!endTime.trim();
     if (hasStart !== hasEnd) return 'Isi jam mulai dan jam selesai';
@@ -207,6 +215,7 @@ export default function IsiEvaluasiPage() {
         weekDate,
         notes,
         location: location.trim() || null,
+        sessionDate: sessionDate.trim() || null,
         startTime: startTime.trim() || null,
         endTime: endTime.trim() || null,
         attendances: attendances.map(({ userId, status, note }) => ({
@@ -337,6 +346,19 @@ export default function IsiEvaluasiPage() {
             <p className="text-sm text-muted-foreground">Memuat data evaluasi...</p>
           ) : (
             <>
+              <div className="space-y-2">
+                <Label htmlFor="sessionDate">Tanggal liqo</Label>
+                <Input
+                  id="sessionDate"
+                  type="date"
+                  value={sessionDate}
+                  max={todayMax}
+                  onChange={(e) => setSessionDate(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Hari liqo dilaksanakan (default hari ini).
+                </p>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="location">Tempat</Label>
                 <Input
@@ -476,6 +498,7 @@ export default function IsiEvaluasiPage() {
                 weekDate={weekDate}
                 notes={notes}
                 location={location.trim() || null}
+                sessionDate={sessionDate.trim() || null}
                 startTime={startTime.trim() || null}
                 endTime={endTime.trim() || null}
                 attendances={attendances.map(({ name, status, note }) => ({ name, status, note }))}

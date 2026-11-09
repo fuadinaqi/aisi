@@ -126,6 +126,10 @@ export function EvaluationInfiniteList({
                       groupName={e.group?.name ?? 'Kelompok'}
                       weekDate={e.weekDate}
                       notes={e.notes}
+                      location={e.location}
+                      sessionDate={e.sessionDate}
+                      startTime={e.startTime}
+                      endTime={e.endTime}
                       attendances={(e.attendances ?? []).map((att) => ({
                         name: att.user?.name ?? '',
                         status: att.status,

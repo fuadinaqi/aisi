@@ -106,6 +106,7 @@ export interface EvaluationItem {
   isSubmitted: boolean;
   notes?: string;
   location?: string | null;
+  sessionDate?: string | null;
   startTime?: string | null;
   endTime?: string | null;
   photoUrls?: string[];

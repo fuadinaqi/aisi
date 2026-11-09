@@ -16,6 +16,7 @@ export function ShareLiqoReportButton({
   attendances,
   notes,
   location,
+  sessionDate,
   startTime,
   endTime,
   className,
@@ -32,6 +33,7 @@ export function ShareLiqoReportButton({
         attendances,
         notes,
         location,
+        sessionDate,
         startTime,
         endTime,
       });
