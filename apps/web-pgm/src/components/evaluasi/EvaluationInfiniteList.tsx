@@ -101,7 +101,11 @@ export function EvaluationInfiniteList({
         <div className="divide-y">
           {evaluations.map((e) => {
             const href = canManage
-              ? `/evaluasi/isi?groupId=${e.group?.id ?? ''}&weekDate=${toDateInputValue(new Date(e.weekDate))}`
+              ? `/evaluasi/isi?groupId=${e.group?.id ?? ''}&sessionDate=${
+                  e.sessionDate
+                    ? toDateInputValue(new Date(e.sessionDate))
+                    : toDateInputValue(new Date(e.weekDate))
+                }`
               : `/evaluasi/${e.id}`;
             const statusLabel = e.isSubmitted
               ? canManage

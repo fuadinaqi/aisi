@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn, formatWeekRange, getMediaUrl, toDateInputValue, toWeekDateParam } from '@/lib/utils';
+import { weekPosterMeta } from '@/lib/laporanPoster';
+import { cn, formatDate, getMediaUrl, toDateInputValue, toWeekDateParam } from '@/lib/utils';
 import { compressImage, isImageFile } from '@/lib/compressImage';
 import type { EvaluationItem, GroupItem } from '@/lib/types';
 import { toastError, toastSuccess } from '@/lib/toast';
@@ -36,10 +37,11 @@ export default function IsiEvaluasiPage() {
   const [searchParams] = useSearchParams();
   const todayMax = toDateInputValue();
   const [groupId, setGroupId] = useState(searchParams.get('groupId') || '');
-  const [weekDate, setWeekDate] = useState(searchParams.get('weekDate') || todayMax);
   const [notes, setNotes] = useState('');
   const [location, setLocation] = useState('');
-  const [sessionDate, setSessionDate] = useState(todayMax);
+  const [sessionDate, setSessionDate] = useState(
+    searchParams.get('sessionDate') || searchParams.get('weekDate') || todayMax,
+  );
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [attendances, setAttendances] = useState<
@@ -112,23 +114,23 @@ export default function IsiEvaluasiPage() {
     );
   }, []);
 
-  const loadExistingEvaluation = useCallback(async (gid: string, week: string) => {
+  const loadExistingEvaluation = useCallback(async (gid: string, forSessionDate: string) => {
+    if (!forSessionDate) return;
     setEvalLoading(true);
     setError('');
     try {
       const res = await api.get<ApiResponse<EvaluationItem[]>>('/evaluations', {
-        params: { groupId: gid, weekDate: toWeekDateParam(week), limit: 1 },
+        params: { groupId: gid, weekDate: toWeekDateParam(forSessionDate), limit: 1 },
       });
       const ev = res.data.data?.[0];
       clearSelectedPhoto();
       if (ev) {
         setEvalId(ev.id);
         setIsSubmitted(ev.isSubmitted);
-        setWeekDate(toWeekDateParam(ev.weekDate));
         setNotes(ev.notes || '');
         setLocation(ev.location?.trim() || '');
         setSessionDate(
-          ev.sessionDate ? toDateInputValue(new Date(ev.sessionDate)) : todayMax,
+          ev.sessionDate ? toDateInputValue(new Date(ev.sessionDate)) : forSessionDate,
         );
         setStartTime(ev.startTime?.trim() || '');
         setEndTime(ev.endTime?.trim() || '');
@@ -146,7 +148,7 @@ export default function IsiEvaluasiPage() {
         setIsSubmitted(false);
         setNotes('');
         setLocation('');
-        setSessionDate(todayMax);
+        setSessionDate(forSessionDate);
         setStartTime('');
         setEndTime('');
         setExistingPhotoUrl(null);
@@ -157,7 +159,7 @@ export default function IsiEvaluasiPage() {
       setIsSubmitted(false);
       setNotes('');
       setLocation('');
-      setSessionDate(todayMax);
+      setSessionDate(forSessionDate);
       setStartTime('');
       setEndTime('');
       setExistingPhotoUrl(null);
@@ -168,13 +170,15 @@ export default function IsiEvaluasiPage() {
   }, [clearSelectedPhoto, loadGroupMembers]);
 
   useEffect(() => {
-    if (!groupId || !weekDate) return;
-    loadExistingEvaluation(groupId, weekDate);
-  }, [groupId, weekDate, loadExistingEvaluation]);
+    if (!groupId || !sessionDate) return;
+    loadExistingEvaluation(groupId, sessionDate);
+  }, [groupId, sessionDate, loadExistingEvaluation]);
 
-  const handleWeekDateChange = (value: string) => {
+  const pekanMeta = sessionDate ? weekPosterMeta(sessionDate) : null;
+
+  const handleSessionDateChange = (value: string) => {
     if (!value || value > todayMax) return;
-    setWeekDate(value);
+    setSessionDate(value);
   };
 
   const handleGroupChange = (value: string) => {
@@ -185,7 +189,8 @@ export default function IsiEvaluasiPage() {
     const place = location.trim();
     if (place.length > 200) return 'Tempat maksimal 200 karakter';
     const day = sessionDate.trim();
-    if (day && day > todayMax) return 'Tanggal tidak boleh setelah hari ini';
+    if (!day) return 'Tanggal wajib diisi';
+    if (day > todayMax) return 'Tanggal tidak boleh setelah hari ini';
     const hasStart = !!startTime.trim();
     const hasEnd = !!endTime.trim();
     if (hasStart !== hasEnd) return 'Isi jam mulai dan jam selesai';
@@ -212,10 +217,10 @@ export default function IsiEvaluasiPage() {
       setError('');
       const payload = {
         groupId,
-        weekDate,
+        weekDate: toWeekDateParam(sessionDate),
         notes,
         location: location.trim() || null,
-        sessionDate: sessionDate.trim() || null,
+        sessionDate: sessionDate.trim(),
         startTime: startTime.trim() || null,
         endTime: endTime.trim() || null,
         attendances: attendances.map(({ userId, status, note }) => ({
@@ -235,7 +240,7 @@ export default function IsiEvaluasiPage() {
         } catch (err: unknown) {
           const status = (err as { response?: { status?: number } })?.response?.status;
           if (status === 409) {
-            await loadExistingEvaluation(groupId, weekDate);
+            await loadExistingEvaluation(groupId, sessionDate);
             throw new Error(
               (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
                 'Evaluasi pekan ini sudah ada. Form telah dimuat untuk diedit.',
@@ -302,7 +307,7 @@ export default function IsiEvaluasiPage() {
 
       {isSubmitted && (
         <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Evaluasi pekan {formatWeekRange(weekDate)} sudah dikirim. Kehadiran, catatan, dan foto masih bisa diperbaiki.{' '}
+          Evaluasi untuk tanggal ini sudah dikirim. Kehadiran, catatan, dan foto masih bisa diperbaiki.{' '}
           <Link to={`/evaluasi/${evalId}`} className="font-medium underline">
             Lihat detail
           </Link>
@@ -317,29 +322,16 @@ export default function IsiEvaluasiPage() {
 
       <Card>
         <CardContent className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Kelompok</Label>
-              <SearchableSelect
-                value={groupId}
-                onChange={handleGroupChange}
-                disabled={evalLoading}
-                placeholder="Pilih kelompok"
-                searchPlaceholder="Cari kelompok..."
-                options={(groups || []).map((g) => ({ value: g.id, label: g.name }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Pekan (Senin)</Label>
-              <Input
-                type="date"
-                value={weekDate}
-                max={todayMax}
-                disabled={evalLoading}
-                onChange={(e) => handleWeekDateChange(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Pekan {formatWeekRange(weekDate)}</p>
-            </div>
+          <div className="space-y-2">
+            <Label>Kelompok</Label>
+            <SearchableSelect
+              value={groupId}
+              onChange={handleGroupChange}
+              disabled={evalLoading}
+              placeholder="Pilih kelompok"
+              searchPlaceholder="Cari kelompok..."
+              options={(groups || []).map((g) => ({ value: g.id, label: g.name }))}
+            />
           </div>
 
           {evalLoading ? (
@@ -347,17 +339,20 @@ export default function IsiEvaluasiPage() {
           ) : (
             <>
               <div className="space-y-2">
-                <Label htmlFor="sessionDate">Tanggal liqo</Label>
+                <Label htmlFor="sessionDate">Tanggal</Label>
                 <Input
                   id="sessionDate"
                   type="date"
                   value={sessionDate}
                   max={todayMax}
-                  onChange={(e) => setSessionDate(e.target.value)}
+                  disabled={evalLoading}
+                  onChange={(e) => handleSessionDateChange(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Hari liqo dilaksanakan (default hari ini).
-                </p>
+                {pekanMeta ? (
+                  <p className="text-xs text-muted-foreground">
+                    Tercatat sebagai {pekanMeta.weekLabel} · {pekanMeta.monthLabel} (otomatis dari tanggal).
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="location">Tempat</Label>
@@ -495,7 +490,7 @@ export default function IsiEvaluasiPage() {
               <ShareLiqoReportButton
                 className="w-full"
                 groupName={groupName}
-                weekDate={weekDate}
+                weekDate={toWeekDateParam(sessionDate)}
                 notes={notes}
                 location={location.trim() || null}
                 sessionDate={sessionDate.trim() || null}
@@ -548,8 +543,8 @@ export default function IsiEvaluasiPage() {
         title="Hapus evaluasi?"
         description={
           isSubmitted
-            ? `Evaluasi pekan ${formatWeekRange(weekDate)} akan dihapus beserta kehadiran dan fotonya. Poin yang sudah diberikan dari evaluasi ini ikut ditarik.`
-            : `Draft evaluasi pekan ${formatWeekRange(weekDate)} akan dihapus.`
+            ? `Evaluasi tanggal ${formatDate(sessionDate)} akan dihapus beserta kehadiran dan fotonya. Poin yang sudah diberikan dari evaluasi ini ikut ditarik.`
+            : `Draft evaluasi untuk pekan ${pekanMeta?.weekLabel ?? 'ini'} akan dihapus.`
         }
         confirmLabel="Hapus"
         destructive

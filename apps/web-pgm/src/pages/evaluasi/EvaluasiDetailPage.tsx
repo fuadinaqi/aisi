@@ -11,7 +11,14 @@ import { Button } from '@/components/ui/button';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import { compressImage, isImageFile } from '@/lib/compressImage';
-import { formatDate, formatTimeRangeWib, formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
+import {
+  formatDate,
+  formatTimeRangeWib,
+  formatWeekRange,
+  getMediaUrl,
+  toDateInputValue,
+  toWeekDateParam,
+} from '@/lib/utils';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
@@ -108,7 +115,13 @@ export default function EvaluasiDetailPage() {
           role === 'PEMBINA' ? (
             <div className="flex gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link to={`/evaluasi/isi?groupId=${group.id}&weekDate=${toWeekDateParam(data.weekDate)}`}>
+                <Link
+                  to={`/evaluasi/isi?groupId=${group.id}&sessionDate=${
+                    data.sessionDate
+                      ? toDateInputValue(new Date(data.sessionDate))
+                      : toWeekDateParam(data.weekDate)
+                  }`}
+                >
                   Edit
                 </Link>
               </Button>
@@ -252,7 +265,7 @@ export default function EvaluasiDetailPage() {
             </div>
             {data.sessionDate && (
               <div>
-                <p className="text-muted-foreground">Tanggal liqo</p>
+                <p className="text-muted-foreground">Tanggal</p>
                 <p className="font-medium">{formatDate(data.sessionDate)}</p>
               </div>
             )}

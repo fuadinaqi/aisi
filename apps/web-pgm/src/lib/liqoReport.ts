@@ -31,7 +31,7 @@ export function buildLiqoReportText(input: LiqoReportInput): string {
   const lines = [input.groupName.trim() || 'Kelompok', `${weekLabel} · ${monthLabel}`];
   const session = input.sessionDate?.trim();
   if (session) {
-    lines.push(`Tanggal liqo: ${formatDate(session)}`);
+    lines.push(`Tanggal: ${formatDate(session)}`);
   }
   const place = input.location?.trim();
   if (place) lines.push(`Tempat: ${place}`);
