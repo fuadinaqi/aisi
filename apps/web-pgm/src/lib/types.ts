@@ -105,6 +105,7 @@ export interface EvaluationItem {
   weekDate: string;
   isSubmitted: boolean;
   notes?: string;
+  photoUrls?: string[];
   group?: { id: string; name: string };
   groupId?: string;
   attendances?: { userId: string; status: string; note?: string; user?: { name: string } }[];
@@ -146,6 +147,9 @@ export interface MateriItem {
   fileUrls: string[];
   fileNames?: string[];
   targetLevels?: string[];
+  schoolId?: string | null;
+  schoolName?: string | null;
+  isPublished?: boolean;
   createdAt?: string;
 }
 
