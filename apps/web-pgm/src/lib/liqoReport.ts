@@ -1,4 +1,5 @@
 import { weekPosterMeta } from '@/lib/laporanPoster';
+import { formatTimeRangeWib, formatWeekRange } from '@/lib/utils';
 
 const SECTIONS = [
   { status: 'HADIR', label: 'Hadir' },
@@ -18,12 +19,24 @@ export type LiqoReportInput = {
   weekDate: string | Date;
   attendances: LiqoReportAttendance[];
   notes?: string | null;
+  location?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
 };
 
 /** Teks rekap liqo untuk dibagikan ke grup, misalnya lewat WhatsApp. */
 export function buildLiqoReportText(input: LiqoReportInput): string {
   const { weekLabel, monthLabel } = weekPosterMeta(input.weekDate);
-  const lines = [input.groupName.trim() || 'Kelompok', weekLabel, monthLabel, ''];
+  const lines = [
+    input.groupName.trim() || 'Kelompok',
+    `${weekLabel} · ${monthLabel}`,
+    formatWeekRange(input.weekDate),
+  ];
+  const place = input.location?.trim();
+  if (place) lines.push(`Tempat: ${place}`);
+  const jam = formatTimeRangeWib(input.startTime, input.endTime);
+  if (jam) lines.push(`Jam: ${jam}`);
+  lines.push('');
 
   for (const section of SECTIONS) {
     const people = input.attendances

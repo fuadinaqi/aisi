@@ -15,6 +15,9 @@ export function ShareLiqoReportButton({
   weekDate,
   attendances,
   notes,
+  location,
+  startTime,
+  endTime,
   className,
   compact = false,
 }: ShareLiqoReportButtonProps) {
@@ -23,7 +26,15 @@ export function ShareLiqoReportButton({
   const share = async () => {
     try {
       setPending(true);
-      const text = buildLiqoReportText({ groupName, weekDate, attendances, notes });
+      const text = buildLiqoReportText({
+        groupName,
+        weekDate,
+        attendances,
+        notes,
+        location,
+        startTime,
+        endTime,
+      });
       const result = await sharePlainText(text);
       if (result === 'copied') {
         toastSuccess('Laporan disalin', 'Tempel di grup WhatsApp.');

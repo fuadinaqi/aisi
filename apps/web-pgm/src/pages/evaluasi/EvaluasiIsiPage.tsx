@@ -38,6 +38,9 @@ export default function IsiEvaluasiPage() {
   const [groupId, setGroupId] = useState(searchParams.get('groupId') || '');
   const [weekDate, setWeekDate] = useState(searchParams.get('weekDate') || todayMax);
   const [notes, setNotes] = useState('');
+  const [location, setLocation] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [attendances, setAttendances] = useState<
     { userId: string; name: string; status: string; note?: string }[]
   >([]);
@@ -122,6 +125,9 @@ export default function IsiEvaluasiPage() {
         setIsSubmitted(ev.isSubmitted);
         setWeekDate(toWeekDateParam(ev.weekDate));
         setNotes(ev.notes || '');
+        setLocation(ev.location?.trim() || '');
+        setStartTime(ev.startTime?.trim() || '');
+        setEndTime(ev.endTime?.trim() || '');
         setExistingPhotoUrl(ev.photoUrls?.[0] ? getMediaUrl(ev.photoUrls[0]) : null);
         setAttendances(
           (ev.attendances ?? []).map((a) => ({
@@ -135,6 +141,9 @@ export default function IsiEvaluasiPage() {
         setEvalId('');
         setIsSubmitted(false);
         setNotes('');
+        setLocation('');
+        setStartTime('');
+        setEndTime('');
         setExistingPhotoUrl(null);
         await loadGroupMembers(gid);
       }
@@ -142,6 +151,9 @@ export default function IsiEvaluasiPage() {
       setEvalId('');
       setIsSubmitted(false);
       setNotes('');
+      setLocation('');
+      setStartTime('');
+      setEndTime('');
       setExistingPhotoUrl(null);
       await loadGroupMembers(gid);
     } finally {
@@ -163,8 +175,24 @@ export default function IsiEvaluasiPage() {
     setGroupId(value);
   };
 
+  const validateSessionMeta = (): string | null => {
+    const place = location.trim();
+    if (place.length > 200) return 'Tempat maksimal 200 karakter';
+    const hasStart = !!startTime.trim();
+    const hasEnd = !!endTime.trim();
+    if (hasStart !== hasEnd) return 'Isi jam mulai dan jam selesai';
+    if (hasStart && startTime > endTime) return 'Jam mulai tidak boleh setelah jam selesai';
+    return null;
+  };
+
   const save = async (submit = false) => {
     const alreadySubmitted = isSubmitted;
+    const metaErr = validateSessionMeta();
+    if (metaErr) {
+      setError(metaErr);
+      toastError(new Error(metaErr));
+      return;
+    }
     if (submit && !alreadySubmitted && !photoFile && !existingPhotoUrl) {
       setError('Foto agenda liqo wajib diunggah');
       toastError(new Error('Foto agenda liqo wajib diunggah'));
@@ -178,6 +206,9 @@ export default function IsiEvaluasiPage() {
         groupId,
         weekDate,
         notes,
+        location: location.trim() || null,
+        startTime: startTime.trim() || null,
+        endTime: endTime.trim() || null,
         attendances: attendances.map(({ userId, status, note }) => ({
           userId,
           status,
@@ -306,6 +337,39 @@ export default function IsiEvaluasiPage() {
             <p className="text-sm text-muted-foreground">Memuat data evaluasi...</p>
           ) : (
             <>
+              <div className="space-y-2">
+                <Label htmlFor="location">Tempat</Label>
+                <Input
+                  id="location"
+                  value={location}
+                  placeholder="Opsional, mis. masjid atau rumah anggota"
+                  onChange={(e) => setLocation(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="startTime">Jam mulai</Label>
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endTime">Jam selesai</Label>
+                  <Input
+                    id="endTime"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tempat dan jam opsional. Jika mengisi jam, isi jam mulai dan selesai.
+              </p>
+
               <div className="space-y-3">
                 <Label>Kehadiran</Label>
                 {attendances.map((att, i) => (
@@ -411,6 +475,9 @@ export default function IsiEvaluasiPage() {
                 groupName={groupName}
                 weekDate={weekDate}
                 notes={notes}
+                location={location.trim() || null}
+                startTime={startTime.trim() || null}
+                endTime={endTime.trim() || null}
                 attendances={attendances.map(({ name, status, note }) => ({ name, status, note }))}
               />
               <Button onClick={() => save(false)} disabled={loading || evalLoading} variant="outline" className="w-full">

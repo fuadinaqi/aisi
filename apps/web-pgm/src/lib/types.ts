@@ -105,6 +105,9 @@ export interface EvaluationItem {
   weekDate: string;
   isSubmitted: boolean;
   notes?: string;
+  location?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
   photoUrls?: string[];
   group?: { id: string; name: string };
   groupId?: string;

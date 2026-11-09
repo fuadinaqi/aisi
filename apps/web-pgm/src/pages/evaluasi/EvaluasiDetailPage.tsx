@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useActiveRole } from '@/components/layout/RoleGuard';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
 import { compressImage, isImageFile } from '@/lib/compressImage';
-import { formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
+import { formatTimeRangeWib, formatWeekRange, getMediaUrl, toWeekDateParam } from '@/lib/utils';
 import { toastError, toastSuccess } from '@/lib/toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ShareLiqoReportButton } from '@/components/evaluasi/ShareLiqoReportButton';
@@ -132,6 +132,9 @@ export default function EvaluasiDetailPage() {
           groupName={group.name}
           weekDate={data.weekDate}
           notes={data.notes}
+          location={data.location}
+          startTime={data.startTime}
+          endTime={data.endTime}
           attendances={attendances.map((att) => ({
             name: att.user?.name ?? '',
             status: att.status,
@@ -246,6 +249,18 @@ export default function EvaluasiDetailPage() {
               <p className="text-muted-foreground">Status</p>
               <p className="font-medium">{data.isSubmitted ? 'Terkirim' : 'Draft'}</p>
             </div>
+            {data.location?.trim() && (
+              <div>
+                <p className="text-muted-foreground">Tempat</p>
+                <p className="font-medium">{data.location.trim()}</p>
+              </div>
+            )}
+            {formatTimeRangeWib(data.startTime, data.endTime) && (
+              <div>
+                <p className="text-muted-foreground">Jam liqo</p>
+                <p className="font-medium">{formatTimeRangeWib(data.startTime, data.endTime)}</p>
+              </div>
+            )}
             {data.notes && (
               <div>
                 <p className="text-muted-foreground">Catatan pembina</p>

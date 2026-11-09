@@ -54,6 +54,15 @@ export function toWeekDateParam(date: string | Date): string {
 }
 
 /** Label rentang pekan (Sen–Min) dalam WIB */
+/** Teks jam liqo untuk tampilan / WhatsApp, mis. "19.00 – 21.00 WIB". */
+export function formatTimeRangeWib(start?: string | null, end?: string | null): string | null {
+  const a = start?.trim();
+  const b = end?.trim();
+  if (!a || !b) return null;
+  const dot = (t: string) => t.replace(':', '.');
+  return `${dot(a)} – ${dot(b)} WIB`;
+}
+
 export function formatWeekRange(date: string | Date): string {
   const mondayParam = toWeekDateParam(date);
   const [y, m, d] = mondayParam.split('-').map(Number);

@@ -32,7 +32,69 @@ type evaluationInput struct {
 	GroupID     string       `json:"groupId"`
 	WeekDate    string       `json:"weekDate"`
 	Notes       *string      `json:"notes"`
+	Location    *string      `json:"location"`
+	StartTime   *string      `json:"startTime"`
+	EndTime     *string      `json:"endTime"`
 	Attendances []attendance `json:"attendances"`
+}
+
+const maxEvaluationLocation = 200
+
+type evaluationMeta struct {
+	location *string
+	start    *time.Time
+	end      *time.Time
+}
+
+func parseTimeHHMM(s string) (time.Time, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, false
+	}
+	t, err := time.Parse("15:04", s)
+	return t, err == nil
+}
+
+func timeHHMMString(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.Format("15:04")
+}
+
+func normalizeEvaluationMeta(loc, startStr, endStr *string) (evaluationMeta, int, string) {
+	var meta evaluationMeta
+	if loc != nil {
+		trimmed := strings.TrimSpace(*loc)
+		if trimmed == "" {
+			meta.location = nil
+		} else if len(trimmed) > maxEvaluationLocation {
+			return meta, 400, "Tempat maksimal 200 karakter"
+		} else {
+			meta.location = &trimmed
+		}
+	}
+	hasStart := startStr != nil && strings.TrimSpace(*startStr) != ""
+	hasEnd := endStr != nil && strings.TrimSpace(*endStr) != ""
+	if hasStart != hasEnd {
+		return meta, 400, "Isi jam mulai dan jam selesai"
+	}
+	if hasStart {
+		st, ok := parseTimeHHMM(*startStr)
+		if !ok {
+			return meta, 400, "Format jam mulai tidak valid"
+		}
+		en, ok := parseTimeHHMM(*endStr)
+		if !ok {
+			return meta, 400, "Format jam selesai tidak valid"
+		}
+		if st.After(en) {
+			return meta, 400, "Jam mulai tidak boleh setelah jam selesai"
+		}
+		meta.start = &st
+		meta.end = &en
+	}
+	return meta, 0, ""
 }
 
 func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
@@ -157,7 +219,7 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		args = append(args, (page-1)*limit, limit)
-		rows, err := db.Query(r.Context(), `SELECT e."id",e."groupId",e."createdById",e."weekDate",e."notes",e."photoUrls",e."isSubmitted",e."submittedAt",e."createdAt",e."updatedAt",json_build_object('id',g."id",'name',g."name") FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE `+sqlWhere+` ORDER BY e."weekDate" DESC OFFSET $`+strconv.Itoa(len(args)-1)+` LIMIT $`+strconv.Itoa(len(args)), args...)
+		rows, err := db.Query(r.Context(), `SELECT e."id",e."groupId",e."createdById",e."weekDate",e."notes",e."location",e."startTime",e."endTime",e."photoUrls",e."isSubmitted",e."submittedAt",e."createdAt",e."updatedAt",json_build_object('id',g."id",'name',g."name") FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE `+sqlWhere+` ORDER BY e."weekDate" DESC OFFSET $`+strconv.Itoa(len(args)-1)+` LIMIT $`+strconv.Itoa(len(args)), args...)
 		if err != nil {
 			httpx.Error(w, 500, "Gagal memuat evaluasi")
 			return
@@ -168,11 +230,13 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 			var id, gid, cid string
 			var wd, created, updated time.Time
 			var notes *string
+			var loc *string
+			var startTime, endTime *time.Time
 			var urls []string
 			var submitted bool
 			var submittedAt *time.Time
 			var group json.RawMessage
-			if err = rows.Scan(&id, &gid, &cid, &wd, &notes, &urls, &submitted, &submittedAt, &created, &updated, &group); err != nil {
+			if err = rows.Scan(&id, &gid, &cid, &wd, &notes, &loc, &startTime, &endTime, &urls, &submitted, &submittedAt, &created, &updated, &group); err != nil {
 				httpx.Error(w, 500, "Gagal membaca evaluasi")
 				return
 			}
@@ -188,7 +252,12 @@ func list(db *pgxpool.Pool) http.HandlerFunc {
 				}
 				aRows.Close()
 			}
-			items = append(items, map[string]any{"id": id, "groupId": gid, "createdById": cid, "weekDate": wd, "notes": notes, "photoUrls": urls, "isSubmitted": submitted, "submittedAt": submittedAt, "createdAt": created, "updatedAt": updated, "group": group, "attendances": atts})
+			items = append(items, map[string]any{
+				"id": id, "groupId": gid, "createdById": cid, "weekDate": wd, "notes": notes,
+				"location": loc, "startTime": timeHHMMString(startTime), "endTime": timeHHMMString(endTime),
+				"photoUrls": urls, "isSubmitted": submitted, "submittedAt": submittedAt,
+				"createdAt": created, "updatedAt": updated, "group": group, "attendances": atts,
+			})
 		}
 		httpx.Paginated(w, items, page, limit, total)
 	}
@@ -209,6 +278,11 @@ func create(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 400, "Tanggal evaluasi tidak boleh setelah hari ini")
 			return
 		}
+		meta, code, msg := normalizeEvaluationMeta(in.Location, in.StartTime, in.EndTime)
+		if code > 0 {
+			httpx.Error(w, code, msg)
+			return
+		}
 		c, _ := middleware.Claims(r)
 		tx, err := db.Begin(r.Context())
 		if err != nil {
@@ -217,7 +291,7 @@ func create(db *pgxpool.Pool) http.HandlerFunc {
 		}
 		defer tx.Rollback(r.Context())
 		id := uuid.NewString()
-		_, err = tx.Exec(r.Context(), `INSERT INTO "WeeklyEvaluation" ("id","groupId","createdById","weekDate","notes","updatedAt") VALUES($1,$2,$3,$4,$5,NOW())`, id, in.GroupID, c.UserID, wd, in.Notes)
+		_, err = tx.Exec(r.Context(), `INSERT INTO "WeeklyEvaluation" ("id","groupId","createdById","weekDate","notes","location","startTime","endTime","updatedAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW())`, id, in.GroupID, c.UserID, wd, in.Notes, meta.location, meta.start, meta.end)
 		if err == nil {
 			for _, a := range in.Attendances {
 				_, err = tx.Exec(r.Context(), `INSERT INTO "EvaluationAttendance" ("id","evaluationId","userId","status","note") VALUES($1,$2,$3,$4::"AttendanceStatus",$5)`, uuid.NewString(), id, a.UserID, a.Status, a.Note)
@@ -248,10 +322,12 @@ func detailByID(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, id str
 	var gid, cid string
 	var wd, created, updated time.Time
 	var notes *string
+	var loc *string
+	var startTime, endTime *time.Time
 	var urls []string
 	var submitted bool
 	var submittedAt *time.Time
-	err := db.QueryRow(r.Context(), `SELECT "groupId","createdById","weekDate","notes","photoUrls","isSubmitted","submittedAt","createdAt","updatedAt" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &cid, &wd, &notes, &urls, &submitted, &submittedAt, &created, &updated)
+	err := db.QueryRow(r.Context(), `SELECT "groupId","createdById","weekDate","notes","location","startTime","endTime","photoUrls","isSubmitted","submittedAt","createdAt","updatedAt" FROM "WeeklyEvaluation" WHERE "id"=$1`, id).Scan(&gid, &cid, &wd, &notes, &loc, &startTime, &endTime, &urls, &submitted, &submittedAt, &created, &updated)
 	if err == pgx.ErrNoRows {
 		httpx.Error(w, 404, "Evaluasi tidak ditemukan")
 		return
@@ -282,6 +358,7 @@ func detailByID(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, id str
 	_ = db.QueryRow(r.Context(), `SELECT "id","name" FROM "Group" WHERE "id"=$1`, gid).Scan(&groupID, &groupName)
 	httpx.Success(w, status, map[string]any{
 		"id": id, "groupId": gid, "createdById": cid, "weekDate": wd, "notes": notes,
+		"location": loc, "startTime": timeHHMMString(startTime), "endTime": timeHHMMString(endTime),
 		"photoUrls": urls, "isSubmitted": submitted, "submittedAt": submittedAt,
 		"createdAt": created, "updatedAt": updated, "attendances": as,
 		"group": map[string]string{"id": groupID, "name": groupName},
@@ -306,10 +383,18 @@ func update(db *pgxpool.Pool) http.HandlerFunc {
 		}
 		var raw struct {
 			Notes       *string      `json:"notes"`
+			Location    *string      `json:"location"`
+			StartTime   *string      `json:"startTime"`
+			EndTime     *string      `json:"endTime"`
 			Attendances []attendance `json:"attendances"`
 		}
 		if !decode(r, &raw) {
 			httpx.Error(w, 400, "Data evaluasi tidak valid")
+			return
+		}
+		meta, code, msg := normalizeEvaluationMeta(raw.Location, raw.StartTime, raw.EndTime)
+		if code > 0 {
+			httpx.Error(w, code, msg)
 			return
 		}
 		tx, err := db.Begin(r.Context())
@@ -318,9 +403,7 @@ func update(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback(r.Context())
-		if raw.Notes != nil {
-			_, err = tx.Exec(r.Context(), `UPDATE "WeeklyEvaluation" SET "notes"=$1,"updatedAt"=NOW() WHERE "id"=$2`, raw.Notes, id)
-		}
+		_, err = tx.Exec(r.Context(), `UPDATE "WeeklyEvaluation" SET "notes"=$1,"location"=$2,"startTime"=$3,"endTime"=$4,"updatedAt"=NOW() WHERE "id"=$5`, raw.Notes, meta.location, meta.start, meta.end, id)
 		if err == nil && raw.Attendances != nil {
 			if !validAttendance(raw.Attendances) {
 				httpx.Error(w, 400, "Data kehadiran tidak valid")
