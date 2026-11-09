@@ -55,7 +55,7 @@ export function InviteForm({
 }: InviteFormProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [addMode, setAddMode] = useState<'account' | 'profileOnly'>('account');
+  const [addMode, setAddMode] = useState<'account' | 'profileOnly'>('profileOnly');
 
   const {
     register,

@@ -134,7 +134,7 @@ export default function UndangAnggotaPage() {
           </div>
         ) : (
           <InviteForm
-            description="Tanpa password, anggota menerima undangan email. Centang set password langsung agar akun langsung aktif. Pilih “tambah data saja” jika email belum ada."
+            description="Default: tambah data saja (tanpa email). Pilih “buat akun sekarang” jika ingin undangan email atau set password langsung."
             submitLabel="Tambah anggota"
             successMessage="Anggota berhasil ditambahkan"
             showPhone
