@@ -9,6 +9,7 @@ import (
 
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/domain/constants"
+	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/domain/usercred"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-pgm/internal/response"
@@ -126,7 +127,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.SchoolID != nil && *in.SchoolID != "" && !h.assertSchoolAccess(r, *in.SchoolID) {
-		httpx.Error(w, 403, "Akses PGM ditolak")
+		httpx.Error(w, 403, "Akses sekolah ditolak")
 		return
 	}
 	// Undangan anggota ke kelompok: gender diisi otomatis dari jenis kelompok.
@@ -156,7 +157,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Role == "PJ_SEKOLAH" && (in.SchoolID == nil || *in.SchoolID == "") {
-		httpx.Error(w, 400, "PGM wajib dipilih untuk undangan ini")
+		httpx.Error(w, 400, "Sekolah wajib dipilih untuk undangan ini")
 		return
 	}
 	if h.pendingInvitation(r, in.Email) {
@@ -166,10 +167,10 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	existingUser := h.activeUser(r, in.Email)
 	schoolAttachOnly := false
 	if existingUser && h.userHasRole(r, in.Email, in.Role) {
-		// Pembina boleh di beberapa PGM: undang ulang = tautkan PGM baru.
+		// Pembina boleh di beberapa sekolah: undang ulang = tautkan sekolah baru.
 		if in.Role == "PEMBINA" && in.SchoolID != nil && *in.SchoolID != "" {
 			if h.userInSchool(r, in.Email, *in.SchoolID) {
-				httpx.Error(w, 400, "Pembina sudah terdaftar di PGM ini")
+				httpx.Error(w, 400, "Pembina sudah terdaftar di sekolah ini")
 				return
 			}
 			schoolAttachOnly = true
@@ -196,7 +197,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	msg := "Undangan berhasil dikirim"
 	if schoolAttachOnly {
-		msg = "Undangan penugasan pembina ke PGM berhasil dikirim"
+		msg = "Undangan penugasan pembina ke sekolah berhasil dikirim"
 	} else if existingUser {
 		msg = "Undangan peran tambahan berhasil dikirim"
 	}
@@ -279,9 +280,7 @@ func (h Handler) pendingInvitation(r *http.Request, email string) bool {
 }
 
 func (h Handler) activeUser(r *http.Request, email string) bool {
-	var exists bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive")`, validate.NormalizeEmail(email)).Scan(&exists)
-	return exists
+	return usercred.UserHasCredentials(r.Context(), h.DB, email)
 }
 
 func (h Handler) userHasRole(r *http.Request, email, role string) bool {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -86,6 +86,12 @@ export default function EditAnggotaPage() {
     enabled: !!id && !!userId,
   });
 
+  const formSchema = useMemo(
+    () =>
+      member?.user.hasAccount === false ? editMemberSchema.omit({ email: true }) : editMemberSchema,
+    [member?.user.hasAccount],
+  );
+
   const {
     register,
     control,
@@ -93,7 +99,7 @@ export default function EditAnggotaPage() {
     reset,
     formState: { isSubmitting, errors },
   } = useForm<FormData>({
-    resolver: zodResolver(editMemberSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: emptyForm(),
   });
 
@@ -102,7 +108,7 @@ export default function EditAnggotaPage() {
     const g = member.user.gender === 'AKHWAT' ? 'AKHWAT' : 'IKHWAN';
     reset({
       name: member.user.name,
-      email: member.user.email,
+      email: member.user.email || '',
       phone: member.user.phone || '',
       gender: g,
       birthPlace: member.user.birthPlace || '',
@@ -123,9 +129,8 @@ export default function EditAnggotaPage() {
   const onSubmit = async (data: FormData) => {
     try {
       setError('');
-      await api.put(`/groups/${id}/members/${userId}`, {
+      const payload: Record<string, unknown> = {
         name: data.name.trim(),
-        email: data.email.trim(),
         phone: data.phone?.trim() || null,
         gender: data.gender,
         birthPlace: data.birthPlace?.trim() ?? '',
@@ -140,7 +145,11 @@ export default function EditAnggotaPage() {
         motherName: data.motherName?.trim() ?? '',
         motherPhone: data.motherPhone?.trim() ?? '',
         hobby: data.hobby?.trim() ?? '',
-      });
+      };
+      if (member.user.hasAccount !== false) {
+        payload.email = data.email.trim();
+      }
+      await api.put(`/groups/${id}/members/${userId}`, payload);
       await queryClient.invalidateQueries({ queryKey: ['group-member', id, userId] });
       await invalidateGroupQueries(queryClient, { groupId: id });
       toastSuccess('Berhasil disimpan');
@@ -164,6 +173,7 @@ export default function EditAnggotaPage() {
 
   if (!member) return null;
 
+  const pendingAccount = member.user.hasAccount === false;
   const err = errors;
 
   return (
@@ -193,9 +203,19 @@ export default function EditAnggotaPage() {
               <Field id="name" label="Nama lengkap" error={err.name?.message}>
                 <Input id="name" className="rounded-xl" {...register('name')} />
               </Field>
-              <Field id="email" label="Email" error={err.email?.message}>
-                <Input id="email" type="email" className="rounded-xl" {...register('email')} />
-              </Field>
+              {pendingAccount ? (
+                <p className="rounded-xl bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                  Email dan akun login diatur lewat{' '}
+                  <Link to={`/kelompok/${id}/anggota/${userId}`} className="font-medium text-primary">
+                    Aktivasi akun
+                  </Link>{' '}
+                  di halaman detail.
+                </p>
+              ) : (
+                <Field id="email" label="Email" error={err.email?.message}>
+                  <Input id="email" type="email" className="rounded-xl" {...register('email')} />
+                </Field>
+              )}
               <Field id="gender" label="Jenis kelamin" error={err.gender?.message}>
                 <Controller
                   name="gender"

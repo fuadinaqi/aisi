@@ -11,6 +11,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/db"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/usercred"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
@@ -1089,9 +1090,6 @@ func (h Handler) stats(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, map[string]int{"totalGroups": groups, "totalAnggota": members, "evaluationsThisWeek": evals, "totalEvaluations": total, "submissionRate": rate}, "")
 }
 func (h Handler) activeEmail(r *http.Request, mail string) bool {
-	var v bool
-	mail = validate.NormalizeEmail(mail)
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive") OR EXISTS(SELECT 1 FROM "UserInvitation" WHERE LOWER("email")=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, mail).Scan(&v)
-	return v
+	return usercred.EmailTaken(r.Context(), h.DB, mail)
 }
 func gender(v string) bool { return v == "IKHWAN" || v == "AKHWAT" }

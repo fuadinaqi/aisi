@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -16,12 +17,15 @@ import { ProfileDetailsCard } from '@/components/shared/ProfileDetailsCard';
 import { Button } from '@/components/ui/button';
 import { formatDate, formatWeekRange, toDateInputValue, toWeekDateParam } from '@/lib/utils';
 import { MutabaahMemberPanel } from '@/components/mutabaah/MutabaahMemberPanel';
+import { ActivateMemberAccountForm } from '@/components/shared/ActivateMemberAccountForm';
+import { invalidateGroupQueries } from '@/lib/queryInvalidation';
 import { ICMemberPanel } from '@/components/ic/ICMemberPanel';
 import type { GroupMemberDetail } from '@/lib/types';
 import { useGroupLevelLabels } from '@/hooks/useGroupLevelLabels';
 
 export default function AnggotaDetailPage() {
   const { id = '', userId = '' } = useParams<{ id: string; userId: string }>();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const role = useActiveRole() || '';
   const canEdit =
@@ -52,7 +56,16 @@ export default function AnggotaDetailPage() {
 
   const group = member.group ?? { id: id || '', name: '-', level: 'LEVEL_1', gender: 'IKHWAN' };
   const school = member.school ?? { id: '', name: '-' };
-  const memberUser = member.user ?? { id: userId || '', name: '-', email: '', phone: null as string | null, totalPoints: 0, lastLoginAt: null as string | null };
+  const memberUser = member.user ?? {
+    id: userId || '',
+    name: '-',
+    email: null as string | null,
+    phone: null as string | null,
+    totalPoints: 0,
+    lastLoginAt: null as string | null,
+    hasAccount: true,
+  };
+  const needsActivation = memberUser.hasAccount === false;
   const groupGender = group.gender ?? 'IKHWAN';
   const theme = getGroupGenderTheme(groupGender);
   const cardClass = cn('p-4', theme.card);
@@ -91,9 +104,30 @@ export default function AnggotaDetailPage() {
         }
       />
 
+      {needsActivation && (
+        <ListGroup className={cn('mb-4 border-amber-200/80 bg-amber-50/80 p-4 dark:border-amber-900/50 dark:bg-amber-950/30', theme.card)}>
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Belum punya akun login</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Anggota sudah bisa dicatat di evaluasi/mutabaah. Aktifkan akun agar bisa login sendiri.
+          </p>
+          {canEdit && (
+            <div className="mt-4">
+              <ActivateMemberAccountForm
+                groupId={id}
+                userId={userId}
+                onSuccess={async () => {
+                  await invalidateGroupQueries(queryClient, { groupId: id });
+                  await queryClient.invalidateQueries({ queryKey: ['group-member', id, userId] });
+                }}
+              />
+            </div>
+          )}
+        </ListGroup>
+      )}
+
       <ProfileHeader
         name={memberUser.name}
-        email={memberUser.email}
+        email={memberUser.email || undefined}
         badge={<RoleBadge role="ANGGOTA" />}
         points={<PointBadge points={memberUser.totalPoints ?? 0} />}
         className={theme.card}
@@ -127,7 +161,7 @@ export default function AnggotaDetailPage() {
           <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">Email</p>
-            <p className="truncate font-medium">{memberUser.email}</p>
+            <p className="truncate font-medium">{memberUser.email || '—'}</p>
           </div>
         </div>
         <div className="flex items-start gap-3 px-4 py-4 md:px-5">

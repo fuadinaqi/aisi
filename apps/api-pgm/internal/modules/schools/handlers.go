@@ -11,6 +11,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/db"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/domain/constants"
+	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/domain/usercred"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-pgm/internal/response"
@@ -40,23 +41,19 @@ func (h Handler) Routes() chi.Router {
 	r.Get("/{id}/pembina", h.pembina)
 	r.Post("/{id}/groups", h.createGroup)
 	r.Get("/{id}/stats", h.stats)
-	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Get("/{id}/template-info", h.templateInfo)
-	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Get("/{id}/template", h.templateFile)
-	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Post("/{id}/template", h.uploadTemplate)
-	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Delete("/{id}/template", h.deleteTemplate)
 	r.Get("/{id}", h.detail)
 	return r
 }
 
 type pjInput struct {
-	UserID        *string `json:"userId"`
-	Name, Email   string
-	Phone         *string
-	Gender        string
-	Password      *string
-	AlsoAsPembina *bool `json:"alsoAsPembina"`
-	Replace       bool
-	ReplaceUserID *string `json:"replaceUserId"`
+	UserID          *string `json:"userId"`
+	Name, Email     string
+	Phone           *string
+	Gender          string
+	Password        *string
+	AlsoAsPembina   *bool   `json:"alsoAsPembina"`
+	Replace         bool
+	ReplaceUserID   *string `json:"replaceUserId"`
 }
 
 func ptrStr(p *string) string {
@@ -72,7 +69,6 @@ func alsoAsPembina(v *bool) bool {
 	}
 	return *v
 }
-
 type schoolInput struct {
 	Name     string
 	City     *string
@@ -122,7 +118,7 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 	q += ` ORDER BY ` + db.NaturalName(`"name"`)
 	rows, e := h.DB.Query(r.Context(), q, args...)
 	if e != nil {
-		httpx.Error(w, 500, "Gagal mengambil PGM")
+		httpx.Error(w, 500, "Gagal mengambil sekolah")
 		return
 	}
 	defer rows.Close()
@@ -141,17 +137,17 @@ func (h Handler) list(w http.ResponseWriter, r *http.Request) {
 func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	var in schoolInput
 	if !decode(r, &in) || len(in.Name) < 2 || in.PJ == nil {
-		httpx.Error(w, 400, "Data PGM atau pengurus tidak valid")
+		httpx.Error(w, 400, "Data sekolah atau PJ tidak valid")
 		return
 	}
 	existingUserID := ptrStr(in.PJ.UserID)
 	in.PJ.Email = validate.NormalizeEmail(in.PJ.Email)
 	if existingUserID == "" && (len(in.PJ.Name) < 2 || in.PJ.Email == "" || !gender(in.PJ.Gender)) {
-		httpx.Error(w, 400, "Data PGM atau pengurus tidak valid")
+		httpx.Error(w, 400, "Data sekolah atau PJ tidak valid")
 		return
 	}
 	if existingUserID == "" && h.activeEmail(r, in.PJ.Email) {
-		httpx.Error(w, 400, "Email pengurus sudah terdaftar atau memiliki undangan aktif")
+		httpx.Error(w, 400, "Email PJ sudah terdaftar atau memiliki undangan aktif")
 		return
 	}
 	city := "Depok"
@@ -174,14 +170,14 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 	c, _ := middleware.Claims(r)
 	tx, e := h.DB.Begin(r.Context())
 	if e != nil {
-		httpx.Error(w, 500, "Gagal membuat PGM")
+		httpx.Error(w, 500, "Gagal membuat sekolah")
 		return
 	}
 	defer tx.Rollback(r.Context())
 	sid := uuid.NewString()
 	_, e = tx.Exec(r.Context(), `INSERT INTO "School" ("id","name","city","address","mapsUrl","updatedAt") VALUES ($1,$2,$3,$4,$5,NOW())`, sid, in.Name, city, address, mapsUrl)
 	if e != nil {
-		httpx.Error(w, 400, "Nama PGM sudah terdaftar")
+		httpx.Error(w, 400, "Nama sekolah sudah terdaftar")
 		return
 	}
 	mode := "invite"
@@ -202,7 +198,7 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		uid := uuid.NewString()
 		hash, he := auth.HashPassword(*in.PJ.Password)
 		if he != nil {
-			httpx.Error(w, 500, "Gagal membuat PGM")
+			httpx.Error(w, 500, "Gagal membuat sekolah")
 			return
 		}
 		_, e = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","phone","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::"Gender",NOW())`, uid, in.PJ.Name, in.PJ.Email, in.PJ.Phone, hash, in.PJ.Gender)
@@ -226,24 +222,24 @@ func (h Handler) create(w http.ResponseWriter, r *http.Request) {
 		data["_inviteToken"] = token
 	}
 	if e != nil || tx.Commit(r.Context()) != nil {
-		httpx.Error(w, 500, "Gagal membuat PGM")
+		httpx.Error(w, 500, "Gagal membuat sekolah")
 		return
 	}
 	if mode == "invite" {
 		tok := data["_inviteToken"].(string)
 		delete(data, "_inviteToken")
 		if e = email.New(h.Config).SendInvitation(r.Context(), in.PJ.Email, in.PJ.Name, h.Config.AppURL+"/set-password?token="+tok); e != nil {
-			httpx.Error(w, 502, "PGM dibuat, namun email gagal dikirim")
+			httpx.Error(w, 502, "Sekolah dibuat, namun email gagal dikirim")
 			return
 		}
 	}
 	data["mode"] = mode
-	msg := "PGM berhasil dibuat. Undangan Pengurus PGM telah dikirim."
+	msg := "Sekolah berhasil dibuat. Undangan PJ Sekolah telah dikirim."
 	if mode == "direct" {
-		msg = "PGM dan akun Pengurus PGM berhasil dibuat"
+		msg = "Sekolah dan akun PJ Sekolah berhasil dibuat"
 	}
 	if mode == "existing" {
-		msg = "PGM berhasil dibuat dan pengurus dipilih dari user yang sudah ada"
+		msg = "Sekolah berhasil dibuat dan PJ dipilih dari user yang sudah ada"
 	}
 	httpx.Success(w, 201, data, msg)
 }
@@ -263,7 +259,7 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 		}
 		// PJ hanya boleh mengubah alamat & maps
 		if in.Name != "" || in.City != nil || in.IsActive != nil {
-			httpx.Error(w, 403, "Pengurus hanya dapat mengubah alamat dan link Google Maps")
+			httpx.Error(w, 403, "PJ hanya dapat mengubah alamat dan link Google Maps")
 			return
 		}
 	}
@@ -304,40 +300,40 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 		isAdmin, in.Name, in.City, in.IsActive, setAddress, address, setMaps, mapsUrl, sid,
 	).Scan(&id, &name, &city, &addr, &maps, &active)
 	if e == pgx.ErrNoRows {
-		httpx.Error(w, 404, "PGM tidak ditemukan")
+		httpx.Error(w, 404, "Sekolah tidak ditemukan")
 		return
 	}
 	if e != nil {
-		httpx.Error(w, 400, "Gagal memperbarui PGM")
+		httpx.Error(w, 400, "Gagal memperbarui sekolah")
 		return
 	}
-	httpx.Success(w, 200, map[string]any{"id": id, "name": name, "city": city, "address": addr, "mapsUrl": maps, "isActive": active}, "PGM berhasil diperbarui")
+	httpx.Success(w, 200, map[string]any{"id": id, "name": name, "city": city, "address": addr, "mapsUrl": maps, "isActive": active}, "Sekolah berhasil diperbarui")
 }
 func (h Handler) remove(w http.ResponseWriter, r *http.Request) {
 	tag, e := h.DB.Exec(r.Context(), `UPDATE "School" SET "isActive"=false,"updatedAt"=NOW() WHERE "id"=$1`, chi.URLParam(r, "id"))
 	if e != nil || tag.RowsAffected() == 0 {
-		httpx.Error(w, 404, "PGM tidak ditemukan")
+		httpx.Error(w, 404, "Sekolah tidak ditemukan")
 		return
 	}
-	httpx.Success(w, 200, nil, "PGM dinonaktifkan")
+	httpx.Success(w, 200, nil, "Sekolah dinonaktifkan")
 }
 func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 	var in pjInput
 	if !decode(r, &in) {
-		httpx.Error(w, 400, "Data pengurus tidak valid")
+		httpx.Error(w, 400, "Data PJ tidak valid")
 		return
 	}
 	existingUserID := ptrStr(in.UserID)
 	in.Email = validate.NormalizeEmail(in.Email)
 	if existingUserID == "" && (len(in.Name) < 2 || in.Email == "" || !gender(in.Gender)) {
-		httpx.Error(w, 400, "Data pengurus tidak valid")
+		httpx.Error(w, 400, "Data PJ tidak valid")
 		return
 	}
 	sid := chi.URLParam(r, "id")
 	var exists bool
 	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "School" WHERE "id"=$1 AND "isActive")`, sid).Scan(&exists)
 	if !exists {
-		httpx.Error(w, 404, "PGM tidak ditemukan")
+		httpx.Error(w, 404, "Sekolah tidak ditemukan")
 		return
 	}
 	if existingUserID == "" && h.activeEmail(r, in.Email) {
@@ -346,7 +342,7 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 	}
 	tx, e := h.DB.Begin(r.Context())
 	if e != nil {
-		httpx.Error(w, 500, "Gagal membuat pengurus")
+		httpx.Error(w, 500, "Gagal membuat PJ")
 		return
 	}
 	defer tx.Rollback(r.Context())
@@ -357,7 +353,7 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if tx.Commit(r.Context()) != nil {
-			httpx.Error(w, 500, "Gagal membuat pengurus")
+			httpx.Error(w, 500, "Gagal membuat PJ")
 			return
 		}
 		httpx.Success(w, 201, map[string]any{"mode": "existing", "pjUser": pjUser, "movedFrom": pjUser["movedFrom"]}, msg)
@@ -370,7 +366,7 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 			_, e = tx.Exec(r.Context(), `DELETE FROM "UserSchool" us USING "UserRole" ur WHERE us."userId"=ur."userId" AND us."schoolId"=$1 AND ur."role"='PJ_SEKOLAH'`, sid)
 		}
 		if e != nil {
-			httpx.Error(w, 500, "Gagal mengganti pengurus")
+			httpx.Error(w, 500, "Gagal mengganti PJ")
 			return
 		}
 	}
@@ -385,7 +381,7 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 		uid := uuid.NewString()
 		hash, he := auth.HashPassword(*in.Password)
 		if he != nil {
-			httpx.Error(w, 500, "Gagal membuat pengurus")
+			httpx.Error(w, 500, "Gagal membuat PJ")
 			return
 		}
 		_, e = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","phone","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::"Gender",NOW())`, uid, in.Name, in.Email, in.Phone, hash, in.Gender)
@@ -408,7 +404,7 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 		data["_inviteToken"] = token
 	}
 	if e != nil || tx.Commit(r.Context()) != nil {
-		httpx.Error(w, 500, "Gagal membuat pengurus")
+		httpx.Error(w, 500, "Gagal membuat PJ")
 		return
 	}
 	if mode == "invite" {
@@ -420,22 +416,22 @@ func (h Handler) addPJ(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	data["mode"] = mode
-	httpx.Success(w, 201, data, "Pengurus PGM berhasil ditambahkan")
+	httpx.Success(w, 201, data, "PJ Sekolah berhasil ditambahkan")
 }
 func (h Handler) removePJ(w http.ResponseWriter, r *http.Request) {
 	sid, uid := chi.URLParam(r, "id"), chi.URLParam(r, "userId")
 	var n int
 	e := h.DB.QueryRow(r.Context(), `SELECT count(*) FROM "UserSchool" us JOIN "UserRole" ur ON ur."userId"=us."userId" WHERE us."schoolId"=$1 AND ur."role"='PJ_SEKOLAH'`, sid).Scan(&n)
 	if e != nil || n <= 1 {
-		httpx.Error(w, 400, "PGM harus memiliki minimal 1 Pengurus PGM")
+		httpx.Error(w, 400, "Sekolah harus memiliki minimal 1 PJ Sekolah")
 		return
 	}
 	tag, e := h.DB.Exec(r.Context(), `DELETE FROM "UserSchool" WHERE "schoolId"=$1 AND "userId"=$2`, sid, uid)
 	if e != nil || tag.RowsAffected() == 0 {
-		httpx.Error(w, 404, "Pengurus PGM tidak ditemukan di PGM ini")
+		httpx.Error(w, 404, "PJ Sekolah tidak ditemukan di sekolah ini")
 		return
 	}
-	httpx.Success(w, 200, nil, "Pengurus PGM berhasil dihapus dari PGM")
+	httpx.Success(w, 200, nil, "PJ Sekolah berhasil dihapus dari sekolah")
 }
 
 func (h Handler) pjCandidates(w http.ResponseWriter, r *http.Request) {
@@ -444,7 +440,7 @@ func (h Handler) pjCandidates(w http.ResponseWriter, r *http.Request) {
 		var exists bool
 		_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "School" WHERE "id"=$1 AND "isActive")`, sid).Scan(&exists)
 		if !exists {
-			httpx.Error(w, 404, "PGM tidak ditemukan")
+			httpx.Error(w, 404, "Sekolah tidak ditemukan")
 			return
 		}
 	}
@@ -470,7 +466,7 @@ func (h Handler) pjCandidates(w http.ResponseWriter, r *http.Request) {
 		  ))
 		ORDER BY u."name"`, sid)
 	if e != nil {
-		httpx.Error(w, 500, "Gagal mengambil calon pengurus")
+		httpx.Error(w, 500, "Gagal mengambil calon PJ")
 		return
 	}
 	defer rows.Close()
@@ -480,7 +476,7 @@ func (h Handler) pjCandidates(w http.ResponseWriter, r *http.Request) {
 		var phone *string
 		var rolesRaw, pjRaw []byte
 		if rows.Scan(&id, &name, &email, &phone, &gender, &rolesRaw, &pjRaw) != nil {
-			httpx.Error(w, 500, "Gagal membaca calon pengurus")
+			httpx.Error(w, 500, "Gagal membaca calon PJ")
 			return
 		}
 		var roles []string
@@ -499,7 +495,7 @@ func (h Handler) pjCandidates(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	if rows.Err() != nil {
-		httpx.Error(w, 500, "Gagal mengambil calon pengurus")
+		httpx.Error(w, 500, "Gagal mengambil calon PJ")
 		return
 	}
 	httpx.Success(w, 200, out, "")
@@ -527,7 +523,7 @@ func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembin
 		return nil, 400, "User tidak aktif"
 	}
 	if !eligible {
-		return nil, 400, "Hanya user dengan peran Pembina ke atas yang dapat dijadikan Pengurus PGM"
+		return nil, 400, "Hanya user dengan peran Pembina ke atas yang dapat dijadikan PJ Sekolah"
 	}
 
 	var alreadyHere bool
@@ -538,7 +534,7 @@ func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembin
 			WHERE us."userId"=$1 AND us."schoolId"=$2
 		)`, userID, sid).Scan(&alreadyHere)
 	if alreadyHere {
-		return nil, 400, "User sudah menjadi pengurus di PGM ini"
+		return nil, 400, "User sudah menjadi PJ di sekolah ini"
 	}
 
 	var hasPjRole bool
@@ -552,7 +548,7 @@ func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembin
 			JOIN "School" s ON s."id"=us."schoolId"
 			WHERE us."userId"=$1 AND us."schoolId"<>$2 AND s."isActive"`, userID, sid)
 		if qe != nil {
-			return nil, 500, "Gagal memeriksa PGM pengurus"
+			return nil, 500, "Gagal memeriksa sekolah PJ"
 		}
 		type schoolRow struct{ id, name string }
 		var others []schoolRow
@@ -560,13 +556,13 @@ func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembin
 			var row schoolRow
 			if rows.Scan(&row.id, &row.name) != nil {
 				rows.Close()
-				return nil, 500, "Gagal membaca PGM pengurus"
+				return nil, 500, "Gagal membaca sekolah PJ"
 			}
 			others = append(others, row)
 		}
 		rows.Close()
 		if rows.Err() != nil {
-			return nil, 500, "Gagal memeriksa PGM pengurus"
+			return nil, 500, "Gagal memeriksa sekolah PJ"
 		}
 		for _, other := range others {
 			var remaining int
@@ -574,10 +570,10 @@ func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembin
 				SELECT count(*) FROM "UserSchool" us
 				JOIN "UserRole" ur ON ur."userId"=us."userId" AND ur."role"='PJ_SEKOLAH'
 				WHERE us."schoolId"=$1 AND us."userId"<>$2`, other.id, userID).Scan(&remaining) != nil {
-				return nil, 500, "Gagal memeriksa pengurus PGM lain"
+				return nil, 500, "Gagal memeriksa PJ sekolah lain"
 			}
 			if remaining < 1 {
-				return nil, 400, fmt.Sprintf("Tidak dapat memindahkan: %s harus memiliki minimal 1 Pengurus PGM lain", other.name)
+				return nil, 400, fmt.Sprintf("Tidak dapat memindahkan: %s harus memiliki minimal 1 PJ Sekolah lain", other.name)
 			}
 			movedFrom = append(movedFrom, map[string]string{"id": other.id, "name": other.name})
 		}
@@ -591,29 +587,29 @@ func assignExistingPJ(r *http.Request, tx pgx.Tx, sid, userID string, alsoPembin
 			_, re = tx.Exec(ctx, `DELETE FROM "UserSchool" us USING "UserRole" ur WHERE us."userId"=ur."userId" AND us."schoolId"=$1 AND ur."role"='PJ_SEKOLAH' AND us."userId"<>$2`, sid, userID)
 		}
 		if re != nil {
-			return nil, 500, "Gagal mengganti pengurus"
+			return nil, 500, "Gagal mengganti PJ"
 		}
 	}
 
 	if _, e = tx.Exec(ctx, `DELETE FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"<>$2`, userID, sid); e != nil {
-		return nil, 500, "Gagal memindahkan pengurus"
+		return nil, 500, "Gagal memindahkan PJ"
 	}
 	if _, e = tx.Exec(ctx, `INSERT INTO "UserRole" ("id","userId","role") SELECT $1,$2,'PJ_SEKOLAH'::"Role" WHERE NOT EXISTS (SELECT 1 FROM "UserRole" WHERE "userId"=$2 AND "role"='PJ_SEKOLAH'::"Role")`, uuid.NewString(), userID); e != nil {
-		return nil, 500, "Gagal menambahkan peran Pengurus PGM"
+		return nil, 500, "Gagal menambahkan peran PJ Sekolah"
 	}
 	if alsoPembina {
 		_, _ = tx.Exec(ctx, `INSERT INTO "UserRole" ("id","userId","role") SELECT $1,$2,'PEMBINA'::"Role" WHERE NOT EXISTS (SELECT 1 FROM "UserRole" WHERE "userId"=$2 AND "role"='PEMBINA'::"Role")`, uuid.NewString(), userID)
 	}
 	if _, e = tx.Exec(ctx, `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), userID, sid); e != nil {
-		return nil, 500, "Gagal menautkan pengurus ke PGM"
+		return nil, 500, "Gagal menautkan PJ ke sekolah"
 	}
 
-	msg := "Pengurus PGM berhasil ditambahkan"
+	msg := "PJ Sekolah berhasil ditambahkan"
 	if replace {
-		msg = "Pengurus PGM berhasil diganti"
+		msg = "PJ Sekolah berhasil diganti"
 	}
 	if len(movedFrom) > 0 {
-		msg = "Pengurus PGM dipindahkan ke PGM ini"
+		msg = "PJ Sekolah dipindahkan ke sekolah ini"
 	}
 	return map[string]any{"id": userID, "name": name, "email": email, "movedFrom": movedFrom}, 0, msg
 }
@@ -630,7 +626,7 @@ func (h Handler) pembina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	g := r.URL.Query().Get("gender")
-	// Semua pembina (boleh lintas PGM); tandai yang sudah terkait PGM ini.
+	// Semua pembina (boleh lintas sekolah); tandai yang sudah terkait sekolah ini.
 	rows, e := h.DB.Query(r.Context(), `
 		SELECT u."id",u."name",u."email",u."gender"::text,u."phone",
 			EXISTS(
@@ -711,7 +707,7 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 		id := uuid.NewString()
 		_, e = tx.Exec(r.Context(), `INSERT INTO "Group" ("id","name","level","gender","schoolId","pembinaId","updatedAt") VALUES ($1,$2,$3::"GroupLevel",$4::"Gender",$5,$6,NOW())`, id, in.Name, in.Level, in.Gender, sid, in.PembinaID)
 		if e == nil {
-			// Tautkan pembina ke PGM ini (boleh sudah punya PGM lain).
+			// Tautkan pembina ke sekolah ini (boleh sudah punya sekolah lain).
 			_, e = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), in.PembinaID, sid)
 		}
 		if e != nil || tx.Commit(r.Context()) != nil {
@@ -740,7 +736,7 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "Jenis kelamin pembina tidak valid")
 		return
 	}
-	// Email sudah pembina aktif: tautkan ke PGM + buat kelompok (multi-PGM).
+	// Email sudah pembina aktif: tautkan ke sekolah + buat kelompok (multi-sekolah).
 	// Gender pembina boleh beda dari jenis kelompok.
 	var existingPembinaID string
 	_ = h.DB.QueryRow(r.Context(), `
@@ -768,7 +764,7 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 			"mode":    "direct",
 			"group":   map[string]string{"id": gid, "name": in.Name},
 			"pembina": map[string]any{"id": existingPembinaID, "email": p.Email},
-		}, "Kelompok dibuat; pembina existing ditautkan ke PGM ini")
+		}, "Kelompok dibuat; pembina existing ditautkan ke sekolah ini")
 		return
 	}
 	if h.activeEmail(r, p.Email) {
@@ -798,7 +794,7 @@ func (h Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		httpx.Success(w, 201, map[string]any{
-			"mode":       "invite",
+			"mode": "invite",
 			"invitation": map[string]any{"id": iid, "email": p.Email, "status": "PENDING"},
 		}, "Undangan pembina berhasil dikirim")
 		return
@@ -853,7 +849,7 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 	var created, updated time.Time
 	e := h.DB.QueryRow(ctx, `SELECT "id","name","city","address","mapsUrl","isActive","createdAt","updatedAt" FROM "School" WHERE "id"=$1 AND "isActive"=true`, sid).Scan(&id, &n, &city, &address, &mapsUrl, &active, &created, &updated)
 	if e != nil {
-		httpx.Error(w, 404, "PGM tidak ditemukan")
+		httpx.Error(w, 404, "Sekolah tidak ditemukan")
 		return
 	}
 
@@ -868,7 +864,7 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		  AND ur."role" = 'PJ_SEKOLAH'::"Role"
 		ORDER BY u."name"`, sid)
 	if err != nil {
-		httpx.Error(w, 500, "Gagal memuat pengurus PGM")
+		httpx.Error(w, 500, "Gagal memuat PJ sekolah")
 		return
 	}
 	for pjRows.Next() {
@@ -876,14 +872,14 @@ func (h Handler) detail(w http.ResponseWriter, r *http.Request) {
 		var phone *string
 		if err := pjRows.Scan(&uid, &name, &email, &phone); err != nil {
 			pjRows.Close()
-			httpx.Error(w, 500, "Gagal membaca pengurus")
+			httpx.Error(w, 500, "Gagal membaca PJ")
 			return
 		}
 		pjUsers = append(pjUsers, map[string]any{"id": uid, "name": name, "email": email, "phone": phone})
 	}
 	pjRows.Close()
 	if err := pjRows.Err(); err != nil {
-		httpx.Error(w, 500, "Gagal memuat pengurus")
+		httpx.Error(w, 500, "Gagal memuat PJ")
 		return
 	}
 
@@ -1094,9 +1090,6 @@ func (h Handler) stats(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, map[string]int{"totalGroups": groups, "totalAnggota": members, "evaluationsThisWeek": evals, "totalEvaluations": total, "submissionRate": rate}, "")
 }
 func (h Handler) activeEmail(r *http.Request, mail string) bool {
-	var v bool
-	mail = validate.NormalizeEmail(mail)
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive") OR EXISTS(SELECT 1 FROM "UserInvitation" WHERE LOWER("email")=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, mail).Scan(&v)
-	return v
+	return usercred.EmailTaken(r.Context(), h.DB, mail)
 }
 func gender(v string) bool { return v == "IKHWAN" || v == "AKHWAT" }

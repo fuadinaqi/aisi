@@ -136,9 +136,9 @@ model School {
 model User {
   id          String    @id @default(cuid())
   name        String
-  email       String    @unique
+  email       String?
   phone       String?
-  password    String
+  password    String?
   avatarUrl   String?
   gender      Gender    @default(IKHWAN)
   birthPlace  String?
@@ -172,6 +172,7 @@ model User {
   eventAttendances   EventAttendance[]
   eventApprovals     EventAttendance[]      @relation("EventApprover")
   invitationsSent    UserInvitation[]       @relation("InvitationCreator")
+  invitationsTargeted UserInvitation[]      @relation("InvitationTarget")
   mutabaahEntries    MutabaahEntry[]
   icProgressAsMember MemberICProgress[] @relation("ICMember")
   icProgressChecked  MemberICProgress[] @relation("ICChecker")
@@ -408,6 +409,7 @@ model UserInvitation {
   schoolId       String?
   groupId        String?
   gender         Gender?
+  targetUserId   String?
   token          String           @unique @default(uuid())
   status         InvitationStatus @default(PENDING)
   invitedById    String
@@ -415,10 +417,12 @@ model UserInvitation {
   usedAt         DateTime?
   createdAt      DateTime         @default(now())
 
-  invitedBy User @relation("InvitationCreator", fields: [invitedById], references: [id])
+  invitedBy  User  @relation("InvitationCreator", fields: [invitedById], references: [id])
+  targetUser User? @relation("InvitationTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
 
   @@index([token])
   @@index([email])
+  @@index([targetUserId])
 }
 
 model MutabaahItem {

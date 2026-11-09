@@ -46,6 +46,22 @@ export async function apiGet<T>(token: string, path: string): Promise<T> {
   return json.data;
 }
 
+export async function apiPostRaw(
+  token: string | null,
+  path: string,
+  body: unknown,
+): Promise<{ status: number; json: { success?: boolean; message?: string; data?: unknown } }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_URL}/api/v1${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  const json = (await res.json()) as { success?: boolean; message?: string; data?: unknown };
+  return { status: res.status, json };
+}
+
 export async function apiPost<T>(
   token: string,
   path: string,

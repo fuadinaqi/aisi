@@ -80,8 +80,10 @@ func dateStr(t *time.Time) any {
 }
 
 func user(db *pgxpool.Pool, r *http.Request, id string) (map[string]any, error) {
-	var name, email, gender string
+	var name, gender string
+	var email *string
 	var phone, avatar *string
+	var hasAccount bool
 	var birthPlace, address, tiktok, instagram, facebook, socialX *string
 	var fatherName, fatherPhone, motherName, motherPhone, hobby *string
 	var birthDate *time.Time
@@ -94,19 +96,25 @@ func user(db *pgxpool.Pool, r *http.Request, id string) (map[string]any, error) 
 			"birthPlace","birthDate","address",
 			"tiktok","instagram","facebook","socialX",
 			"fatherName","fatherPhone","motherName","motherPhone","hobby",
-			"totalPoints","isActive","createdAt","lastLoginAt"
+			"totalPoints","isActive","createdAt","lastLoginAt",
+			("email" IS NOT NULL AND "password" IS NOT NULL)
 		FROM "User" WHERE "id"=$1`, id).Scan(
 		&name, &email, &phone, &avatar, &gender,
 		&birthPlace, &birthDate, &address,
 		&tiktok, &instagram, &facebook, &socialX,
 		&fatherName, &fatherPhone, &motherName, &motherPhone, &hobby,
-		&points, &active, &created, &login,
+		&points, &active, &created, &login, &hasAccount,
 	)
 	if e != nil {
 		return nil, e
 	}
+	var emailOut any
+	if email != nil {
+		emailOut = *email
+	}
 	return map[string]any{
-		"id": id, "name": name, "email": email, "phone": phone, "avatarUrl": avatar, "gender": gender,
+		"id": id, "name": name, "email": emailOut, "phone": phone, "avatarUrl": avatar, "gender": gender,
+		"hasAccount": hasAccount,
 		"birthPlace": birthPlace, "birthDate": dateStr(birthDate), "address": address,
 		"tiktok": tiktok, "instagram": instagram, "facebook": facebook, "socialX": socialX,
 		"fatherName": fatherName, "fatherPhone": fatherPhone,
@@ -418,12 +426,12 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 		alreadyHasRole := db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserRole" WHERE "userId"=$1 AND "role"=$2::"Role")`, id, in.Role).Scan(&exists) == nil && exists
 		schoolAttachOnly := false
 		if alreadyHasRole {
-			// Pembina boleh di beberapa PGM: request ulang dengan schoolId = tautkan PGM baru.
+			// Pembina boleh di beberapa sekolah: request ulang dengan schoolId = tautkan sekolah baru.
 			if in.Role == "PEMBINA" && in.SchoolID != nil && *in.SchoolID != "" {
 				var inSchool bool
 				_ = db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "UserSchool" WHERE "userId"=$1 AND "schoolId"=$2)`, id, *in.SchoolID).Scan(&inSchool)
 				if inSchool {
-					httpx.Error(w, 400, "Pembina sudah terdaftar di PGM ini")
+					httpx.Error(w, 400, "Pembina sudah terdaftar di sekolah ini")
 					return
 				}
 				schoolAttachOnly = true
@@ -434,7 +442,7 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 		}
 		withPembina := (in.Role == "ADMIN" || in.Role == "PJ_SEKOLAH") && (in.AlsoAsPembina == nil || *in.AlsoAsPembina)
 		if in.Role == "PJ_SEKOLAH" && (in.SchoolID == nil || *in.SchoolID == "") {
-			httpx.Error(w, 400, "PGM wajib dipilih untuk role ini")
+			httpx.Error(w, 400, "Sekolah wajib dipilih untuk role ini")
 			return
 		}
 		tx, err := db.Begin(r.Context())
@@ -455,7 +463,7 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 		if in.SchoolID != nil && *in.SchoolID != "" && (in.Role == "PJ_SEKOLAH" || in.Role == "PEMBINA" || in.Role == "ANGGOTA") {
 			var schoolOK bool
 			if tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "School" WHERE "id"=$1 AND "isActive")`, *in.SchoolID).Scan(&schoolOK) != nil || !schoolOK {
-				httpx.Error(w, 400, "PGM tidak valid")
+				httpx.Error(w, 400, "Sekolah tidak valid")
 				return
 			}
 			_, _ = tx.Exec(r.Context(), `INSERT INTO "UserSchool" ("id","userId","schoolId") SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM "UserSchool" WHERE "userId"=$2 AND "schoolId"=$3)`, uuid.NewString(), id, *in.SchoolID)
@@ -475,7 +483,7 @@ func addRole(db *pgxpool.Pool) http.HandlerFunc {
 		u, _ := user(db, r, id)
 		msg := "Role berhasil ditambahkan"
 		if schoolAttachOnly {
-			msg = "Pembina ditautkan ke PGM"
+			msg = "Pembina ditautkan ke sekolah"
 		}
 		httpx.Success(w, 200, u, msg)
 	}

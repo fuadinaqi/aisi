@@ -9,6 +9,7 @@ import (
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/constants"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/usercred"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-go/internal/response"
@@ -279,9 +280,7 @@ func (h Handler) pendingInvitation(r *http.Request, email string) bool {
 }
 
 func (h Handler) activeUser(r *http.Request, email string) bool {
-	var exists bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive")`, validate.NormalizeEmail(email)).Scan(&exists)
-	return exists
+	return usercred.UserHasCredentials(r.Context(), h.DB, email)
 }
 
 func (h Handler) userHasRole(r *http.Request, email, role string) bool {

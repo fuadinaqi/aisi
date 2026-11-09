@@ -6,8 +6,9 @@ export interface GroupMemberDetail {
   user: {
     id: string;
     name: string;
-    email: string;
+    email: string | null;
     phone: string | null;
+    hasAccount?: boolean;
     gender?: string;
     totalPoints: number;
     lastLoginAt: string | null;
@@ -43,7 +44,14 @@ export interface GroupItem {
   totalSlots?: number;
   members?: {
     joinedAt: string;
-    user: { id: string; name: string; email: string; phone?: string | null; totalPoints: number };
+    user: {
+      id: string;
+      name: string;
+      email: string | null;
+      phone?: string | null;
+      totalPoints: number;
+      hasAccount?: boolean;
+    };
     attendanceRate: number | null;
     totalHadir: number;
     totalPekan: number;
@@ -97,7 +105,6 @@ export interface EvaluationItem {
   weekDate: string;
   isSubmitted: boolean;
   notes?: string;
-  photoUrls?: string[];
   group?: { id: string; name: string };
   groupId?: string;
   attendances?: { userId: string; status: string; note?: string; user?: { name: string } }[];
@@ -139,9 +146,6 @@ export interface MateriItem {
   fileUrls: string[];
   fileNames?: string[];
   targetLevels?: string[];
-  schoolId?: string | null;
-  schoolName?: string | null;
-  isPublished?: boolean;
   createdAt?: string;
 }
 

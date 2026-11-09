@@ -80,8 +80,10 @@ func dateStr(t *time.Time) any {
 }
 
 func user(db *pgxpool.Pool, r *http.Request, id string) (map[string]any, error) {
-	var name, email, gender string
+	var name, gender string
+	var email *string
 	var phone, avatar *string
+	var hasAccount bool
 	var birthPlace, address, tiktok, instagram, facebook, socialX *string
 	var fatherName, fatherPhone, motherName, motherPhone, hobby *string
 	var birthDate *time.Time
@@ -94,19 +96,25 @@ func user(db *pgxpool.Pool, r *http.Request, id string) (map[string]any, error) 
 			"birthPlace","birthDate","address",
 			"tiktok","instagram","facebook","socialX",
 			"fatherName","fatherPhone","motherName","motherPhone","hobby",
-			"totalPoints","isActive","createdAt","lastLoginAt"
+			"totalPoints","isActive","createdAt","lastLoginAt",
+			("email" IS NOT NULL AND "password" IS NOT NULL)
 		FROM "User" WHERE "id"=$1`, id).Scan(
 		&name, &email, &phone, &avatar, &gender,
 		&birthPlace, &birthDate, &address,
 		&tiktok, &instagram, &facebook, &socialX,
 		&fatherName, &fatherPhone, &motherName, &motherPhone, &hobby,
-		&points, &active, &created, &login,
+		&points, &active, &created, &login, &hasAccount,
 	)
 	if e != nil {
 		return nil, e
 	}
+	var emailOut any
+	if email != nil {
+		emailOut = *email
+	}
 	return map[string]any{
-		"id": id, "name": name, "email": email, "phone": phone, "avatarUrl": avatar, "gender": gender,
+		"id": id, "name": name, "email": emailOut, "phone": phone, "avatarUrl": avatar, "gender": gender,
+		"hasAccount": hasAccount,
 		"birthPlace": birthPlace, "birthDate": dateStr(birthDate), "address": address,
 		"tiktok": tiktok, "instagram": instagram, "facebook": facebook, "socialX": socialX,
 		"fatherName": fatherName, "fatherPhone": fatherPhone,

@@ -10,6 +10,7 @@ import (
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/auth"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/domain/constants"
+	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/domain/usercred"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-pgm/internal/middleware"
 	httpx "github.com/dakwah-depok/aisi/apps/api-pgm/internal/response"
@@ -38,6 +39,7 @@ func (h Handler) Routes() chi.Router {
 	r.Post("/{id}/members", h.addMember)
 	r.Get("/{id}/members/{userId}", h.member)
 	r.Put("/{id}/members/{userId}", h.updateMember)
+	r.Post("/{id}/members/{userId}/activate-account", h.activateMemberAccount)
 	r.Delete("/{id}/members/{userId}", h.removeMember)
 	return r
 }
@@ -241,7 +243,7 @@ func (h Handler) update(w http.ResponseWriter, r *http.Request) {
 	if in.PembinaID != "" && in.PembinaID != oldPembina {
 		c, _ := middleware.Claims(r)
 		if !admin(c.Roles) && !has(c.Roles, "PJ_SEKOLAH") {
-			httpx.Error(w, 403, "Hanya Pengurus PGM atau Admin yang dapat mengganti pembina")
+			httpx.Error(w, 403, "Hanya PJ Sekolah atau Admin yang dapat mengganti pembina")
 			return
 		}
 		var pembinaOK bool
@@ -293,19 +295,29 @@ func (h Handler) members(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, h.memberRows(r, id), "")
 }
 func (h Handler) memberRows(r *http.Request, id string) []map[string]any {
-	rows, e := h.DB.Query(r.Context(), `SELECT gm."id",gm."userId",gm."joinedAt",u."name",u."email",u."phone",u."gender"::text,u."totalPoints" FROM "GroupMember" gm JOIN "User" u ON u."id"=gm."userId" WHERE gm."groupId"=$1 AND gm."isActive"`, id)
+	rows, e := h.DB.Query(r.Context(), `
+		SELECT gm."id",gm."userId",gm."joinedAt",u."name",u."email",u."phone",u."gender"::text,u."totalPoints",
+		       (u."email" IS NOT NULL AND u."password" IS NOT NULL)
+		FROM "GroupMember" gm JOIN "User" u ON u."id"=gm."userId"
+		WHERE gm."groupId"=$1 AND gm."isActive"`, id)
 	if e != nil {
 		return []map[string]any{}
 	}
 	defer rows.Close()
 	out := []map[string]any{}
 	for rows.Next() {
-		var mid, uid, n, mail, g string
+		var mid, uid, n, g string
+		var mail *string
 		var phone *string
 		var joined time.Time
 		var points int
-		if rows.Scan(&mid, &uid, &joined, &n, &mail, &phone, &g, &points) == nil {
-			out = append(out, map[string]any{"id": mid, "userId": uid, "joinedAt": joined, "user": map[string]any{"id": uid, "name": n, "email": mail, "phone": phone, "gender": g, "totalPoints": points}})
+		var hasAccount bool
+		if rows.Scan(&mid, &uid, &joined, &n, &mail, &phone, &g, &points, &hasAccount) == nil {
+			var email any
+			if mail != nil {
+				email = *mail
+			}
+			out = append(out, map[string]any{"id": mid, "userId": uid, "joinedAt": joined, "user": map[string]any{"id": uid, "name": n, "email": email, "phone": phone, "gender": g, "totalPoints": points, "hasAccount": hasAccount}})
 		}
 	}
 	return out
@@ -366,11 +378,16 @@ func (h Handler) memberCandidates(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	out := []map[string]any{}
 	for rows.Next() {
-		var uid, name, mail, ug string
+		var uid, name, ug string
+		var mail *string
 		var phone, lastGroup *string
 		if rows.Scan(&uid, &name, &mail, &phone, &ug, &lastGroup) == nil {
+			var email any
+			if mail != nil {
+				email = *mail
+			}
 			out = append(out, map[string]any{
-				"id": uid, "name": name, "email": mail, "phone": phone, "gender": ug,
+				"id": uid, "name": name, "email": email, "phone": phone, "gender": ug,
 				"lastGroupName": lastGroup,
 			})
 		}
@@ -427,9 +444,7 @@ func (h Handler) addExistingMember(w http.ResponseWriter, r *http.Request, group
 }
 
 func (h Handler) emailTaken(r *http.Request, mail string) bool {
-	var exists bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive") OR EXISTS(SELECT 1 FROM "UserInvitation" WHERE LOWER("email")=$1 AND "status"='PENDING' AND "expiresAt">NOW())`, mail).Scan(&exists)
-	return exists
+	return usercred.EmailTaken(r.Context(), h.DB, mail)
 }
 
 func (h Handler) addMember(w http.ResponseWriter, r *http.Request) {
@@ -466,16 +481,51 @@ func (h Handler) addMember(w http.ResponseWriter, r *http.Request) {
 	in.Name = strings.TrimSpace(in.Name)
 	in.Email = validate.NormalizeEmail(in.Email)
 	phone := optionalPhone(in.Phone)
-	if len(in.Name) < 2 || in.Email == "" {
-		httpx.Error(w, 400, "Nama lengkap dan email wajib diisi")
+	if len(in.Name) < 2 {
+		httpx.Error(w, 400, "Nama lengkap wajib diisi")
 		return
 	}
+
+	hasPassword := in.Password != nil && strings.TrimSpace(*in.Password) != ""
+	hasEmail := in.Email != ""
+
+	if !hasEmail && !hasPassword {
+		tx, e := h.DB.Begin(r.Context())
+		if e != nil {
+			httpx.Error(w, 500, "Gagal membuat anggota")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		uid := uuid.NewString()
+		mid := uuid.NewString()
+		_, e = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","phone","gender","updatedAt") VALUES ($1,$2,$3,$4::"Gender",NOW())`, uid, in.Name, phone, gender)
+		if e == nil {
+			_, e = tx.Exec(r.Context(), `INSERT INTO "UserRole" ("id","userId","role") VALUES ($1,$2,'ANGGOTA')`, uuid.NewString(), uid)
+		}
+		if e == nil {
+			_, e = tx.Exec(r.Context(), `INSERT INTO "GroupMember" ("id","groupId","userId","isActive") VALUES ($1,$2,$3,true)`, mid, id, uid)
+		}
+		if e != nil || tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal membuat anggota")
+			return
+		}
+		httpx.Success(w, 201, map[string]any{
+			"mode": "pending", "id": mid, "groupId": id, "userId": uid,
+			"user": map[string]any{"id": uid, "name": in.Name, "email": nil, "hasAccount": false},
+		}, "Anggota berhasil ditambahkan")
+		return
+	}
+
+	if !hasEmail && hasPassword {
+		httpx.Error(w, 400, "Email wajib jika menyet password langsung")
+		return
+	}
+
 	if h.emailTaken(r, in.Email) {
 		httpx.Error(w, 400, "Email sudah terdaftar atau memiliki undangan aktif. Jika sudah anggota tanpa kelompok, pilih dari daftar anggota terdaftar.")
 		return
 	}
 
-	hasPassword := in.Password != nil && strings.TrimSpace(*in.Password) != ""
 	if hasPassword {
 		if err := auth.ValidatePassword(*in.Password); err != nil {
 			httpx.Error(w, 400, err.Error())
@@ -531,8 +581,10 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 	}
 	var mid string
 	var joined time.Time
-	var name, email, gender string
+	var name, gender string
+	var email *string
 	var phone *string
+	var hasAccount bool
 	var birthPlace, address, tiktok, instagram, facebook, socialX *string
 	var fatherName, fatherPhone, motherName, motherPhone, hobby *string
 	var birthDate *time.Time
@@ -543,6 +595,7 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 	e := h.DB.QueryRow(r.Context(), `
 		SELECT gm."id", gm."joinedAt",
 		       u."name", u."email", u."phone", u."gender"::text, u."totalPoints", u."lastLoginAt", u."createdAt",
+		       (u."email" IS NOT NULL AND u."password" IS NOT NULL),
 		       u."birthPlace", u."birthDate", u."address",
 		       u."tiktok", u."instagram", u."facebook", u."socialX",
 		       u."fatherName", u."fatherPhone", u."motherName", u."motherPhone", u."hobby",
@@ -553,7 +606,7 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 		JOIN "Group" g ON g."id"=gm."groupId"
 		JOIN "School" s ON s."id"=g."schoolId"
 		WHERE gm."groupId"=$1 AND gm."userId"=$2 AND gm."isActive"=true`, id, uid).
-		Scan(&mid, &joined, &name, &email, &phone, &gender, &points, &lastLogin, &createdAt,
+		Scan(&mid, &joined, &name, &email, &phone, &gender, &points, &lastLogin, &createdAt, &hasAccount,
 			&birthPlace, &birthDate, &address,
 			&tiktok, &instagram, &facebook, &socialX,
 			&fatherName, &fatherPhone, &motherName, &motherPhone, &hobby,
@@ -570,7 +623,7 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 	// Monday of join week (WIB), same rule as Express getMonday
 	loc := time.FixedZone("WIB", 7*3600)
 	joinedLocal := joined.In(loc)
-	joinedMonday := joinedLocal.AddDate(0, 0, -((int(joinedLocal.Weekday()) + 6) % 7))
+	joinedMonday := joinedLocal.AddDate(0, 0, -((int(joinedLocal.Weekday())+6)%7))
 	joinedMonday = time.Date(joinedMonday.Year(), joinedMonday.Month(), joinedMonday.Day(), 0, 0, 0, 0, loc)
 
 	rows, e := h.DB.Query(r.Context(), `
@@ -603,11 +656,15 @@ func (h Handler) member(w http.ResponseWriter, r *http.Request) {
 		attendanceRate = nil
 	}
 
+	var emailOut any
+	if email != nil {
+		emailOut = *email
+	}
 	httpx.Success(w, 200, map[string]any{
 		"id": mid, "userId": uid, "joinedAt": joined,
 		"totalPekan": totalPekan, "totalHadir": totalHadir, "attendanceRate": attendanceRate,
 		"user": map[string]any{
-			"id": uid, "name": name, "email": email, "phone": phone,
+			"id": uid, "name": name, "email": emailOut, "phone": phone, "hasAccount": hasAccount,
 			"gender": gender, "totalPoints": points, "lastLoginAt": lastLogin, "createdAt": createdAt,
 			"birthPlace": birthPlace, "birthDate": birthDateStr, "address": address,
 			"tiktok": tiktok, "instagram": instagram, "facebook": facebook, "socialX": socialX,
@@ -647,6 +704,15 @@ func (h Handler) updateMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Email = validate.NormalizeEmail(in.Email)
+	hasAccount, herr := usercred.HasAccountByID(r.Context(), h.DB, uid)
+	if herr != nil {
+		httpx.Error(w, 404, "Anggota tidak ditemukan")
+		return
+	}
+	if !hasAccount && strings.TrimSpace(in.Email) != "" {
+		httpx.Error(w, 400, "Gunakan aktivasi akun untuk mengisi email. Buka detail anggota → Aktivasi akun.")
+		return
+	}
 	if in.BirthDate != nil && *in.BirthDate != "" {
 		if _, err := time.Parse("2006-01-02", *in.BirthDate); err != nil {
 			httpx.Error(w, 400, "Format tanggal lahir tidak valid (YYYY-MM-DD)")
@@ -692,7 +758,7 @@ func (h Handler) updateMember(w http.ResponseWriter, r *http.Request) {
 		uid, id,
 	)
 	if e != nil {
-		if strings.Contains(e.Error(), "User_email_key") || strings.Contains(strings.ToLower(e.Error()), "duplicate key") {
+		if strings.Contains(e.Error(), "User_email_lower_key") || strings.Contains(strings.ToLower(e.Error()), "duplicate key") {
 			httpx.Error(w, 400, "Email sudah digunakan")
 			return
 		}
@@ -705,6 +771,135 @@ func (h Handler) updateMember(w http.ResponseWriter, r *http.Request) {
 	}
 	h.member(w, r)
 }
+
+func (h Handler) activateMemberAccount(w http.ResponseWriter, r *http.Request) {
+	groupID := chi.URLParam(r, "id")
+	userID := chi.URLParam(r, "userId")
+	if !h.groupAccess(r, groupID, true) {
+		httpx.Error(w, 403, "Akses ditolak")
+		return
+	}
+	var in struct {
+		Email    string  `json:"email"`
+		Password *string `json:"password"`
+		Mode     string  `json:"mode"`
+	}
+	if !decode(r, &in) {
+		httpx.Error(w, 400, "Body tidak valid")
+		return
+	}
+	in.Email = validate.NormalizeEmail(in.Email)
+	in.Mode = strings.TrimSpace(strings.ToLower(in.Mode))
+	if in.Email == "" {
+		httpx.Error(w, 400, "Email wajib diisi")
+		return
+	}
+	if in.Mode != "invite" && in.Mode != "direct" {
+		httpx.Error(w, 400, "Mode aktivasi tidak valid (invite atau direct)")
+		return
+	}
+
+	tx, err := h.DB.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, 500, "Gagal mengaktifkan akun")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var memberActive bool
+	var userName, gender string
+	var hasAccount bool
+	e := tx.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM "GroupMember" WHERE "groupId"=$1 AND "userId"=$2 AND "isActive"
+		), u."name", u."gender"::text,
+		       (u."email" IS NOT NULL AND u."password" IS NOT NULL)
+		FROM "User" u WHERE u."id"=$2`, groupID, userID).Scan(&memberActive, &userName, &gender, &hasAccount)
+	if e != nil || !memberActive {
+		httpx.Error(w, 404, "Anggota tidak ditemukan di kelompok ini")
+		return
+	}
+	if hasAccount {
+		httpx.Error(w, 400, "Akun sudah aktif")
+		return
+	}
+	var lock int
+	if tx.QueryRow(r.Context(), `SELECT 1 FROM "User" WHERE "id"=$1 FOR UPDATE`, userID).Scan(&lock) != nil {
+		httpx.Error(w, 500, "Gagal mengaktifkan akun")
+		return
+	}
+
+	if usercred.EmailTakenExceptUser(r.Context(), h.DB, in.Email, userID) {
+		httpx.Error(w, 400, "Email sudah terdaftar atau memiliki undangan aktif")
+		return
+	}
+	if inviteID, ok := usercred.PendingActivationInviteID(r.Context(), h.DB, userID); ok {
+		_ = inviteID
+		httpx.Error(w, 400, "Sudah ada undangan aktivasi yang menunggu. Batalkan atau kirim ulang undangan tersebut.")
+		return
+	}
+
+	var phone *string
+	_ = tx.QueryRow(r.Context(), `SELECT "phone" FROM "User" WHERE "id"=$1`, userID).Scan(&phone)
+
+	if in.Mode == "direct" {
+		if in.Password == nil || strings.TrimSpace(*in.Password) == "" {
+			httpx.Error(w, 400, "Password wajib diisi")
+			return
+		}
+		if err := auth.ValidatePassword(*in.Password); err != nil {
+			httpx.Error(w, 400, err.Error())
+			return
+		}
+		hash, he := auth.HashPassword(*in.Password)
+		if he != nil {
+			httpx.Error(w, 500, "Gagal mengaktifkan akun")
+			return
+		}
+		if _, e = tx.Exec(r.Context(), `
+			UPDATE "User" SET "email"=$1,"password"=$2,"updatedAt"=NOW()
+			WHERE "id"=$3`, in.Email, hash, userID); e != nil {
+			if strings.Contains(strings.ToLower(e.Error()), "duplicate key") {
+				httpx.Error(w, 400, "Email sudah digunakan")
+				return
+			}
+			httpx.Error(w, 500, "Gagal mengaktifkan akun")
+			return
+		}
+		if tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal mengaktifkan akun")
+			return
+		}
+		httpx.Success(w, 200, map[string]any{"mode": "direct", "userId": userID, "email": in.Email}, "Akun anggota berhasil diaktifkan")
+		return
+	}
+
+	c, _ := middleware.Claims(r)
+	token, iid := uuid.NewString(), uuid.NewString()
+	expires := time.Now().AddDate(0, 0, h.Config.InvitationExpireDays)
+	_, e = tx.Exec(r.Context(), `
+		INSERT INTO "UserInvitation" ("id","name","email","phone","role","alsoAsPembina","gender","groupId","targetUserId","token","invitedById","expiresAt")
+		VALUES ($1,$2,$3,$4,'ANGGOTA',false,$5::"Gender",$6,$7,$8,$9,$10)`,
+		iid, userName, in.Email, phone, gender, groupID, userID, token, c.UserID, expires)
+	if e != nil {
+		if strings.Contains(strings.ToLower(e.Error()), "UserInvitation_target_pending_key") {
+			httpx.Error(w, 400, "Sudah ada undangan aktivasi yang menunggu")
+			return
+		}
+		httpx.Error(w, 500, "Gagal membuat undangan aktivasi")
+		return
+	}
+	if tx.Commit(r.Context()) != nil {
+		httpx.Error(w, 500, "Gagal membuat undangan aktivasi")
+		return
+	}
+	if e = email.New(h.Config).SendInvitation(r.Context(), in.Email, userName, h.Config.AppURL+"/set-password?token="+token); e != nil {
+		httpx.Error(w, 502, "Undangan dibuat, namun email gagal dikirim")
+		return
+	}
+	httpx.Success(w, 201, map[string]any{"mode": "invite", "invitation": map[string]string{"id": iid, "email": in.Email}}, "Undangan aktivasi akun berhasil dikirim")
+}
+
 func (h Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 	id, uid := chi.URLParam(r, "id"), chi.URLParam(r, "userId")
 	if !h.groupAccess(r, id, true) {
@@ -719,7 +914,7 @@ func (h Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, 200, nil, "Anggota berhasil dihapus")
 }
 func gender(v string) bool { return v == "IKHWAN" || v == "AKHWAT" }
-func level(v string) bool  { return constants.ValidGroupLevel(v) }
+func level(v string) bool { return constants.ValidGroupLevel(v) }
 func has(s []string, x string) bool {
 	for _, v := range s {
 		if v == x {

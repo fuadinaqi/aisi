@@ -26,14 +26,16 @@ type InviteFormProps = {
   showGender?: boolean;
   showPasswordOption?: boolean;
   showAlsoAsPembina?: boolean;
+  showProfileOnlyOption?: boolean;
   successMessage?: string;
   onSubmit: (data: {
     name: string;
-    email: string;
+    email?: string;
     phone?: string;
     gender?: 'IKHWAN' | 'AKHWAT';
     password?: string;
     alsoAsPembina?: boolean;
+    profileOnly?: boolean;
   }) => Promise<void>;
   onCancel?: () => void;
 };
@@ -46,12 +48,14 @@ export function InviteForm({
   showGender = false,
   showPasswordOption = false,
   showAlsoAsPembina = false,
+  showProfileOnlyOption = false,
   successMessage,
   onSubmit,
   onCancel,
 }: InviteFormProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [addMode, setAddMode] = useState<'account' | 'profileOnly'>('account');
 
   const {
     register,
@@ -64,21 +68,30 @@ export function InviteForm({
   });
 
   const useDirectPassword = watch('useDirectPassword');
+  const profileOnly = showProfileOnlyOption && addMode === 'profileOnly';
 
   const handleFormSubmit = async (data: InviteFormData) => {
     try {
       setError('');
       setSuccess('');
-      await onSubmit({
-        name: data.name.trim(),
-        email: data.email.trim(),
-        phone: data.phone?.trim() || undefined,
-        ...(showGender ? { gender: data.gender || 'IKHWAN' } : {}),
-        ...(showAlsoAsPembina ? { alsoAsPembina: !!data.alsoAsPembina } : {}),
-        ...(showPasswordOption && data.useDirectPassword && data.password
-          ? { password: data.password }
-          : {}),
-      });
+      if (profileOnly) {
+        await onSubmit({
+          name: data.name.trim(),
+          phone: data.phone?.trim() || undefined,
+          profileOnly: true,
+        });
+      } else {
+        await onSubmit({
+          name: data.name.trim(),
+          email: data.email.trim(),
+          phone: data.phone?.trim() || undefined,
+          ...(showGender ? { gender: data.gender || 'IKHWAN' } : {}),
+          ...(showAlsoAsPembina ? { alsoAsPembina: !!data.alsoAsPembina } : {}),
+          ...(showPasswordOption && data.useDirectPassword && data.password
+            ? { password: data.password }
+            : {}),
+        });
+      }
       setSuccess(successMessage || 'Berhasil! Cek log API untuk link undangan jika mode undangan.');
       toastSuccess(successMessage || 'Undangan berhasil dikirim');
     } catch (err: unknown) {
@@ -99,20 +112,45 @@ export function InviteForm({
         </div>
       )}
 
+      {showProfileOnlyOption && (
+        <div className="flex flex-col gap-2">
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/60 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+            <input
+              type="radio"
+              name="addMode"
+              checked={addMode === 'account'}
+              onChange={() => setAddMode('account')}
+            />
+            <span className="text-sm">Buat akun sekarang (email / undangan)</span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/60 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+            <input
+              type="radio"
+              name="addMode"
+              checked={addMode === 'profileOnly'}
+              onChange={() => setAddMode('profileOnly')}
+            />
+            <span className="text-sm">Tambah data saja — buat akun nanti</span>
+          </label>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label>Nama lengkap</Label>
         <Input className="rounded-xl" {...register('name', { required: true })} placeholder="Nama lengkap" />
       </div>
 
-      <div className="space-y-2">
-        <Label>Email</Label>
-        <Input
-          type="email"
-          className="rounded-xl"
-          {...register('email', { required: true })}
-          placeholder="email@domain.com"
-        />
-      </div>
+      {!profileOnly && (
+        <div className="space-y-2">
+          <Label>Email</Label>
+          <Input
+            type="email"
+            className="rounded-xl"
+            {...register('email', { required: !profileOnly })}
+            placeholder="email@domain.com"
+          />
+        </div>
+      )}
 
       {showGender && (
         <div className="space-y-2">
@@ -144,7 +182,7 @@ export function InviteForm({
         </label>
       )}
 
-      {showPasswordOption && (
+      {showPasswordOption && !profileOnly && (
         <>
           <label className="flex items-start gap-3 rounded-xl bg-muted/50 p-3">
             <input type="checkbox" className="mt-1" {...register('useDirectPassword')} />

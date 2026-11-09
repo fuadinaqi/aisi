@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/auth"
+	"github.com/dakwah-depok/aisi/apps/api-go/internal/domain/usercred"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/config"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/email"
 	"github.com/dakwah-depok/aisi/apps/api-go/internal/middleware"
@@ -57,7 +58,14 @@ type user struct {
 
 func (h Handler) getUser(ctx context.Context, email string) (user, error) {
 	var u user
-	err := h.DB.QueryRow(ctx, `SELECT u."id",u."name",u."email",u."password",u."totalPoints",u."isActive",COALESCE(array_agg(ur."role"::text) FILTER (WHERE ur."role" IS NOT NULL),'{}') FROM "User" u LEFT JOIN "UserRole" ur ON ur."userId"=u."id" WHERE LOWER(u."email")=$1 GROUP BY u."id"`, validate.NormalizeEmail(email)).Scan(&u.ID, &u.Name, &u.Email, &u.Password, &u.TotalPoints, &u.Active, &u.Roles)
+	err := h.DB.QueryRow(ctx, `
+		SELECT u."id",u."name",u."email",u."password",u."totalPoints",u."isActive",
+		       COALESCE(array_agg(ur."role"::text) FILTER (WHERE ur."role" IS NOT NULL),'{}')
+		FROM "User" u
+		LEFT JOIN "UserRole" ur ON ur."userId"=u."id"
+		WHERE LOWER(u."email")=$1
+		  AND u."email" IS NOT NULL AND u."password" IS NOT NULL
+		GROUP BY u."id"`, validate.NormalizeEmail(email)).Scan(&u.ID, &u.Name, &u.Email, &u.Password, &u.TotalPoints, &u.Active, &u.Roles)
 	return u, err
 }
 func decode(r *http.Request, target any) error { return json.NewDecoder(r.Body).Decode(target) }
@@ -74,7 +82,7 @@ func (h Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := h.getUser(r.Context(), in.Email)
-	if err != nil || !u.Active || auth.CheckPassword(u.Password, in.Password) != nil {
+	if err != nil || !u.Active || u.Password == "" || auth.CheckPassword(u.Password, in.Password) != nil {
 		httpx.Error(w, 401, "Email atau password salah")
 		return
 	}
@@ -127,7 +135,7 @@ func (h Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	}
 	var u user
 	err = tx.QueryRow(r.Context(), `SELECT u."id",u."name",u."email",u."password",u."totalPoints",u."isActive",COALESCE(array_agg(ur."role"::text) FILTER (WHERE ur."role" IS NOT NULL),'{}') FROM "User" u LEFT JOIN "UserRole" ur ON ur."userId"=u."id" WHERE u."id"=$1 GROUP BY u."id"`, userID).Scan(&u.ID, &u.Name, &u.Email, &u.Password, &u.TotalPoints, &u.Active, &u.Roles)
-	if err != nil || !u.Active {
+	if err != nil || !u.Active || u.Email == "" || u.Password == "" {
 		httpx.Error(w, 401, "User tidak ditemukan")
 		return
 	}
@@ -174,13 +182,13 @@ func (h Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, err.Error())
 		return
 	}
-	var old string
+	var old *string
 	err := h.DB.QueryRow(r.Context(), `SELECT "password" FROM "User" WHERE "id"=$1`, c.UserID).Scan(&old)
-	if err != nil {
+	if err != nil || old == nil || *old == "" {
 		httpx.Error(w, 404, "User tidak ditemukan")
 		return
 	}
-	if auth.CheckPassword(old, in.CurrentPassword) != nil {
+	if auth.CheckPassword(*old, in.CurrentPassword) != nil {
 		httpx.Error(w, 400, "Password saat ini salah")
 		return
 	}
@@ -213,7 +221,7 @@ func (h Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var userID, name, storedEmail string
-	err := h.DB.QueryRow(r.Context(), `SELECT "id","name","email" FROM "User" WHERE LOWER("email")=$1 AND "isActive"`, in.Email).Scan(&userID, &name, &storedEmail)
+	err := h.DB.QueryRow(r.Context(), `SELECT "id","name","email" FROM "User" WHERE LOWER("email")=$1 AND "isActive" AND "email" IS NOT NULL AND "password" IS NOT NULL`, in.Email).Scan(&userID, &name, &storedEmail)
 	if err != nil {
 		// Jangan bocorkan apakah email terdaftar.
 		httpx.Success(w, 200, nil, forgotPasswordMsg)
@@ -309,8 +317,7 @@ func (h Handler) invitation(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "Undangan sudah expired")
 		return
 	}
-	var existingUser bool
-	_ = h.DB.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "isActive")`, validate.NormalizeEmail(email)).Scan(&existingUser)
+	existingUser := usercred.UserHasCredentials(r.Context(), h.DB, email)
 	httpx.Success(w, 200, map[string]any{"name": name, "email": email, "role": role, "alsoAsPembina": alsoAsPembina, "existingUser": existingUser}, "")
 }
 
@@ -335,20 +342,14 @@ func (h Handler) setPassword(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	var id, name, email, role string
 	var alsoAsPembina bool
-	var schoolID, groupID, gender, phone *string
+	var schoolID, groupID, gender, phone, targetUserID *string
 	var expires time.Time
-	err = tx.QueryRow(r.Context(), `SELECT "id","name","email","role"::text,"alsoAsPembina","schoolId","groupId","gender"::text,"phone","expiresAt" FROM "UserInvitation" WHERE "token"=$1 AND "status"='PENDING' FOR UPDATE`, in.Token).Scan(&id, &name, &email, &role, &alsoAsPembina, &schoolID, &groupID, &gender, &phone, &expires)
+	err = tx.QueryRow(r.Context(), `SELECT "id","name","email","role"::text,"alsoAsPembina","schoolId","groupId","gender"::text,"phone","expiresAt","targetUserId" FROM "UserInvitation" WHERE "token"=$1 AND "status"='PENDING' FOR UPDATE`, in.Token).Scan(&id, &name, &email, &role, &alsoAsPembina, &schoolID, &groupID, &gender, &phone, &expires, &targetUserID)
 	if err != nil || expires.Before(time.Now()) {
 		httpx.Error(w, 400, "Undangan tidak valid atau sudah expired")
 		return
 	}
-	var exists bool
 	email = validate.NormalizeEmail(email)
-	_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1)`, email).Scan(&exists)
-	if exists {
-		httpx.Error(w, 400, "Email sudah terdaftar. Login lalu buka tautan undangan untuk menerima peran tambahan.")
-		return
-	}
 	hash, err := auth.HashPassword(in.Password)
 	if err != nil {
 		httpx.Error(w, 500, "Gagal membuat akun")
@@ -363,6 +364,63 @@ func (h Handler) setPassword(w http.ResponseWriter, r *http.Request) {
 	g := "IKHWAN"
 	if gender != nil && *gender != "" {
 		g = *gender
+	}
+
+	if targetUserID != nil && strings.TrimSpace(*targetUserID) != "" {
+		targetID := strings.TrimSpace(*targetUserID)
+		var hasAccount bool
+		var hasAnggota bool
+		if tx.QueryRow(r.Context(), `
+			SELECT ("email" IS NOT NULL AND "password" IS NOT NULL),
+			       EXISTS(SELECT 1 FROM "UserRole" WHERE "userId"=$1 AND "role"='ANGGOTA'::"Role")
+			FROM "User" WHERE "id"=$1 FOR UPDATE`, targetID).Scan(&hasAccount, &hasAnggota) != nil || !hasAnggota {
+			httpx.Error(w, 400, "Undangan aktivasi tidak valid")
+			return
+		}
+		if hasAccount {
+			httpx.Error(w, 400, "Akun sudah aktif")
+			return
+		}
+		var emailConflict bool
+		_ = tx.QueryRow(r.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "id"<>$2
+				  AND "email" IS NOT NULL AND "password" IS NOT NULL
+			)`, email, targetID).Scan(&emailConflict)
+		if emailConflict {
+			httpx.Error(w, 400, "Email sudah terdaftar")
+			return
+		}
+		if groupID != nil && *groupID != "" && role == "ANGGOTA" {
+			var inGroup bool
+			_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "GroupMember" WHERE "groupId"=$1 AND "userId"=$2 AND "isActive")`, *groupID, targetID).Scan(&inGroup)
+			if !inGroup {
+				httpx.Error(w, 400, "Anggota tidak lagi terdaftar di kelompok undangan")
+				return
+			}
+		}
+		_, err = tx.Exec(r.Context(), `
+			UPDATE "User" SET "email"=$1,"password"=$2,
+				"phone"=CASE WHEN $3::text IS NULL OR $3='' THEN "phone" ELSE $3 END,
+				"name"=COALESCE(NULLIF($4,''),"name"),
+				"updatedAt"=NOW()
+			WHERE "id"=$5`, email, hash, phone, name, targetID)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), `UPDATE "UserInvitation" SET "status"='USED',"usedAt"=NOW() WHERE "id"=$1`, id)
+		}
+		if err != nil || tx.Commit(r.Context()) != nil {
+			httpx.Error(w, 500, "Gagal mengaktifkan akun")
+			return
+		}
+		httpx.Success(w, 200, nil, "Akun berhasil diaktifkan, silakan login")
+		return
+	}
+
+	var exists bool
+	_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM "User" WHERE LOWER("email")=$1 AND "email" IS NOT NULL AND "password" IS NOT NULL)`, email).Scan(&exists)
+	if exists {
+		httpx.Error(w, 400, "Email sudah terdaftar. Login lalu buka tautan undangan untuk menerima peran tambahan.")
+		return
 	}
 	_, err = tx.Exec(r.Context(), `INSERT INTO "User" ("id","name","email","phone","password","gender","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::"Gender",NOW())`, uid, name, email, phone, hash, g)
 	if err == nil {
@@ -421,7 +479,7 @@ func (h Handler) acceptRole(w http.ResponseWriter, r *http.Request) {
 	}
 	var uid string
 	var active bool
-	if tx.QueryRow(r.Context(), `SELECT "id","isActive" FROM "User" WHERE LOWER("email")=$1`, validate.NormalizeEmail(email)).Scan(&uid, &active) != nil || !active {
+	if tx.QueryRow(r.Context(), `SELECT "id","isActive" FROM "User" WHERE LOWER("email")=$1 AND "email" IS NOT NULL AND "password" IS NOT NULL`, validate.NormalizeEmail(email)).Scan(&uid, &active) != nil || !active {
 		httpx.Error(w, 400, "Akun tidak ditemukan. Gunakan tautan buat password.")
 		return
 	}

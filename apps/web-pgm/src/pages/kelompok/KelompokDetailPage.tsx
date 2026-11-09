@@ -181,7 +181,11 @@ export default function KelompokDetailPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className={cn('font-medium', theme.memberLink)}>{m.user.name}</p>
-                        <p className="truncate text-sm text-muted-foreground">{m.user.email}</p>
+                        <p className="truncate text-sm text-muted-foreground">
+                          {m.user.hasAccount === false
+                            ? 'Belum punya akun'
+                            : m.user.email || '—'}
+                        </p>
                       </div>
                       <ChevronRight
                         className={cn('mt-0.5 h-4 w-4 shrink-0 text-muted-foreground', theme.memberChevron)}

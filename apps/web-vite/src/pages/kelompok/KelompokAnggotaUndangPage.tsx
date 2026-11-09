@@ -75,9 +75,9 @@ export default function UndangAnggotaPage() {
         <div className="mb-4 space-y-1">
           <p className="text-sm font-semibold">Anggota kelompok</p>
           <p className="text-xs text-muted-foreground">
-            Pilih anggota yang sudah terdaftar, atau undang akun baru
-            {group?.name ? ` ke ${group.name}` : ''}. Jenis kelamin mengikuti jenis kelompok. Nama
-            lengkap dan email wajib; no. telepon opsional.
+            Pilih anggota yang sudah terdaftar, undang akun baru, atau tambahkan data anggota dulu
+            {group?.name ? ` ke ${group.name}` : ''} (buat akun bisa belakangan). Jenis kelamin mengikuti
+            jenis kelompok.
           </p>
         </div>
 
@@ -134,19 +134,23 @@ export default function UndangAnggotaPage() {
           </div>
         ) : (
           <InviteForm
-            description="Tanpa password, anggota menerima undangan email. Centang set password langsung agar akun langsung aktif, sama seperti undangan PJ Sekolah atau Pembina."
+            description="Tanpa password, anggota menerima undangan email. Centang set password langsung agar akun langsung aktif. Pilih “tambah data saja” jika email belum ada."
             submitLabel="Tambah anggota"
             successMessage="Anggota berhasil ditambahkan"
             showPhone
             showPasswordOption
+            showProfileOnlyOption
             onCancel={() => navigate(-1)}
             onSubmit={async (data) => {
-              await api.post(`/groups/${id}/members`, {
+              const body: Record<string, string | undefined> = {
                 name: data.name,
-                email: data.email,
                 phone: data.phone,
-                password: data.password,
-              });
+              };
+              if (!data.profileOnly) {
+                body.email = data.email;
+                body.password = data.password;
+              }
+              await api.post(`/groups/${id}/members`, body);
               await invalidateGroupQueries(queryClient, { groupId: id });
               await invalidateInvitationQueries(queryClient);
               navigate(`/kelompok/${id}`);
