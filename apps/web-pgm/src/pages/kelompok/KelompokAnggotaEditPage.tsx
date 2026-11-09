@@ -127,6 +127,7 @@ export default function EditAnggotaPage() {
   }, [member, reset]);
 
   const onSubmit = async (data: FormData) => {
+    if (!member) return;
     try {
       setError('');
       const payload: Record<string, unknown> = {
