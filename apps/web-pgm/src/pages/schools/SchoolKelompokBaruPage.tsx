@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { ArrowLeft } from 'lucide-react';
@@ -47,11 +47,13 @@ type FormData = {
 
 export default function NewSchoolGroupPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const { configs: levelConfigs } = useGroupLevelLabels();
+  const presetGender = searchParams.get('gender') === 'AKHWAT' ? 'AKHWAT' : 'IKHWAN';
 
   const {
     register,
@@ -62,10 +64,10 @@ export default function NewSchoolGroupPage() {
   } = useForm<FormData>({
     defaultValues: {
       level: 'LEVEL_1',
-      gender: 'IKHWAN',
+      gender: presetGender,
       pembinaMode: 'new',
       pembinaId: '',
-      pembinaGender: 'IKHWAN',
+      pembinaGender: presetGender,
       useDirectPassword: false,
     },
   });

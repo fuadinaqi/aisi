@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
+import { getDefaultActiveRole } from '@/lib/utils';
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -19,7 +19,7 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   const activeRole = useAuthStore((s) => s.activeRole);
   const [mounted, setMounted] = useState(false);
 
-  const effectiveRole = activeRole || (user ? getPrimaryRole(user.roles) : null);
+  const effectiveRole = activeRole || (user ? getDefaultActiveRole(user.roles) : null);
 
   useEffect(() => {
     setMounted(true);
@@ -57,7 +57,7 @@ export function useActiveRole(): string | null {
   const activeRole = useAuthStore((s) => s.activeRole);
   if (!user) return null;
   if (activeRole && user.roles.includes(activeRole)) return activeRole;
-  return getPrimaryRole(user.roles);
+  return getDefaultActiveRole(user.roles);
 }
 
 /** @deprecated Gunakan useActiveRole */

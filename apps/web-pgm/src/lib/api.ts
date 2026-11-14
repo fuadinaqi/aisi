@@ -1,6 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/store/authStore';
-import { getPrimaryRole } from '@/lib/utils';
+import { getDefaultActiveRole } from '@/lib/utils';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001/api/v1';
 
@@ -14,7 +14,7 @@ function activeRoleHeader(): string | null {
   const { user, activeRole } = useAuthStore.getState();
   if (!user) return null;
   const role =
-    activeRole && user.roles.includes(activeRole) ? activeRole : getPrimaryRole(user.roles);
+    activeRole && user.roles.includes(activeRole) ? activeRole : getDefaultActiveRole(user.roles);
   return user.roles.includes(role) ? role : null;
 }
 

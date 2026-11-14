@@ -107,7 +107,7 @@ export default function KelompokDetailPage() {
               >
                 <Link to={`/kelompok/${id}/anggota/undang`}>
                   <UserPlus className="mr-1 h-4 w-4" />
-                  Undang
+                  Tambah Anggota
                 </Link>
               </Button>
             </div>
@@ -164,7 +164,7 @@ export default function KelompokDetailPage() {
                     to={`/kelompok/${id}/anggota/undang`}
                     className={cn('font-medium', theme.inlineLink)}
                   >
-                    Undang anggota
+                    Tambah anggota
                   </Link>
                 </>
               )}

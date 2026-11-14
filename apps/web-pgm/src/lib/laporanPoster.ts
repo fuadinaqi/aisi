@@ -19,7 +19,6 @@ const A4_WIDTH = 1654;
 const A4_HEIGHT = 2339;
 const SCRIPT_FONT = '"Alex Brush", cursive';
 
-type Norm = [number, number, number, number];
 type Rect = { x: number; y: number; w: number; h: number };
 type Drawable = CanvasImageSource & { width: number; height: number };
 
@@ -87,16 +86,11 @@ function drawPoster(
 
   const area: Rect = { x: padX, y: photoTop, w: w - padX * 2, h: h - photoTop - photoBottom };
   const gap = Math.max(10, w * 0.012);
-  const slots = collageSlots(input.photos.length, area, gap);
+  const slots = squareSlots(input.photos.length, area, gap);
   input.photos.forEach((photo, i) => {
     const slot = slots[i];
     if (!slot) return;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(slot.x, slot.y, slot.w, slot.h);
-    ctx.clip();
-    drawCover(ctx, photo, slot);
-    ctx.restore();
+    drawContainSquare(ctx, photo, slot);
   });
 }
 
@@ -171,83 +165,54 @@ function drawScript(
   lines.forEach((line, index) => ctx.fillText(line, text.x, text.y + lineH * index));
   ctx.restore();
 }
-function collageSlots(count: number, area: Rect, gap: number): Rect[] {
-  return normalizedSlots(count).map(([nx, ny, nw, nh]) =>
-    inset(
-      {
-        x: area.x + nx * area.w,
-        y: area.y + ny * area.h,
-        w: nw * area.w,
-        h: nh * area.h,
-      },
-      gap,
-    ),
-  );
-}
-
-function normalizedSlots(count: number): Norm[] {
-  if (count <= 0) return [];
-  if (count === 1) return [[0, 0, 1, 1]];
-  if (count === 3) {
-    return [
-      [0, 0, 0.58, 1],
-      [0.58, 0, 0.42, 0.5],
-      [0.58, 0.5, 0.42, 0.5],
-    ];
-  }
-  if (count === 2) return fromRows([[1.15, 0.85]], [1]);
-  if (count === 4) return fromRows([[1, 1], [1, 1]], [0.5, 0.5]);
-  if (count === 5) return fromRows([[1.05, 0.95], [1, 1, 1]], [0.56, 0.44]);
-  if (count === 6) return fromRows([[1.05, 0.95], [1.45, 0.8], [1, 1.08]], [0.3, 0.4, 0.3]);
-  if (count === 7) return fromRows([[1.1, 0.9], [1, 1, 1], [1.05, 0.95]], [0.34, 0.34, 0.32]);
-  if (count === 8) return fromRows([[1.08, 0.92], [1, 1.05, 0.95], [1, 1, 1]], [0.36, 0.32, 0.32]);
-  if (count === 9) return fromRows([[1, 1, 1], [1, 1.08, 0.92], [1, 1, 1]], [1 / 3, 1 / 3, 1 / 3]);
-  return gridSlots(count);
-}
-
-function fromRows(rowWeights: number[][], rowHeights: number[]): Norm[] {
-  const slots: Norm[] = [];
-  let y = 0;
-  rowWeights.forEach((weights, r) => {
-    const rowH = r === rowWeights.length - 1 ? 1 - y : rowHeights[r];
-    const sum = weights.reduce((total, weight) => total + weight, 0);
-    let x = 0;
-    for (const weight of weights) {
-      const rowW = weight / sum;
-      slots.push([x, y, rowW, rowH]);
-      x += rowW;
+/** Equal squares, largest that fit, centered. A short last row is centered too. */
+function squareSlots(count: number, area: Rect, gap: number): Rect[] {
+  if (count <= 0 || area.w <= 0 || area.h <= 0) return [];
+  let bestCols = 1;
+  let bestCell = 0;
+  for (let cols = 1; cols <= count; cols++) {
+    const rows = Math.ceil(count / cols);
+    const cellW = (area.w - gap * (cols - 1)) / cols;
+    const cellH = (area.h - gap * (rows - 1)) / rows;
+    const cell = Math.min(cellW, cellH);
+    if (cell > bestCell) {
+      bestCell = cell;
+      bestCols = cols;
     }
-    y += rowH;
-  });
-  return slots;
-}
-
-function gridSlots(count: number): Norm[] {
-  const cols = count <= 12 ? 3 : count <= 20 ? 4 : 5;
+  }
+  const cell = Math.max(1, bestCell);
+  const cols = bestCols;
   const rows = Math.ceil(count / cols);
-  const slots: Norm[] = [];
-  let index = 0;
-  let y = 0;
-  for (let r = 0; r < rows; r++) {
-    const rowCount = Math.min(cols, count - index);
-    const rowH = r === rows - 1 ? 1 - y : 1 / rows;
-    for (let c = 0; c < rowCount; c++) {
-      slots.push([c / rowCount, y, 1 / rowCount, rowH]);
-      index += 1;
-    }
-    y += rowH;
+  const gridW = cols * cell + gap * (cols - 1);
+  const gridH = rows * cell + gap * (rows - 1);
+  const originX = area.x + (area.w - gridW) / 2;
+  const originY = area.y + (area.h - gridH) / 2;
+  const slots: Rect[] = [];
+  for (let i = 0; i < count; i++) {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const rowCount = Math.min(cols, count - row * cols);
+    const rowW = rowCount * cell + gap * Math.max(0, rowCount - 1);
+    const rowX = originX + (gridW - rowW) / 2;
+    slots.push({
+      x: rowX + col * (cell + gap),
+      y: originY + row * (cell + gap),
+      w: cell,
+      h: cell,
+    });
   }
   return slots;
 }
 
-function inset(rect: Rect, gap: number): Rect {
-  const g = gap / 2;
-  return {
-    x: rect.x + g,
-    y: rect.y + g,
-    w: Math.max(1, rect.w - gap),
-    h: Math.max(1, rect.h - gap),
-  };
+/** Fit the whole photo inside the square. Leftover space is black, nothing is cropped. */
+function drawContainSquare(ctx: CanvasRenderingContext2D, img: Drawable, rect: Rect) {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  if (img.width <= 0 || img.height <= 0) return;
+  const scale = Math.min(rect.w / img.width, rect.h / img.height);
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  ctx.drawImage(img, rect.x + (rect.w - dw) / 2, rect.y + (rect.h - dh) / 2, dw, dh);
 }
 
 function drawCover(ctx: CanvasRenderingContext2D, img: Drawable, rect: Rect) {

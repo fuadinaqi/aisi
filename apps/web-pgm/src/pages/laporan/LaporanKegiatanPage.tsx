@@ -173,7 +173,7 @@ export default function LaporanKegiatanPage() {
       <PageContainer className="max-w-3xl">
         <PageHeader
           title="Laporan kegiatan"
-          description="Poster A4 dari foto agenda liqo. Latarnya template PGM, atau putih jika belum diunggah"
+          description="Poster A4 dari foto agenda liqo. Setiap foto tampil utuh di kotak persegi. Latarnya template PGM, atau putih jika belum diunggah"
         />
 
         <Card>

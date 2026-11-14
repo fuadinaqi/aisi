@@ -158,6 +158,11 @@ export function getPrimaryRole(roles: string[]): string {
   return roles[0] || 'ANGGOTA';
 }
 
+/** Role awal sesi baru. Pembina didahulukan supaya login langsung ke peran pembinaan. */
+export function getDefaultActiveRole(roles: string[]): string {
+  return roles.includes('PEMBINA') ? 'PEMBINA' : getPrimaryRole(roles);
+}
+
 export function isPointEligibleRole(roles: string[]): boolean {
   return roles.some((r) => r === 'PEMBINA' || r === 'ANGGOTA');
 }

@@ -13,6 +13,8 @@ import LeaderboardPage from '@/pages/leaderboard/LeaderboardPage';
 import SchoolsPage from '@/pages/schools/SchoolsPage';
 import SchoolNewPage from '@/pages/schools/SchoolNewPage';
 import SchoolDetailPage from '@/pages/schools/SchoolDetailPage';
+import SchoolEvaluasiPage from '@/pages/schools/SchoolEvaluasiPage';
+import SchoolPengurusPage from '@/pages/schools/SchoolPengurusPage';
 import SchoolKelompokBaruPage from '@/pages/schools/SchoolKelompokBaruPage';
 import SchoolPjUndangPage from '@/pages/schools/SchoolPjUndangPage';
 import SchoolPjGantiPage from '@/pages/schools/SchoolPjGantiPage';
@@ -75,6 +77,8 @@ export default function App() {
           <Route path="/schools" element={<SchoolsPage />} />
           <Route path="/schools/new" element={<SchoolNewPage />} />
           <Route path="/schools/:id" element={<SchoolDetailPage />} />
+          <Route path="/schools/:id/evaluasi" element={<SchoolEvaluasiPage />} />
+          <Route path="/schools/:id/pengurus" element={<SchoolPengurusPage />} />
           <Route path="/schools/:id/kelompok/baru" element={<SchoolKelompokBaruPage />} />
           <Route path="/schools/:id/pj/undang" element={<SchoolPjUndangPage />} />
           <Route path="/schools/:id/pj/:userId/ganti" element={<SchoolPjGantiPage />} />

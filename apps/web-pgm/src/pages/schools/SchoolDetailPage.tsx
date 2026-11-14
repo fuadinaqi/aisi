@@ -1,27 +1,26 @@
-
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Plus, UserMinus, UserPlus, Users } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Plus, Users } from 'lucide-react';
 import { api, type ApiResponse } from '@/lib/api';
-import { useActiveRole } from '@/components/layout/RoleGuard';
+import { RoleGuard, useActiveRole } from '@/components/layout/RoleGuard';
 import { PageContainer, PageHeader, Section } from '@/components/layout/PageShell';
 import { AppSectionHeader, ListDivider, ListGroup, ListRow } from '@/components/layout/AppUI';
 import { EvaluationInfiniteList } from '@/components/evaluasi/EvaluationInfiniteList';
 import { LoadingSkeleton } from '@/components/shared/Badges';
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { AttendanceRate } from '@/components/shared/AttendanceRate';
 import { WhatsAppButton } from '@/components/shared/WhatsAppButton';
-import { GenderBadge } from '@/components/shared/GenderField';
-import { getGenderLabel } from '@/lib/utils';
-import { RoleGuard } from '@/components/layout/RoleGuard';
+import { getGroupGenderTheme } from '@/components/shared/GenderField';
+import { cn, formatWeekRange, toWeekDateParam } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { invalidateSchoolQueries } from '@/lib/queryInvalidation';
 import { toastError, toastSuccess } from '@/lib/toast';
-import type { SchoolDetail } from '@/lib/types';
+import type { GroupItem, SchoolDetail } from '@/lib/types';
+
+const PJ_PREVIEW_LIMIT = 3;
 
 export default function SchoolDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +30,6 @@ export default function SchoolDetailPage() {
   const canManageGroups = canManagePj || role === 'PJ_SEKOLAH';
   const canEditAddress = canManageGroups;
 
-  const [pjToRemove, setPjToRemove] = useState<{ id: string; name: string } | null>(null);
   const [address, setAddress] = useState('');
   const [mapsUrl, setMapsUrl] = useState('');
   const [savingAddress, setSavingAddress] = useState(false);
@@ -47,13 +45,6 @@ export default function SchoolDetailPage() {
     setAddress(school.address || '');
     setMapsUrl(school.mapsUrl || '');
   }, [school]);
-
-  const handleRemovePj = async () => {
-    if (!pjToRemove) return;
-    await api.delete(`/schools/${id}/pj/${pjToRemove.id}`);
-    await invalidateSchoolQueries(queryClient, id);
-    toastSuccess('Pengurus berhasil dihapus');
-  };
 
   const handleSaveAddress = async () => {
     if (!id) return;
@@ -81,8 +72,10 @@ export default function SchoolDetailPage() {
 
   const pjUsers = school.pjUsers ?? [];
   const groups = school.groups ?? [];
-  const hasPj = pjUsers.length > 0;
-  const canRemovePj = canManagePj && pjUsers.length > 1;
+  const ikhwanGroups = groups.filter((group) => group.gender !== 'AKHWAT');
+  const akhwatGroups = groups.filter((group) => group.gender === 'AKHWAT');
+  const pjPreview = pjUsers.slice(0, PJ_PREVIEW_LIMIT);
+  const weekDate = toWeekDateParam(new Date());
 
   return (
     <RoleGuard allowedRoles={['SUPERADMIN', 'ADMIN', 'PJ_SEKOLAH']}>
@@ -99,6 +92,96 @@ export default function SchoolDetailPage() {
         <p className="px-0.5 text-sm text-muted-foreground">
           {school.city} · {school.totalGroups} kelompok · {school.totalAnggota} anggota
         </p>
+
+        <GroupSection
+          schoolId={school.id}
+          title="Kelompok Ikhwan"
+          gender="IKHWAN"
+          groups={ikhwanGroups}
+          canManage={canManageGroups}
+        />
+        <GroupSection
+          schoolId={school.id}
+          title="Kelompok Akhwat"
+          gender="AKHWAT"
+          groups={akhwatGroups}
+          canManage={canManageGroups}
+        />
+
+        <section className="space-y-3">
+          <AppSectionHeader
+            title="Evaluasi pekan ini"
+            action={
+              <div className="flex items-center gap-3">
+                <Link
+                  to={`/laporan?schoolId=${school.id}`}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Poster A4
+                </Link>
+                <Link
+                  to={`/schools/${id}/evaluasi`}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Lihat semua
+                </Link>
+              </div>
+            }
+          />
+          <p className="px-0.5 text-xs text-muted-foreground">Pekan {formatWeekRange(weekDate)}</p>
+          <EvaluationInfiniteList
+            queryKey={['evaluations', 'school', id, 'week']}
+            params={{ schoolId: id, weekDate }}
+            compact
+            emptyTitle="Belum ada evaluasi pekan ini"
+            emptyDescription="Evaluasi yang dikirim kelompok pada pekan ini akan muncul di sini."
+          />
+        </section>
+
+        <section className="space-y-3">
+          <AppSectionHeader
+            title={`Pengurus PGM (${pjUsers.length})`}
+            action={
+              <Link to={`/schools/${id}/pengurus`} className="text-xs font-medium text-primary hover:underline">
+                Lihat semua
+              </Link>
+            }
+          />
+          {pjPreview.length === 0 ? (
+            <ListGroup>
+              <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+                Belum ada Pengurus PGM.
+                {canManagePj && (
+                  <>
+                    {' '}
+                    <Link to={`/schools/${id}/pj/undang`} className="font-medium text-primary">
+                      Undang pengurus pertama
+                    </Link>
+                  </>
+                )}
+              </div>
+            </ListGroup>
+          ) : (
+            <ListGroup>
+              {pjPreview.map((pj, i) => (
+                <div key={pj.id}>
+                  {i > 0 && <ListDivider />}
+                  <div className="flex items-center gap-3 px-4 py-4 md:px-5">
+                    <div className="min-w-0 flex-1">
+                      <Link to={`/users/${pj.id}`} className="font-medium hover:underline">
+                        {pj.name}
+                      </Link>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {[pj.email, pj.phone].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <WhatsAppButton phone={pj.phone} size="sm" />
+                  </div>
+                </div>
+              ))}
+            </ListGroup>
+          )}
+        </section>
 
         <Section title="Alamat & Lokasi">
           {canEditAddress ? (
@@ -151,168 +234,85 @@ export default function SchoolDetailPage() {
             </ListGroup>
           )}
         </Section>
-
-        <Section title="Pengurus PGM">
-          <div className="mb-3 flex items-center justify-between px-0.5">
-            <p className="text-xs text-muted-foreground">
-              {hasPj ? `${pjUsers.length} pengurus terdaftar` : 'Minimal 1 pengurus diperlukan'}
-            </p>
-            {canManagePj && (
-              <Button asChild size="sm" variant={hasPj ? 'outline' : 'default'} className="rounded-xl">
-                <Link to={`/schools/${id}/pj/undang`}>
-                  <UserPlus className="mr-1 h-4 w-4" />
-                  {hasPj ? 'Tambah pengurus' : 'Undang pengurus'}
-                </Link>
-              </Button>
-            )}
-          </div>
-
-          {!hasPj ? (
-            <ListGroup>
-              <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-                Belum ada Pengurus PGM.
-                {canManagePj && (
-                  <>
-                    {' '}
-                    <Link to={`/schools/${id}/pj/undang`} className="font-medium text-primary">
-                      Undang pengurus pertama
-                    </Link>
-                  </>
-                )}
-              </div>
-            </ListGroup>
-          ) : (
-            <ListGroup>
-              {pjUsers.map((pj, i) => (
-                <div key={pj.id}>
-                  {i > 0 && <ListDivider />}
-                  <div className="flex items-center gap-3 px-4 py-4 md:px-5">
-                    <div className="min-w-0 flex-1">
-                      <Link to={`/users/${pj.id}`} className="font-medium hover:underline">
-                        {pj.name}
-                      </Link>
-                      <p className="truncate text-sm text-muted-foreground">
-                        {[pj.email, pj.phone].filter(Boolean).join(' · ')}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <WhatsAppButton phone={pj.phone} size="sm" />
-                      {canManagePj && (
-                        <>
-                          <Button asChild size="sm" variant="outline" className="h-8 rounded-lg px-2.5 text-xs">
-                            <Link to={`/schools/${id}/pj/${pj.id}/ganti`}>Ganti</Link>
-                          </Button>
-                          {canRemovePj && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive"
-                              onClick={() => setPjToRemove({ id: pj.id, name: pj.name })}
-                              aria-label={`Hapus ${pj.name}`}
-                            >
-                              <UserMinus className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </ListGroup>
-          )}
-        </Section>
-
-        <section className="space-y-3">
-          <AppSectionHeader
-            title={`Kelompok (${school.totalGroups})`}
-            action={
-              canManageGroups ? (
-                <Button asChild size="sm" className="rounded-xl">
-                  <Link to={`/schools/${id}/kelompok/baru`} aria-label="Tambah kelompok">
-                    <Plus className="mr-1 h-4 w-4" />
-                    Tambah kelompok
-                  </Link>
-                </Button>
-              ) : undefined
-            }
-          />
-
-          {groups.length === 0 ? (
-            <ListGroup>
-              <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-                Belum ada kelompok pembinaan.
-                {canManageGroups && (
-                  <>
-                    {' '}
-                    <Link to={`/schools/${id}/kelompok/baru`} className="font-medium text-primary">
-                      Buat kelompok pertama
-                    </Link>
-                  </>
-                )}
-              </div>
-            </ListGroup>
-          ) : (
-            <ListGroup>
-              {groups.map((g, i) => (
-                <div key={g.id}>
-                  {i > 0 && <ListDivider />}
-                  <ListRow
-                    href={`/kelompok/${g.id}`}
-                    icon={Users}
-                    title={g.name}
-                    subtitle={`${getGenderLabel(g.gender)} · Pembina: ${g.pembina?.name ?? '-'} · ${g._count?.members ?? 0} anggota`}
-                    trailing={
-                      <AttendanceRate
-                        variant="group"
-                        rate={g.attendanceRate ?? null}
-                        totalHadir={g.totalHadir ?? 0}
-                        totalPekan={g.totalPekan ?? 0}
-                        totalSlots={g.totalSlots}
-                        className="hidden sm:flex"
-                      />
-                    }
-                  />
-                </div>
-              ))}
-            </ListGroup>
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <AppSectionHeader
-            title="Riwayat evaluasi PGM"
-            action={
-              <Link to={`/laporan?schoolId=${school.id}`} className="text-xs font-medium text-primary hover:underline">
-                Poster A4
-              </Link>
-            }
-          />
-          <EvaluationInfiniteList
-            queryKey={['evaluations', 'school', id]}
-            params={{ schoolId: id }}
-            compact
-            emptyTitle="Belum ada evaluasi"
-            emptyDescription="Evaluasi dari kelompok di PGM ini akan muncul di sini."
-          />
-        </section>
-
-        <ConfirmDialog
-          open={!!pjToRemove}
-          onOpenChange={(open) => !open && setPjToRemove(null)}
-          title="Hapus Pengurus PGM?"
-          description={
-            pjToRemove
-              ? `${pjToRemove.name} akan dihapus dari PGM ini. Akun user tetap ada, hanya keterkaitan dengan PGM yang dilepas.`
-              : ''
-          }
-          confirmLabel="Hapus"
-          cancelLabel="Batal"
-          destructive
-          onConfirm={handleRemovePj}
-        />
       </PageContainer>
     </RoleGuard>
+  );
+}
+
+function GroupSection({
+  schoolId,
+  title,
+  gender,
+  groups,
+  canManage,
+}: {
+  schoolId: string;
+  title: string;
+  gender: 'IKHWAN' | 'AKHWAT';
+  groups: GroupItem[];
+  canManage: boolean;
+}) {
+  const theme = getGroupGenderTheme(gender);
+  const noun = gender === 'AKHWAT' ? 'akhwat' : 'ikhwan';
+
+  return (
+    <section className="space-y-3">
+      <AppSectionHeader
+        title={`${title} (${groups.length})`}
+        action={
+          canManage ? (
+            <Button asChild size="sm" className={cn('rounded-xl', theme.primaryButton)}>
+              <Link to={`/schools/${schoolId}/kelompok/baru?gender=${gender}`} aria-label={`Tambah kelompok ${noun}`}>
+                <Plus className="mr-1 h-4 w-4" />
+                Tambah kelompok
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
+
+      {groups.length === 0 ? (
+        <ListGroup className={theme.card}>
+          <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+            Belum ada kelompok {noun}.
+            {canManage && (
+              <>
+                {' '}
+                <Link
+                  to={`/schools/${schoolId}/kelompok/baru?gender=${gender}`}
+                  className={cn('font-medium', theme.inlineLink)}
+                >
+                  Buat kelompok {noun} pertama
+                </Link>
+              </>
+            )}
+          </div>
+        </ListGroup>
+      ) : (
+        <ListGroup className={theme.card}>
+          {groups.map((group, i) => (
+            <div key={group.id}>
+              {i > 0 && <ListDivider />}
+              <ListRow
+                href={`/kelompok/${group.id}`}
+                icon={Users}
+                title={group.name}
+                subtitle={`Pembina: ${group.pembina?.name ?? '-'} · ${group._count?.members ?? 0} anggota`}
+                trailing={
+                  <AttendanceRate
+                    variant="group"
+                    rate={group.attendanceRate ?? null}
+                    totalHadir={group.totalHadir ?? 0}
+                    totalPekan={group.totalPekan ?? 0}
+                    totalSlots={group.totalSlots}
+                    className="hidden sm:flex"
+                  />
+                }
+              />
+            </div>
+          ))}
+        </ListGroup>
+      )}
+    </section>
   );
 }

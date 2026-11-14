@@ -14,7 +14,7 @@ const PAGE_SIZE = 20;
 
 type EvaluationInfiniteListProps = {
   queryKey: (string | undefined)[];
-  params?: { groupId?: string; schoolId?: string };
+  params?: { groupId?: string; schoolId?: string; weekDate?: string };
   emptyTitle?: string;
   emptyDescription?: string;
   showGroupName?: boolean;
@@ -39,7 +39,7 @@ export function EvaluationInfiniteList({
     hasNextPage,
     fetchNextPage,
   } = useInfiniteQuery({
-    queryKey: [...queryKey, params?.groupId, params?.schoolId],
+    queryKey: [...queryKey, params?.groupId, params?.schoolId, params?.weekDate],
     queryFn: async ({ pageParam }) => {
       const res = await api.get<ApiResponse<EvaluationItem[]>>('/evaluations', {
         params: {
@@ -47,6 +47,7 @@ export function EvaluationInfiniteList({
           limit: PAGE_SIZE,
           ...(params?.groupId ? { groupId: params.groupId } : {}),
           ...(params?.schoolId ? { schoolId: params.schoolId } : {}),
+          ...(params?.weekDate ? { weekDate: params.weekDate } : {}),
         },
       });
       return {

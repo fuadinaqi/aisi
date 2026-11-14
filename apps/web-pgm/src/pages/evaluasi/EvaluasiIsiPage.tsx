@@ -445,7 +445,7 @@ export default function IsiEvaluasiPage() {
               <div className="space-y-2">
                 <Label>Foto agenda liqo</Label>
                 <p className="text-xs text-muted-foreground">
-                  Wajib 1 foto saat evaluasi dikirim. Foto dipotong persegi supaya rapi di poster laporan, dan bisa diganti kapan saja.
+                  Wajib 1 foto saat evaluasi dikirim. Hasilnya tetap persegi. Foto yang tidak persegi ditampilkan utuh dengan latar hitam, dan bisa diganti kapan saja.
                 </p>
                 <input
                   ref={fileRef}
@@ -458,7 +458,7 @@ export default function IsiEvaluasiPage() {
                   <img
                     src={photoPreview || existingPhotoUrl || ''}
                     alt="Foto agenda liqo"
-                    className="mx-auto aspect-square w-full max-w-xs rounded-2xl bg-muted object-contain"
+                    className="mx-auto aspect-square w-full max-w-xs rounded-2xl bg-black object-contain"
                   />
                 ) : (
                   <button

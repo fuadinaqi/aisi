@@ -41,7 +41,7 @@ export function PjSekolahForm({ replace = false, replaceUserId, replaceUserName 
     await invalidateSchoolQueries(queryClient, id);
     await invalidateInvitationQueries(queryClient);
     toastSuccess(message);
-    navigate(`/schools/${id}`);
+    navigate(`/schools/${id}/pengurus`);
   };
 
   const submitExisting = async () => {
@@ -78,7 +78,7 @@ export function PjSekolahForm({ replace = false, replaceUserId, replaceUserName 
           compact
           action={
             <Button asChild variant="ghost" size="sm" className="rounded-xl">
-              <Link to={`/schools/${id}`}>
+              <Link to={`/schools/${id}/pengurus`}>
                 <ArrowLeft className="mr-1 h-4 w-4" />
                 Kembali
               </Link>
@@ -183,7 +183,7 @@ export function PjSekolahForm({ replace = false, replaceUserId, replaceUserName 
                 });
                 await invalidateSchoolQueries(queryClient, id);
                 await invalidateInvitationQueries(queryClient);
-                navigate(`/schools/${id}`);
+                navigate(`/schools/${id}/pengurus`);
               }}
             />
           )}

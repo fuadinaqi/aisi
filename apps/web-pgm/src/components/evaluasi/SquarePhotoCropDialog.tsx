@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Expand, Minus, Plus, Shrink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   MAX_ZOOM,
-  MIN_ZOOM,
   clampOffset,
+  coverView,
   displayedSize,
   fileFromSquareCrop,
+  fitView,
   initialCropView,
+  minZoom,
   resizeCrop,
   zoomAround,
   type CropView,
@@ -134,6 +136,10 @@ export function SquarePhotoCropDialog({ file, onCancel, onConfirm }: SquarePhoto
   }, [status, loaded]);
 
   const display = view ? displayedSize(view) : null;
+  const zoomFloor = view ? minZoom(view) : 1;
+  const alreadySquare = Math.abs(zoomFloor - 1) < 0.02;
+  const fitActive = !!view && view.zoom <= zoomFloor + 0.02;
+  const coverActive = !!view && Math.abs(view.zoom - 1) < 0.02;
 
   const pointInFrame = (clientX: number, clientY: number) => {
     const rect = frameRef.current?.getBoundingClientRect();
@@ -232,16 +238,16 @@ export function SquarePhotoCropDialog({ file, onCancel, onConfirm }: SquarePhoto
       >
         <div className="space-y-1">
           <h2 id="square-crop-title" className="text-lg font-semibold">
-            Potong jadi persegi
+            Atur foto persegi
           </h2>
           <p className="text-sm text-muted-foreground">
-            Geser foto dan atur perbesaran. Kotak ini yang tersimpan untuk poster laporan.
+            Foto ditampilkan utuh dengan latar hitam. Perbesar atau geser jika ingin memotong.
           </p>
         </div>
 
         <div
           ref={frameRef}
-          className="relative mt-4 aspect-square w-full cursor-grab touch-none overflow-hidden rounded-lg bg-muted active:cursor-grabbing"
+          className="relative mt-4 aspect-square w-full cursor-grab touch-none overflow-hidden rounded-lg bg-black active:cursor-grabbing"
           aria-label="Area geser foto"
           role="group"
           onPointerDown={onPointerDown}
@@ -277,18 +283,45 @@ export function SquarePhotoCropDialog({ file, onCancel, onConfirm }: SquarePhoto
             <div className="absolute bottom-2 right-2 h-5 w-5 border-b-2 border-r-2 border-white" />
           </div>
           {status === 'loading' && (
-            <p className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">Memuat foto...</p>
+            <p className="absolute inset-0 flex items-center justify-center text-sm text-white/80">Memuat foto...</p>
           )}
         </div>
+
+        {!alreadySquare && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={fitActive ? 'default' : 'outline'}
+              className="rounded-xl"
+              disabled={!view || status !== 'ready'}
+              aria-pressed={fitActive}
+              onClick={() => updateView(fitView)}
+            >
+              <Shrink className="mr-1.5 h-4 w-4" />
+              Tampilkan utuh
+            </Button>
+            <Button
+              type="button"
+              variant={coverActive ? 'default' : 'outline'}
+              className="rounded-xl"
+              disabled={!view || status !== 'ready'}
+              aria-pressed={coverActive}
+              onClick={() => updateView(coverView)}
+            >
+              <Expand className="mr-1.5 h-4 w-4" />
+              Penuhi kotak
+            </Button>
+          </div>
+        )}
 
         <div className="mt-3 flex items-center gap-3">
           <Minus className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
             type="range"
-            min={MIN_ZOOM}
+            min={zoomFloor}
             max={MAX_ZOOM}
             step={0.01}
-            value={view?.zoom ?? MIN_ZOOM}
+            value={view?.zoom ?? zoomFloor}
             aria-label="Perbesar"
             disabled={!view || status !== 'ready'}
             className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed"

@@ -1,5 +1,6 @@
-export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 4;
+
+export type CropMode = 'fit' | 'cover';
 
 export type CropView = {
   crop: number;
@@ -21,6 +22,14 @@ export function coverScale(view: Pick<CropView, 'crop' | 'naturalWidth' | 'natur
   return view.crop / short;
 }
 
+/** Zoom that fits the whole photo inside the square. 1 means the square is fully covered. */
+export function minZoom(view: Pick<CropView, 'naturalWidth' | 'naturalHeight'>) {
+  const long = Math.max(view.naturalWidth, view.naturalHeight);
+  const short = Math.min(view.naturalWidth, view.naturalHeight);
+  if (long <= 0 || short <= 0) return 1;
+  return short / long;
+}
+
 export function displayedSize(view: CropView) {
   const scale = coverScale(view) * view.zoom;
   return {
@@ -33,13 +42,38 @@ export function displayedSize(view: CropView) {
 export function clampOffset(view: CropView): Pick<CropView, 'offsetX' | 'offsetY'> {
   const { width, height } = displayedSize(view);
   return {
-    offsetX: clamp(view.offsetX, Math.min(view.crop - width, 0), 0),
-    offsetY: clamp(view.offsetY, Math.min(view.crop - height, 0), 0),
+    offsetX: clamp(view.offsetX, Math.min(view.crop - width, 0), Math.max(view.crop - width, 0)),
+    offsetY: clamp(view.offsetY, Math.min(view.crop - height, 0), Math.max(view.crop - height, 0)),
   };
 }
 
-export function initialCropView(crop: number, naturalWidth: number, naturalHeight: number): CropView {
-  const view: CropView = {
+function centered(view: CropView): CropView {
+  const { width, height } = displayedSize(view);
+  const next: CropView = {
+    ...view,
+    offsetX: (view.crop - width) / 2,
+    offsetY: (view.crop - height) / 2,
+  };
+  return { ...next, ...clampOffset(next) };
+}
+
+/** Whole photo inside the square, leftover area stays empty. */
+export function fitView(view: CropView): CropView {
+  return centered({ ...view, zoom: minZoom(view) });
+}
+
+/** Photo fills the square; the overflow is cropped. */
+export function coverView(view: CropView): CropView {
+  return centered({ ...view, zoom: 1 });
+}
+
+export function initialCropView(
+  crop: number,
+  naturalWidth: number,
+  naturalHeight: number,
+  mode: CropMode = 'fit',
+): CropView {
+  const base: CropView = {
     crop: Math.max(crop, 1),
     naturalWidth,
     naturalHeight,
@@ -47,10 +81,7 @@ export function initialCropView(crop: number, naturalWidth: number, naturalHeigh
     offsetX: 0,
     offsetY: 0,
   };
-  const { width, height } = displayedSize(view);
-  view.offsetX = (view.crop - width) / 2;
-  view.offsetY = (view.crop - height) / 2;
-  return { ...view, ...clampOffset(view) };
+  return mode === 'cover' ? coverView(base) : fitView(base);
 }
 
 export function resizeCrop(view: CropView, nextCrop: number): CropView {
@@ -65,9 +96,9 @@ export function resizeCrop(view: CropView, nextCrop: number): CropView {
   return { ...next, ...clampOffset(next) };
 }
 
-/** Zoom while keeping the image point under the anchor fixed, then keep the square covered. */
+/** Zoom while keeping the image point under the anchor fixed. */
 export function zoomAround(view: CropView, nextZoom: number, anchorX: number, anchorY: number): CropView {
-  const zoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+  const zoom = clamp(nextZoom, minZoom(view), MAX_ZOOM);
   const prev = displayedSize(view);
   if (prev.width <= 0 || prev.height <= 0) return { ...view, zoom };
   const nextScale = coverScale(view) * zoom;
@@ -82,31 +113,20 @@ export function zoomAround(view: CropView, nextZoom: number, anchorX: number, an
   return { ...next, ...clampOffset(next) };
 }
 
-/** Source square in original image pixels. */
-export function sourceSquare(view: CropView): { sx: number; sy: number; size: number } {
-  const { scale } = displayedSize(view);
-  const maxSize = Math.min(view.naturalWidth, view.naturalHeight);
-  let size = scale > 0 ? view.crop / scale : maxSize;
-  if (!Number.isFinite(size) || size <= 0) size = maxSize;
-  size = Math.min(size, maxSize);
-  const sx = clamp(-view.offsetX / (scale || 1), 0, Math.max(0, view.naturalWidth - size));
-  const sy = clamp(-view.offsetY / (scale || 1), 0, Math.max(0, view.naturalHeight - size));
-  return { sx, sy, size };
-}
-
 export async function fileFromSquareCrop(image: CanvasImageSource, view: CropView, fileName: string): Promise<File> {
-  const { sx, sy, size } = sourceSquare(view);
-  const output = Math.max(1, Math.min(1600, Math.round(size)));
+  const { scale, width, height } = displayedSize(view);
+  const output = Math.max(1, Math.min(1600, Math.round(scale > 0 ? view.crop / scale : view.crop)));
   const canvas = document.createElement('canvas');
   canvas.width = output;
   canvas.height = output;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Gagal memotong foto');
-  ctx.fillStyle = '#ffffff';
+  const ratio = view.crop > 0 ? output / view.crop : 1;
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, output, output);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(image, sx, sy, size, size, 0, 0, output, output);
+  ctx.drawImage(image, view.offsetX * ratio, view.offsetY * ratio, width * ratio, height * ratio);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
   if (!blob) throw new Error('Gagal memotong foto');
   const base = fileName.replace(/\.[^.]+$/, '') || 'foto';

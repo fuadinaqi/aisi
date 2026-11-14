@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { getPrimaryRole } from '@/lib/utils';
+import { getDefaultActiveRole } from '@/lib/utils';
 import { setSentryUser } from '@/lib/sentry';
 
 export interface AuthUser {
@@ -27,7 +27,7 @@ interface AuthState {
 
 function resolveActiveRole(roles: string[], current: string | null): string {
   if (current && roles.includes(current)) return current;
-  return getPrimaryRole(roles);
+  return getDefaultActiveRole(roles);
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -38,7 +38,7 @@ export const useAuthStore = create<AuthState>()(
       activeRole: null,
       setAuth: (user, token) => {
         localStorage.setItem('accessToken', token);
-        const activeRole = resolveActiveRole(user.roles, get().activeRole);
+        const activeRole = getDefaultActiveRole(user.roles);
         setSentryUser({ id: user.id, email: user.email, name: user.name });
         set({ user, accessToken: token, activeRole });
       },

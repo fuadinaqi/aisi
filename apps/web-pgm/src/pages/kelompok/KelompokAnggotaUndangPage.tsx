@@ -59,7 +59,7 @@ export default function UndangAnggotaPage() {
   return (
     <PageContainer tight className="max-w-lg">
       <PageHeader
-        title="Undang anggota"
+        title="Tambah anggota"
         compact
         action={
           <Button asChild variant="ghost" size="sm" className="rounded-xl">
@@ -106,7 +106,7 @@ export default function UndangAnggotaPage() {
                 setError('');
               }}
             />
-            <span className="text-sm">Undang anggota baru</span>
+            <span className="text-sm">Anggota baru</span>
           </label>
         </div>
 
