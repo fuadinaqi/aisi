@@ -20,8 +20,10 @@ interface AnalyticsOverview {
   totalPembina: number;
   totalAnggota: number;
   submissionRate: number;
+  submissionRateLastWeek?: number;
   evaluationsThisWeek?: number;
-  attendanceTrend?: { week: string; rate: number }[];
+  evaluationsLastWeek?: number;
+  attendanceTrend?: { week: string; rate: number | null }[];
   genderBreakdown?: GenderBreakdown;
   levelBreakdown?: LevelBreakdown;
   levelGenderBreakdown?: LevelGenderBreakdown;
@@ -63,7 +65,12 @@ export default function AnalyticsPage() {
                 <StatCard icon={LayoutGrid} label="Kelompok aktif" value={data.totalGroups} />
                 <StatCard icon={Users} label="Pembina" value={data.totalPembina} />
                 <StatCard icon={Users} label="Anggota" value={data.totalAnggota} />
-                <StatCard icon={ClipboardList} label="Submit rate" value={`${data.submissionRate}%`} />
+                <StatCard
+                  icon={ClipboardList}
+                  label="Laporan pekan lalu"
+                  value={`${data.submissionRateLastWeek ?? 0}%`}
+                  sub={`Pekan ini ${data.submissionRate}%`}
+                />
               </div>
 
               {data.genderBreakdown && <GenderBreakdownPanel data={data.genderBreakdown} />}
@@ -76,7 +83,7 @@ export default function AnalyticsPage() {
 
               {isPj && (
                 <p className="px-0.5 text-sm text-muted-foreground">
-                  {data.evaluationsThisWeek ?? 0} evaluasi terkirim pekan ini
+                  {data.evaluationsLastWeek ?? 0} kelompok melapor pekan lalu · {data.evaluationsThisWeek ?? 0} pekan ini
                 </p>
               )}
 
@@ -92,11 +99,14 @@ export default function AnalyticsPage() {
                           new Date(v).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
                         }
                       />
-                      <YAxis />
+                      <YAxis domain={[0, 100]} />
                       <Tooltip />
                       <Bar dataKey="rate" fill="hsl(218, 42%, 38%)" name="Kehadiran %" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Pekan tanpa batang berarti belum ada laporan pada pekan itu.
+                  </p>
                 </ListGroup>
               )}
             </div>

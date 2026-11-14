@@ -29,6 +29,7 @@ import {
   MetricStrip,
   QuickActionGrid,
 } from '@/components/layout/AppUI';
+import { attentionSummary, fetchLiqo } from '@/lib/liqo';
 import type { GroupItem, OverviewData } from '@/lib/types';
 
 function getQuickActions(role: string) {
@@ -54,10 +55,10 @@ function getQuickActions(role: string) {
 
   if (role === 'PJ_SEKOLAH') {
     return [
+      { href: '/liqo', label: 'Liqo', icon: ClipboardList },
       { href: '/schools', label: 'PGM', icon: School },
-      { href: '/analytics', label: 'Analitik', icon: BarChart3 },
       { href: '/pembina', label: 'Pembina', icon: Users },
-      { href: '/events', label: 'Agenda', icon: Calendar },
+      { href: '/analytics', label: 'Analitik', icon: BarChart3 },
     ];
   }
 
@@ -87,6 +88,12 @@ export default function DashboardPage() {
   const role = useActiveRole() || 'ANGGOTA';
   const { totalPoints, showPoints } = useMyPoints();
   const quickActions = getQuickActions(role);
+
+  const { data: liqo } = useQuery({
+    queryKey: ['analytics', 'liqo', role],
+    queryFn: () => fetchLiqo(),
+    enabled: !!user && role === 'PJ_SEKOLAH',
+  });
 
   const { data: overview, isLoading } = useQuery<OverviewData | null>({
     queryKey: ['analytics', role],
@@ -156,9 +163,9 @@ export default function DashboardPage() {
               { label: 'Kelompok', value: overview.totalGroups ?? 0 },
               { label: 'Anggota', value: overview.totalAnggota ?? 0 },
               {
-                label: 'Evaluasi',
-                value: `${overview.submissionRate ?? 0}%`,
-                sub: `${overview.evaluationsThisWeek ?? 0} pekan ini`,
+                label: 'Liqo pekan lalu',
+                value: `${overview.submissionRateLastWeek ?? 0}%`,
+                sub: `pekan ini ${overview.submissionRate ?? 0}%`,
               },
             ]}
           />
@@ -188,6 +195,13 @@ export default function DashboardPage() {
         <section className="space-y-3">
           <AppSectionHeader title="Kelola PGM" />
           <ListGroup>
+            <ListRow
+              href="/liqo"
+              icon={ClipboardList}
+              title="Liqo pekanan"
+              subtitle={liqo ? attentionSummary(liqo) : 'Status laporan kelompok'}
+            />
+            <ListDivider />
             <ListRow href="/schools" icon={School} title="PGM saya" subtitle="Lihat pembina & kelompok" />
             <ListDivider />
             <ListRow href="/pembina" icon={Users} title="Daftar pembina" subtitle="Pembina di PGM Anda" />

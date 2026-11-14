@@ -39,6 +39,7 @@ import MateriEditPage from '@/pages/materi/MateriEditPage';
 import MateriDetailPage from '@/pages/materi/MateriDetailPage';
 import LaporanKegiatanPage from '@/pages/laporan/LaporanKegiatanPage';
 import EvaluasiPage from '@/pages/evaluasi/EvaluasiPage';
+import LiqoPage from '@/pages/liqo/LiqoPage';
 import EvaluasiIsiPage from '@/pages/evaluasi/EvaluasiIsiPage';
 import EvaluasiDetailPage from '@/pages/evaluasi/EvaluasiDetailPage';
 import MutabaahPage from '@/pages/mutabaah/MutabaahPage';
@@ -106,6 +107,7 @@ export default function App() {
           <Route path="/materi/:id" element={<MateriDetailPage />} />
           <Route path="/laporan" element={<LaporanKegiatanPage />} />
           <Route path="/evaluasi" element={<EvaluasiPage />} />
+          <Route path="/liqo" element={<LiqoPage />} />
           <Route
             path="/evaluasi/isi"
             element={

@@ -16,6 +16,7 @@ func Routes(db *pgxpool.Pool, c config.Config) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequireAuth(c))
 	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Get("/overview", overview(db))
+	r.With(middleware.RequireRole("SUPERADMIN", "ADMIN", "PJ_SEKOLAH")).Get("/liqo", serveLiqo(db))
 	r.Get("/school/{id}", school(db))
 	r.Get("/group/{id}", group(db))
 	return r
@@ -30,7 +31,9 @@ func has(a []string, v string) bool {
 }
 func monday() time.Time {
 	n := time.Now().In(time.FixedZone("WIB", 7*3600))
-	return n.AddDate(0, 0, -(int(n.Weekday())+6)%7).Truncate(24 * time.Hour)
+	d := (int(n.Weekday()) + 6) % 7
+	y, m, day := n.Date()
+	return time.Date(y, m, day-d, 0, 0, 0, 0, n.Location())
 }
 func accessibleSchool(db *pgxpool.Pool, r *http.Request, school string) bool {
 	c, _ := middleware.Claims(r)
@@ -64,7 +67,7 @@ func overview(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ids, city := scope(db, r)
 		if !city && len(ids) == 0 {
-			httpx.Success(w, 200, map[string]any{"scope": "school", "totalSchools": 0, "totalGroups": 0, "totalPembina": 0, "totalAnggota": 0, "submissionRate": 0, "evaluationsThisWeek": 0, "attendanceTrend": []any{}, "genderBreakdown": emptyBreakdown(), "levelBreakdown": emptyLevel(), "levelGenderBreakdown": emptyLevelGender(), "topSchools": []any{}}, "")
+			httpx.Success(w, 200, map[string]any{"scope": "school", "totalSchools": 0, "totalGroups": 0, "totalPembina": 0, "totalAnggota": 0, "submissionRate": 0, "evaluationsThisWeek": 0, "submissionRateLastWeek": 0, "evaluationsLastWeek": 0, "attendanceTrend": []any{}, "genderBreakdown": emptyBreakdown(), "levelBreakdown": emptyLevel(), "levelGenderBreakdown": emptyLevelGender(), "topSchools": []any{}}, "")
 			return
 		}
 		where, args := `g."isActive"`, []any{}
@@ -72,13 +75,16 @@ func overview(db *pgxpool.Pool) http.HandlerFunc {
 			where += ` AND g."schoolId"=ANY($1)`
 			args = append(args, ids)
 		}
-		var groups, pembina, members, submitted int
+		var groups, pembina, members, submitted, submittedPrev int
+		this := monday()
 		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "Group" g WHERE `+where, args...).Scan(&groups)
 		_ = db.QueryRow(r.Context(), `SELECT count(DISTINCT g."pembinaId") FROM "Group" g WHERE `+where, args...).Scan(&pembina)
 		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "GroupMember" gm JOIN "Group" g ON g."id"=gm."groupId" WHERE gm."isActive" AND `+where, args...).Scan(&members)
-		a := append(append([]any{}, args...), monday())
+		a := append(append([]any{}, args...), this)
 		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE e."isSubmitted" AND e."weekDate"=$`+itoa(len(a))+` AND `+where, a...).Scan(&submitted)
-		data := map[string]any{"scope": map[bool]string{true: "city", false: "school"}[city], "totalGroups": groups, "totalPembina": pembina, "totalAnggota": members, "evaluationsThisWeek": submitted, "submissionRate": rate(submitted, groups), "attendanceTrend": trend(db, r, ids, city), "genderBreakdown": gender(db, r, ids, city), "levelBreakdown": level(db, r, ids, city), "levelGenderBreakdown": levelGender(db, r, ids, city), "topSchools": []any{}}
+		aPrev := append(append([]any{}, args...), this.AddDate(0, 0, -7))
+		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE e."isSubmitted" AND e."weekDate"=$`+itoa(len(aPrev))+` AND `+where, aPrev...).Scan(&submittedPrev)
+		data := map[string]any{"scope": map[bool]string{true: "city", false: "school"}[city], "totalGroups": groups, "totalPembina": pembina, "totalAnggota": members, "evaluationsThisWeek": submitted, "submissionRate": rate(submitted, groups), "evaluationsLastWeek": submittedPrev, "submissionRateLastWeek": rate(submittedPrev, groups), "attendanceTrend": trend(db, r, ids, city), "genderBreakdown": gender(db, r, ids, city), "levelBreakdown": level(db, r, ids, city), "levelGenderBreakdown": levelGender(db, r, ids, city), "topSchools": []any{}}
 		if city {
 			var schools int
 			_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "School" WHERE "isActive"`).Scan(&schools)
@@ -164,20 +170,31 @@ func emptyLevelGender() map[string]any {
 }
 func trend(db *pgxpool.Pool, r *http.Request, ids []string, city bool) []map[string]any {
 	q, a := condition(ids, city)
-	start := monday().AddDate(0, 0, -56)
-	a = append(a, start)
-	rows, e := db.Query(r.Context(), `SELECT e."weekDate",ROUND(count(*) FILTER(WHERE ea."status"='HADIR')::numeric/NULLIF(count(ea."id"),0)*100,1) FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" LEFT JOIN "EvaluationAttendance" ea ON ea."evaluationId"=e."id" WHERE e."isSubmitted" AND e."weekDate">=$`+itoa(len(a))+` AND `+q+` GROUP BY e."weekDate" ORDER BY e."weekDate" LIMIT 8`, a...)
+	this := monday()
+	idx := itoa(len(a) + 1)
+	a = append(a, this.Format("2006-01-02"))
+	rows, e := db.Query(r.Context(), `SELECT (($`+idx+`::date - e."weekDate"::date) / 7)::int, ROUND(count(*) FILTER (WHERE ea."status"='HADIR')::numeric/NULLIF(count(ea."id"),0)*100,1) FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" LEFT JOIN "EvaluationAttendance" ea ON ea."evaluationId"=e."id" WHERE e."isSubmitted" AND e."weekDate">=$`+idx+`::date::timestamp - interval '49 days' AND e."weekDate"<=$`+idx+`::date::timestamp AND `+q+` GROUP BY 1`, a...)
 	if e != nil {
 		return []map[string]any{}
 	}
 	defer rows.Close()
-	out := []map[string]any{}
+	byAgo := map[int]float64{}
+	found := map[int]bool{}
 	for rows.Next() {
-		var week time.Time
+		var ago int
 		var value *float64
-		if rows.Scan(&week, &value) == nil {
-			out = append(out, map[string]any{"week": week, "rate": value})
+		if rows.Scan(&ago, &value) == nil && ago >= 0 && ago < 8 && value != nil {
+			byAgo[ago] = *value
+			found[ago] = true
 		}
+	}
+	out := make([]map[string]any, 0, 8)
+	for ago := 7; ago >= 0; ago-- {
+		item := map[string]any{"week": this.AddDate(0, 0, -7*ago).Format("2006-01-02"), "rate": nil}
+		if found[ago] {
+			item["rate"] = byAgo[ago]
+		}
+		out = append(out, item)
 	}
 	return out
 }
@@ -209,11 +226,14 @@ func school(db *pgxpool.Pool) http.HandlerFunc {
 			httpx.Error(w, 403, "Akses ditolak")
 			return
 		}
-		var g, m, s int
+		var g, pembina, m, submitted, submittedPrev int
+		this := monday()
 		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "Group" WHERE "schoolId"=$1 AND "isActive"`, id).Scan(&g)
+		_ = db.QueryRow(r.Context(), `SELECT count(DISTINCT "pembinaId") FROM "Group" WHERE "schoolId"=$1 AND "isActive"`, id).Scan(&pembina)
 		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "GroupMember" gm JOIN "Group" g ON g."id"=gm."groupId" WHERE g."schoolId"=$1 AND g."isActive" AND gm."isActive"`, id).Scan(&m)
-		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE g."schoolId"=$1 AND e."weekDate"=$2 AND e."isSubmitted"`, id, monday()).Scan(&s)
-		httpx.Success(w, 200, map[string]any{"totalGroups": g, "totalPembina": g, "totalAnggota": m, "submissionRate": rate(s, g)}, "")
+		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE g."schoolId"=$1 AND e."weekDate"=$2 AND e."isSubmitted"`, id, this).Scan(&submitted)
+		_ = db.QueryRow(r.Context(), `SELECT count(*) FROM "WeeklyEvaluation" e JOIN "Group" g ON g."id"=e."groupId" WHERE g."schoolId"=$1 AND e."weekDate"=$2 AND e."isSubmitted"`, id, this.AddDate(0, 0, -7)).Scan(&submittedPrev)
+		httpx.Success(w, 200, map[string]any{"totalGroups": g, "totalPembina": pembina, "totalAnggota": m, "submissionRate": rate(submitted, g), "evaluationsThisWeek": submitted, "submissionRateLastWeek": rate(submittedPrev, g), "evaluationsLastWeek": submittedPrev}, "")
 	}
 }
 func group(db *pgxpool.Pool) http.HandlerFunc {

@@ -40,6 +40,7 @@ type NavItem = {
 const navByRole: Record<string, NavItem[]> = {
   SUPERADMIN: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
+    { href: '/liqo', label: 'Liqo', icon: ClipboardList },
     { href: '/schools', label: 'PGM', icon: School },
     { href: '/laporan', label: 'Laporan', icon: Images },
     { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
@@ -55,6 +56,7 @@ const navByRole: Record<string, NavItem[]> = {
   ],
   ADMIN: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
+    { href: '/liqo', label: 'Liqo', icon: ClipboardList },
     { href: '/schools', label: 'PGM', icon: School },
     { href: '/laporan', label: 'Laporan', icon: Images },
     { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
@@ -68,6 +70,7 @@ const navByRole: Record<string, NavItem[]> = {
   ],
   PJ_SEKOLAH: [
     { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
+    { href: '/liqo', label: 'Liqo', icon: ClipboardList },
     { href: '/schools', label: 'PGM', icon: School },
     { href: '/laporan', label: 'Laporan', icon: Images },
     { href: '/kebutuhan-mentor', label: 'Kebutuhan Mentor', icon: UserPlus },
@@ -104,7 +107,7 @@ const navByRole: Record<string, NavItem[]> = {
 const mobilePrimaryByRole: Record<string, string[]> = {
   SUPERADMIN: ['/dashboard', '/schools', '/notifications', '/profile'],
   ADMIN: ['/dashboard', '/schools', '/notifications', '/profile'],
-  PJ_SEKOLAH: ['/dashboard', '/schools', '/notifications', '/profile'],
+  PJ_SEKOLAH: ['/dashboard', '/liqo', '/schools', '/profile'],
   PEMBINA: ['/dashboard', '/evaluasi', '/notifications', '/profile'],
   ANGGOTA: ['/dashboard', '/mutabaah', '/notifications', '/profile'],
 };

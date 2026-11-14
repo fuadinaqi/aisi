@@ -114,6 +114,12 @@ export default function SchoolDetailPage() {
             action={
               <div className="flex items-center gap-3">
                 <Link
+                  to={`/liqo?schoolId=${school.id}`}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Papan liqo
+                </Link>
+                <Link
                   to={`/laporan?schoolId=${school.id}`}
                   className="text-xs font-medium text-primary hover:underline"
                 >

@@ -65,6 +65,8 @@ export interface OverviewData {
   totalAnggota: number;
   submissionRate: number;
   evaluationsThisWeek: number;
+  submissionRateLastWeek?: number;
+  evaluationsLastWeek?: number;
   genderBreakdown?: GenderBreakdown;
   levelBreakdown?: LevelBreakdown;
   levelGenderBreakdown?: LevelGenderBreakdown;
